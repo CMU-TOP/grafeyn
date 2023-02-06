@@ -5,7 +5,7 @@ val circuit: Circuit.t =
     open Circuit
   in
     Seq.map Seq.fromList (Seq.fromList
-      [[(0, Hadamard)], [(1, Hadamard)], [(2, Hadamard)], [(3, Hadamard)]])
+      [[Hadamard 0], [Hadamard 1], [Hadamard 2], [Hadamard 3]])
   end
 
 val result = Circuit.simulate {numQubits = 4} circuit

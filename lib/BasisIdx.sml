@@ -40,8 +40,9 @@ struct
 
   fun toString {numQubits} bidx =
     "|"
-    ^ CharVector.tabulate (numQubits, fn i => if get bidx i then #"1" else #"0")
-    ^ ">"
+    ^
+    CharVector.tabulate (numQubits, fn i =>
+      if get bidx (numQubits - i - 1) then #"1" else #"0") ^ ">"
 
   fun compare (bidx1: t, bidx2: t) = Word64.compare (bidx1, bidx2)
 end

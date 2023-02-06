@@ -1,19 +1,20 @@
 structure Circuit =
 struct
 
-  datatype gate = PauliY | Hadamard
-
   type qubit_idx = int
-  type circuit_layer = (qubit_idx * gate) Seq.t
+
+  datatype gate = PauliY of qubit_idx | Hadamard of qubit_idx
+
+  type circuit_layer = gate Seq.t
   type circuit = circuit_layer Seq.t
   type t = circuit
 
   fun simulate {numQubits: int} circuit =
     let
-      fun applyGate state (qi, gate) =
+      fun applyGate state gate =
         case gate of
-          PauliY => SparseState.pauliy state qi
-        | Hadamard => SparseState.hadamard state qi
+          PauliY qi => SparseState.pauliy state qi
+        | Hadamard qi => SparseState.hadamard state qi
 
       fun dump state =
         print
