@@ -13,17 +13,12 @@ sig
   val empty: state
   val initial: state
 
-  val reportActive: state -> (BasisIdx.t * weight) Seq.t
+  val toSeq: state -> (BasisIdx.t * weight) Seq.t
+  val fromSeq: (BasisIdx.t * weight) Seq.t -> state
 
   (* combine duplicates, eliminate zeros *)
   val compact: state -> state
   val merge: state * state -> state
-
-  val pauliy: state -> qubit_idx -> state
-  val pauliz: state -> qubit_idx -> state
-  val hadamard: state -> qubit_idx -> state
-
-  val cx: state -> {control: qubit_idx, target: qubit_idx} -> state
 end =
 struct
 
@@ -131,77 +126,7 @@ struct
   fun compact state =
     Seq.filter (fn (_, w) => Complex.isNonZero w) (fromMap (toMap state))
 
-  fun reportActive state = compact state
-
-  (* ====================================================================== *)
-
-  fun pauliy state qi =
-    let
-      fun f (bidx, weight) =
-        let
-          val bidx' = BasisIdx.flip bidx qi
-          val multiplier =
-            if BasisIdx.get bidx qi then Complex.imag ~1.0 else Complex.imag 1.0
-          val weight' = Complex.* (weight, multiplier)
-        in
-          (bidx', weight')
-        end
-    in
-      Seq.map f state
-    end
-
-
-  fun pauliz state qi =
-    let
-      fun f (bidx, weight) =
-        let
-          val multiplier =
-            if BasisIdx.get bidx qi then Complex.real ~1.0 else Complex.real 1.0
-          val weight' = Complex.* (weight, multiplier)
-        in
-          (bidx, weight')
-        end
-    in
-      Seq.map f state
-    end
-
-
-  fun hadamard state qi =
-    let
-      fun f (bidx, weight) =
-        let
-          val bidx1 = bidx
-          val bidx2 = BasisIdx.flip bidx qi
-
-          val multiplier1 =
-            if BasisIdx.get bidx qi then
-              Complex.~ (Complex.real Constants.RECP_SQRT_2)
-            else
-              Complex.real Constants.RECP_SQRT_2
-
-          val multiplier2 = Complex.real Constants.RECP_SQRT_2
-
-          val weight1 = Complex.* (weight, multiplier1)
-          val weight2 = Complex.* (weight, multiplier2)
-        in
-          Seq.fromList [(bidx1, weight1), (bidx2, weight2)]
-        end
-    in
-      Seq.flatten (Seq.map f state)
-    end
-
-
-  fun cx state {control = ci, target = ti} =
-    let
-      fun f (bidx, weight) =
-        let
-          val bidx' =
-            if BasisIdx.get bidx ci then BasisIdx.flip bidx ti else bidx
-        in
-          (bidx', weight)
-        end
-    in
-      Seq.map f state
-    end
+  fun toSeq state = compact state
+  fun fromSeq elems = elems
 
 end

@@ -12,10 +12,12 @@ local
   Complex.sml
   BasisIdx.sml
   SparseState.sml
+  Gate.sml
   Circuit.sml
 in
   structure Complex
   structure BasisIdx
   structure SparseState
+  structure Gate
   structure Circuit
 end
