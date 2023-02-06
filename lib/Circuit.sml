@@ -14,9 +14,8 @@ struct
 
       fun doLayer (state, layer) =
         let
-          val result =
-            SparseState.compact (Seq.reduce SparseState.merge SparseState.empty
-              (Seq.map (fn g => Gate.apply g state) layer))
+          val result = SparseState.compact
+            (Seq.iterate (fn (state, g) => Gate.apply g state) state layer)
         in
           dump false result;
           result
