@@ -20,7 +20,10 @@ sig
   val merge: state * state -> state
 
   val pauliy: state -> qubit_idx -> state
+  val pauliz: state -> qubit_idx -> state
   val hadamard: state -> qubit_idx -> state
+
+  val cx: state -> {control: qubit_idx, target: qubit_idx} -> state
 end =
 struct
 
@@ -126,7 +129,7 @@ struct
     fromMap (BasisIdxMap.unionWith Complex.+ (toMap state1, toMap state2))
 
   fun compact state =
-    fromMap (toMap state)
+    Seq.filter (fn (_, w) => Complex.isNonZero w) (fromMap (toMap state))
 
   fun reportActive state = compact state
 
@@ -142,6 +145,21 @@ struct
           val weight' = Complex.* (weight, multiplier)
         in
           (bidx', weight')
+        end
+    in
+      Seq.map f state
+    end
+
+
+  fun pauliz state qi =
+    let
+      fun f (bidx, weight) =
+        let
+          val multiplier =
+            if BasisIdx.get bidx qi then Complex.real ~1.0 else Complex.real 1.0
+          val weight' = Complex.* (weight, multiplier)
+        in
+          (bidx, weight')
         end
     in
       Seq.map f state
@@ -170,6 +188,20 @@ struct
         end
     in
       Seq.flatten (Seq.map f state)
+    end
+
+
+  fun cx state {control = ci, target = ti} =
+    let
+      fun f (bidx, weight) =
+        let
+          val bidx' =
+            if BasisIdx.get bidx ci then BasisIdx.flip bidx ti else bidx
+        in
+          (bidx', weight)
+        end
+    in
+      Seq.map f state
     end
 
 end

@@ -7,6 +7,8 @@ sig
   val real: real -> t
   val imag: real -> t
 
+  val isNonZero: t -> bool
+
   val zero: t
   val i: t
 
@@ -21,6 +23,15 @@ struct
 
   fun toString (C {re, im}) =
     rtos re ^ " + " ^ rtos im ^ "i"
+
+  fun closeEnough (x, y) =
+    Real.abs (x - y) <= 0.000001
+
+  fun isZero (C {re, im}) =
+    closeEnough (re, 0.0) andalso closeEnough (im, 0.0)
+
+  fun isNonZero c =
+    not (isZero c)
 
   fun real r = C {re = r, im = 0.0}
   fun imag i = C {re = 0.0, im = i}
