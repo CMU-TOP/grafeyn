@@ -6,6 +6,7 @@ sig
     PauliY of qubit_idx
   | PauliZ of qubit_idx
   | Hadamard of qubit_idx
+  | T of qubit_idx
   | CX of {control: qubit_idx, target: qubit_idx}
 
   type t = gate
@@ -20,6 +21,7 @@ struct
     PauliY of qubit_idx
   | PauliZ of qubit_idx
   | Hadamard of qubit_idx
+  | T of qubit_idx
   | CX of {control: qubit_idx, target: qubit_idx}
 
   type t = gate
@@ -95,11 +97,32 @@ struct
     end
 
 
+  fun t state qi =
+    let
+      fun f (bidx, weight) =
+        let
+          val multiplier =
+            if BasisIdx.get bidx qi then
+              Complex.+
+                ( Complex.real Constants.RECP_SQRT_2
+                , Complex.imag Constants.RECP_SQRT_2
+                )
+            else
+              Complex.real 1.0
+        in
+          (bidx, Complex.* (weight, multiplier))
+        end
+    in
+      SparseState.fromSeq (Seq.map f (SparseState.toSeq state))
+    end
+
+
   fun apply gate state =
     case gate of
       PauliY qi => pauliy state qi
     | PauliZ qi => pauliz state qi
     | Hadamard qi => hadamard state qi
+    | T qi => t state qi
     | CX qis => cx state qis
 
 end

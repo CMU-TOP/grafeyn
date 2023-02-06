@@ -39,3 +39,18 @@ val test2 =
     print "\n";
     ()
   end
+
+
+val test3 =
+  let
+    val circuit = Seq.map Seq.fromList (Seq.fromList
+      [[Gate.Hadamard 0], [Gate.T 0], [Gate.T 0], [Gate.T 0], [Gate.T 0]])
+  in
+    print
+      ("=================================================================\n"
+       ^ "TEST 3\n"
+       ^ "=================================================================\n");
+    Circuit.simulate {numQubits = 1} circuit;
+    print "\n";
+    ()
+  end
