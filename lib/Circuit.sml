@@ -1,8 +1,7 @@
 structure Circuit =
 struct
 
-  type circuit_layer = Gate.t Seq.t
-  type circuit = circuit_layer Seq.t
+  type circuit = Gate.t Seq.t
   type t = circuit
 
   fun simulate {numQubits: int} circuit =
@@ -12,17 +11,13 @@ struct
         in print (front ^ SparseState.toString {numQubits = numQubits} state)
         end
 
-      fun doLayer (state, layer) =
-        let
-          val result = SparseState.compact
-            (Seq.iterate (fn (state, g) => Gate.apply g state) state layer)
-        in
-          dump false result;
-          result
+      fun doGate (state, gate) =
+        let val result = SparseState.compact (Gate.apply gate state)
+        in dump false result; result
         end
     in
       dump true SparseState.initial;
-      Seq.iterate doLayer SparseState.initial circuit
+      Seq.iterate doGate SparseState.initial circuit
     end
 
 end
