@@ -1,0 +1,25 @@
+local
+  lib/github.com/mpllang/mpllib/sources.mpl.mlb
+in
+  structure Seq
+  structure CommandLineArgs
+  structure ForkJoin
+end
+
+local
+  $(SML_LIB)/basis/basis.mlb
+  $(SML_LIB)/smlnj-lib/Util/smlnj-lib.mlb
+
+  Constants.sml
+  Complex.sml
+  BasisIdx.sml
+  SparseState.sml
+  Gate.sml
+  Circuit.sml
+in
+  structure Complex
+  structure BasisIdx
+  structure SparseState
+  structure Gate
+  structure Circuit
+end

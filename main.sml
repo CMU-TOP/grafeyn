@@ -1,8 +1,11 @@
 structure CLA = CommandLineArgs
 
-val numGates = CLA.parseInt "gates" 10
-val numQubits = CLA.parseInt "qubits" 10
+val numGates = CLA.parseInt "gates" 60
+val numQubits = CLA.parseInt "qubits" 20
 val output = CLA.parseString "output" ""
+
+val _ = print ("gates  " ^ Int.toString numGates ^ "\n")
+val _ = print ("qubits " ^ Int.toString numQubits ^ "\n")
 
 fun genGate seed =
   let
@@ -10,10 +13,10 @@ fun genGate seed =
     val qi1 = Util.hash (seed + 1) mod numQubits
     val qi2 = Util.hash (seed + 2) mod numQubits
   in
-    if p < 20 then Gate.PauliY qi1
-    else if p < 40 then Gate.PauliZ qi1
-    else if p < 60 then Gate.Hadamard qi1
-    else if p < 80 then Gate.T qi1
+    if p < 50 then Gate.Hadamard qi1
+    else if p < 63 then Gate.PauliY qi1
+    else if p < 76 then Gate.PauliZ qi1
+    else if p < 89 then Gate.T qi1
     else Gate.CX {control = qi1, target = qi2}
   end
 
