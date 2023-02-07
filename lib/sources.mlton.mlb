@@ -2,6 +2,8 @@ local
   lib/github.com/mpllang/mpllib/sources.mlton.mlb
 in
   structure Seq
+  structure CommandLineArgs
+  structure ForkJoin
 end
 
 local

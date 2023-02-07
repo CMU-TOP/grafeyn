@@ -1,53 +1,39 @@
 structure CLA = CommandLineArgs
 
-val test1 =
+fun runTest (testNum, (numQubits, gates)) =
   let
-    val circuit =
-      Seq.fromList
-        [Gate.Hadamard 0, Gate.Hadamard 1, Gate.Hadamard 2, Gate.Hadamard 3]
+    val circuit = Seq.fromList gates
   in
     print
-      ("=================================================================\n"
-       ^ "TEST 1\n"
-       ^ "=================================================================\n");
-    Circuit.simulate {numQubits = 4} circuit;
-    print "\n";
-    ()
+      ("=======================================================\n" ^ "TEST "
+       ^ Int.toString testNum ^ "\n"
+       ^ "=======================================================\n");
+    let val result = Circuit.simulate {numQubits = numQubits} circuit
+    in print (SparseState.toString {numQubits = numQubits} result ^ "\n")
+    end
+  end
+
+val tests =
+  let
+    open Gate
+  in
+    [ (4, [Hadamard 0, Hadamard 1, Hadamard 2, Hadamard 3])
+
+    , ( 2
+      , [ Hadamard 0
+        , CX {control = 0, target = 1}
+        , PauliZ 1
+        , Hadamard 0
+        , Hadamard 1
+        , CX {control = 1, target = 0}
+        , Hadamard 1
+        ]
+      )
+
+    , (1, [Hadamard 0, T 0, T 0, T 0, T 0])
+    ]
   end
 
 
-val test2 =
-  let
-    val circuit = Seq.fromList
-      [ Gate.Hadamard 0
-      , Gate.CX {control = 0, target = 1}
-      , Gate.PauliZ 1
-      , Gate.Hadamard 0
-      , Gate.Hadamard 1
-      , Gate.CX {control = 1, target = 0}
-      , Gate.Hadamard 1
-      ]
-  in
-    print
-      ("=================================================================\n"
-       ^ "TEST 2\n"
-       ^ "=================================================================\n");
-    Circuit.simulate {numQubits = 2} circuit;
-    print "\n";
-    ()
-  end
-
-
-val test3 =
-  let
-    val circuit = Seq.fromList
-      [Gate.Hadamard 0, Gate.T 0, Gate.T 0, Gate.T 0, Gate.T 0]
-  in
-    print
-      ("=================================================================\n"
-       ^ "TEST 3\n"
-       ^ "=================================================================\n");
-    Circuit.simulate {numQubits = 1} circuit;
-    print "\n";
-    ()
-  end
+val _ =
+  Seq.iterate (fn (i, xx) => (runTest (i, xx); i + 1)) 0 (Seq.fromList tests)

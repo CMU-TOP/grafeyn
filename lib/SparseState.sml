@@ -8,6 +8,8 @@ sig
   type weight = Complex.t
   type qubit_idx = int
 
+  val size: state -> int
+
   val toString: {numQubits: int} -> state -> string
 
   val empty: state
@@ -110,6 +112,8 @@ struct
     in
       Seq.iterate op^ "" (Seq.map element state)
     end
+
+  fun size state = Seq.length state
 
   (* ====================================================================== *)
 
