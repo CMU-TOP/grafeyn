@@ -30,9 +30,9 @@ val circuit =
         {numQubits = numQubits, gates = gates}
       end
 
-  | "qitkit_20qbt_45cyc" => HardcodedInputs.qitkit_20qbt_45cyc
-
-  | _ => Util.die ("unknown input " ^ inputName)
+  | _ =>
+      (ParseQASM.loadFromFile inputName
+       handle ParseQASM.ParseError msg => Util.die (inputName ^ ": " ^ msg))
 
 
 val _ = print ("gates  " ^ Int.toString (Circuit.numGates circuit) ^ "\n")

@@ -1,81 +1,186 @@
 structure ParseQASM:
 sig
-  (* (gate name, indices of qubit arguments) *)
-  type gate = string * int Seq.t
-
-  (* returns (numQubits, circuit) *)
-  val readQASM: string -> int * gate Seq.t
+  exception ParseError of string
+  val loadFromFile: string -> Circuit.t
 end =
 struct
 
-  type gate = string * int Seq.t
+  exception ParseError of string
 
-  exception InvalidFormat
+  (* see e.g.
+   * https://github.com/Qiskit/qiskit-terra/blob/main/qiskit/qasm/libs/qelib1.inc
+   *)
+  fun parseGate (name, arity, getArg) =
+    case (name, arity) of
+      ("h", 1) => Gate.Hadamard (getArg 0)
+    | ("y", 1) => Gate.PauliY (getArg 0)
+    | ("z", 1) => Gate.PauliZ (getArg 0)
+    | ("t", 1) => Gate.T (getArg 0)
+    | ("cx", 2) => Gate.CX {control = getArg 0, target = getArg 1}
+    | _ =>
+        raise ParseError
+          ("unknown gate: " ^ name ^ " (arity: " ^ Int.toString arity ^ ")")
 
-  (*
-    fun writeToQASM f gs {perm, M} =
-      let
-        fun writeFile (f: string) (s: string) : unit =
-            let val os = TextIO.openOut f
-            in (TextIO.output(os,s); TextIO.closeOut os)
-              handle X => (TextIO.closeOut os; raise X)
-            end
-  
-        val header = "OPENQASM 2.0; \ninclude \"qelib1.inc\"; \nqreg q[1]; \n"
-        fun write_gate i = (GateSet.label gs i) ^ " q[0];\n"
-        val gate_s = Seq.reduce (fn (a, b) => a ^ b) "" (Seq.map write_gate perm)
-      in
-        writeFile f (header ^ gate_s)
-      end
-  *)
+  fun charSeqToString s =
+    CharVector.tabulate (Seq.length s, Seq.nth s)
 
-  fun readQASM path =
+  type parser_state = {index: int, qreg: (string * int) option}
+
+  fun index ({index = i, ...}: parser_state) = i
+
+  fun advanceBy j ({index = i, qreg}: parser_state) =
+    {index = i + j, qreg = qreg}
+
+  fun declareQReg (name, size) ({index, qreg}: parser_state) =
+    case qreg of
+      NONE =>
+        ( print ("declaring qreg: " ^ name ^ "[" ^ Int.toString size ^ "]\n")
+        ; {index = index, qreg = SOME (name, size)}
+        )
+    | SOME _ => raise ParseError "only one qreg supported at the moment"
+
+
+  fun loadFromFile path =
     let
       val chars = ReadFile.contentsSeq path
-      fun split chars char =
+      fun char i = Seq.nth chars i
+      val numChars = Seq.length chars
+
+      fun checkChar f state =
+        index state < numChars andalso f (char (index state))
+
+
+      fun isChar c state =
+        checkChar (fn c' => c = c') state
+
+
+      fun isString s state =
+        index state + String.size s <= numChars
+        andalso
+        Util.all (0, String.size s) (fn j =>
+          char (index state + j) = String.sub (s, j))
+
+
+      fun goPastChar c state =
+        if index state >= numChars then
+          raise ParseError "unexpected end of file"
+        else if isChar c state then
+          advanceBy 1 state
+        else
+          goPastChar c (advanceBy 1 state)
+
+
+      fun goUntil f state =
+        if f state then state else goUntil f (advanceBy 1 state)
+
+
+      fun goPastWhitespace state =
+        if checkChar Char.isSpace state then
+          goPastWhitespace (advanceBy 1 state)
+        else
+          state
+
+
+      fun expectChar c state =
+        if isChar c state then advanceBy 1 state
+        else raise ParseError ("expected " ^ Char.toString c)
+
+
+      fun parse_toplevel state =
         let
-          fun isChar i =
-            Seq.nth chars i = char
-          val charPos = ArraySlice.full
-            (SeqBasis.filter 10000 (0, Seq.length chars) (fn i => i) isChar)
-          fun splitStart i =
-            if i = 0 then 0 else 1 + Seq.nth charPos (i - 1)
-          fun splitEnd i =
-            if i = Seq.length charPos then Seq.length chars
-            else Seq.nth charPos i
+          val state = goPastWhitespace state
         in
-          DelayedSeq.tabulate
-            (fn i => Seq.subseq chars (splitStart i, splitEnd i - splitStart i))
-            (Seq.length charPos)
+          if isString "//" state then
+            parse_toplevel (goPastChar #"\n" state)
+
+          else if isString "OPENQASM" state then
+            parse_toplevel (goPastChar #";" state)
+
+          else if isString "include" state then
+            let
+              (* just ignore for now *)
+              val (state, _) = parse_stringLiteral (advanceBy 7 state)
+              val state = goPastChar #";" state
+            in
+              parse_toplevel state
+            end
+
+          else if isString "qreg" state then
+            let
+              val (state, {name, index = size}) = parse_nameWithIndex
+                (advanceBy 4 state)
+              val state = declareQReg (name, size) state
+              val state = goPastChar #";" state
+            in
+              parse_toplevel state
+            end
+
+          else
+            raise ParseError
+              ("parse_toplevel: stuck at: "
+               ^ charSeqToString (Seq.drop chars (index state)))
         end
-      val lines = split chars (#"\n")
-      fun line i = DelayedSeq.nth lines i
 
-      (* given a char sequence of the form {q[n]...}, it returns the integer n *)
-      fun getqindex chars =
-        case Parse.parseInt (DelayedSeq.nth (split (Seq.drop chars 2) (#"]")) 0) of
-          SOME n => n
-        | NONE => raise InvalidFormat
 
-      (* from qreg q[n], retrieve n *)
-      val nqubits = getqindex (Seq.drop (line 2) 5)
-      val head_off = 3
-      fun parseGateLine i =
+      and parse_stringLiteral state =
         let
-          val i = i + head_off
-          val line_split = split (line i) (#" ")
-          val gate = Parse.parseString (DelayedSeq.nth line_split 0)
-          val numinputs = DelayedSeq.length line_split - 1
+          val state = goPastWhitespace state
+          val start = index state
+          val state = expectChar #"\"" state
+          val state = goPastChar #"\"" state
+          val stop = index state
         in
-          ( gate
-          , Seq.tabulate (fn i => getqindex (DelayedSeq.nth line_split (1 + i)))
-              numinputs
-          )
+          (state, Seq.subseq chars (start, stop - start))
         end
 
-      val numLines = DelayedSeq.length lines
-      val circuit = Seq.tabulate parseGateLine (numLines - head_off)
+
+      and parse_nameWithIndex state =
+        let
+          val state = goPastWhitespace state
+          val (state, name) = parse_name state
+          val state = goPastWhitespace state
+          val state = expectChar #"[" state
+          val (state, index) = parse_integer state
+          val state = goPastWhitespace state
+          val state = expectChar #"]" state
+        in
+          (state, {name = name, index = index})
+        end
+
+
+      and parse_name state =
+        let
+          val state = goPastWhitespace state
+          val start = index state
+          val state =
+            goUntil (fn s => isChar #"[" s orelse checkChar Char.isSpace s)
+              state
+          val stop = index state
+
+          val name = charSeqToString (Seq.subseq chars (start, stop - start))
+        in
+          (state, name)
+        end
+
+
+      and parse_integer state =
+        let
+          val state = goPastWhitespace state
+          val start = index state
+          val state = goUntil (not o checkChar Char.isDigit) state
+          val stop = index state
+
+          val x =
+            case Parse.parseInt (Seq.subseq chars (start, stop - start)) of
+              NONE => raise ParseError "invalid integer"
+            | SOME x => x
+        in
+          (state, x)
+        end
+
+      val state = parse_toplevel {index = 0, qreg = NONE}
+      val _ = print ("got to: " ^ Int.toString (index state) ^ "\n")
     in
-      (nqubits, circuit)
+      raise Fail "whoops"
     end
 end
