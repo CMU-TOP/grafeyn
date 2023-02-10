@@ -6,6 +6,7 @@ sig
     PauliY of qubit_idx
   | PauliZ of qubit_idx
   | Hadamard of qubit_idx
+  | X of qubit_idx
   | T of qubit_idx
   | CX of {control: qubit_idx, target: qubit_idx}
 
@@ -22,6 +23,7 @@ struct
   | PauliZ of qubit_idx
   | Hadamard of qubit_idx
   | T of qubit_idx
+  | X of qubit_idx
   | CX of {control: qubit_idx, target: qubit_idx}
 
   type t = gate
@@ -117,12 +119,24 @@ struct
     end
 
 
+  fun x state qi =
+    let
+      fun f (bidx, weight) =
+        let val bidx' = BasisIdx.flip bidx qi
+        in (bidx', weight)
+        end
+    in
+      SparseState.fromSeq (Seq.map f (SparseState.toSeq state))
+    end
+
+
   fun apply gate state =
     case gate of
       PauliY qi => pauliy state qi
     | PauliZ qi => pauliz state qi
     | Hadamard qi => hadamard state qi
     | T qi => t state qi
+    | X qi => x state qi
     | CX qis => cx state qis
 
 end

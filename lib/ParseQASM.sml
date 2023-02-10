@@ -20,6 +20,7 @@ struct
       | ("y", 1) => Gate.PauliY (getArg 0)
       | ("z", 1) => Gate.PauliZ (getArg 0)
       | ("t", 1) => Gate.T (getArg 0)
+      | ("x", 1) => Gate.X (getArg 0)
       | ("cx", 2) => Gate.CX {control = getArg 0, target = getArg 1}
       | _ =>
           raise ParseError
