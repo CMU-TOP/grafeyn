@@ -109,17 +109,38 @@ struct
 
       fun parse_toplevel state =
         let
-          (* val _ = print "parse_toplevel\n" *)
+          (* val _ = print ("parse_toplevel " ^ Int.toString (index state) ^ "\n") *)
           val state = goPastWhitespace state
         in
           if index state >= numChars then
             state
 
           else if isString "//" state then
-            parse_toplevel (goPastChar #"\n" state)
+            parse_toplevel (advanceBy 1
+              (goUntilOrEndOfFile (isChar #"\n") state))
 
           else if isString "OPENQASM" state then
             parse_toplevel (goPastChar #";" state)
+
+          else if isString "reset" state then
+            let
+              val state = advanceBy 5 state
+              val (state, _) = parse_name state
+              val state = goPastWhitespace state
+              val state = expectChar #";" state
+            in
+              parse_toplevel state
+            end
+
+          else if isString "barrier" state then
+            let
+              val state = advanceBy 7 state
+              val (state, _) = parse_name state
+              val state = goPastWhitespace state
+              val state = expectChar #";" state
+            in
+              parse_toplevel state
+            end
 
           else if isString "include" state then
             let
@@ -214,7 +235,9 @@ struct
           val start = index state
           val state =
             goUntilOrEndOfFile
-              (fn s => isChar #"[" s orelse checkChar Char.isSpace s) state
+              (fn s =>
+                 isChar #";" s orelse isChar #"[" s
+                 orelse checkChar Char.isSpace s) state
           val stop = index state
 
           val name = charSeqToString (Seq.subseq chars (start, stop - start))
