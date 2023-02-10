@@ -1,6 +1,6 @@
 structure HardcodedInputs =
 struct
-  val qitkit_20qbt_45cyc: (int * Circuit.t) =
+  val qitkit_20qbt_45cyc: Circuit.t =
     let
       open Gate
       val numQubits = 20
@@ -52,9 +52,9 @@ struct
         , CX {control = 9, target = 10}
         ]
 
-      val circuit = Seq.fromList gates
+      val gates = Seq.fromList gates
     in
-      (numQubits, circuit)
+      {numQubits = numQubits, gates = gates}
     end
 
 end

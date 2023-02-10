@@ -7,6 +7,13 @@ in
 end
 
 local
+  lib/github.com/mpllang/mpllib/sources.mpl.mlb
+  ParseQASM.sml
+in
+  structure ParseQASM
+end
+
+local
   $(SML_LIB)/basis/basis.mlb
   $(SML_LIB)/smlnj-lib/Util/smlnj-lib.mlb
 

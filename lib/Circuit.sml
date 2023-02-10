@@ -1,15 +1,27 @@
-structure Circuit =
+structure Circuit:
+sig
+  type circuit = {numQubits: int, gates: Gate.t Seq.t}
+  type t = circuit
+
+  val numGates: circuit -> int
+  val numQubits: circuit -> int
+
+  val simulate: circuit -> SparseState.t
+end =
 struct
 
-  type circuit = Gate.t Seq.t
+  type circuit = {numQubits: int, gates: Gate.t Seq.t}
   type t = circuit
 
   val splitThreshold = CommandLineArgs.parseInt "split-threshold" 100
 
-  fun simulate {numQubits: int} circuit =
+  fun numGates ({gates, ...}: circuit) = Seq.length gates
+  fun numQubits ({numQubits = nq, ...}: circuit) = nq
+
+  fun simulate {numQubits, gates} =
     let
-      fun gate i = Seq.nth circuit i
-      val depth = Seq.length circuit
+      fun gate i = Seq.nth gates i
+      val depth = Seq.length gates
 
       fun loop i state =
         if i >= depth then
