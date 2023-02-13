@@ -39,6 +39,18 @@ val circuit =
 val _ = print ("gates  " ^ Int.toString (Circuit.numGates circuit) ^ "\n")
 val _ = print ("qubits " ^ Int.toString (Circuit.numQubits circuit) ^ "\n")
 
+val showCircuit = CLA.parseFlag "show-circuit"
+val _ = print ("show-circuit? " ^ (if showCircuit then "yes" else "no") ^ "\n")
+val _ =
+  if not showCircuit then
+    ()
+  else
+    print
+      ("=========================================================\n"
+       ^ Circuit.toString circuit
+       ^ "=========================================================\n")
+
+
 val _ = print ("sim " ^ simName ^ "\n")
 val simulator =
   case simName of
