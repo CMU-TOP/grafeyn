@@ -7,6 +7,8 @@ sig
   val numQubits: circuit -> int
 
   val simulate: circuit -> SparseState.t
+
+  val simulateSequential: circuit -> SparseState.t
 end =
 struct
 
@@ -42,6 +44,27 @@ struct
           loop (i + 1) (Gate.applyState (gate i) state)
     in
       SparseState.compact (loop 0 SparseState.initial)
+    end
+
+
+  fun simulateSequential {numQubits, gates} =
+    let
+      fun gate i = Seq.nth gates i
+      val depth = Seq.length gates
+
+      fun loop acc i widx =
+        if i >= depth then
+          widx :: acc
+        else
+          case Gate.apply (gate i) widx of
+            Gate.OutputOne widx' => loop acc (i + 1) widx'
+          | Gate.OutputTwo (widx1, widx2) =>
+              loop (loop acc (i + 1) widx1) (i + 1) widx2
+
+      val initial = (BasisIdx.zeros, Complex.real 1.0)
+      val result = loop [] 0 initial
+    in
+      SparseState.compact (SparseState.fromSeq (Seq.fromList result))
     end
 
 

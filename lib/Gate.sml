@@ -15,8 +15,8 @@ sig
   type weighted_idx = BasisIdx.t * weight
 
   datatype gate_output =
-    One of weighted_idx
-  | Two of weighted_idx * weighted_idx
+    OutputOne of weighted_idx
+  | OutputTwo of weighted_idx * weighted_idx
 
   val applyState: gate -> SparseState.t -> SparseState.t
 
@@ -39,8 +39,8 @@ struct
   type weighted_idx = BasisIdx.t * weight
 
   datatype gate_output =
-    One of weighted_idx
-  | Two of weighted_idx * weighted_idx
+    OutputOne of weighted_idx
+  | OutputTwo of weighted_idx * weighted_idx
 
 
   fun pauliy qi (bidx, weight) =
@@ -50,7 +50,7 @@ struct
         if BasisIdx.get bidx qi then Complex.imag ~1.0 else Complex.imag 1.0
       val weight' = Complex.* (weight, multiplier)
     in
-      One (bidx', weight')
+      OutputOne (bidx', weight')
     end
 
   fun pauliz qi (bidx, weight) =
@@ -59,7 +59,7 @@ struct
         if BasisIdx.get bidx qi then Complex.real ~1.0 else Complex.real 1.0
       val weight' = Complex.* (weight, multiplier)
     in
-      One (bidx, weight')
+      OutputOne (bidx, weight')
     end
 
 
@@ -79,13 +79,13 @@ struct
       val weight1 = Complex.* (weight, multiplier1)
       val weight2 = Complex.* (weight, multiplier2)
     in
-      Two ((bidx1, weight1), (bidx2, weight2))
+      OutputTwo ((bidx1, weight1), (bidx2, weight2))
     end
 
 
   fun cx {control = ci, target = ti} (bidx, weight) =
     let val bidx' = if BasisIdx.get bidx ci then BasisIdx.flip bidx ti else bidx
-    in One (bidx', weight)
+    in OutputOne (bidx', weight)
     end
 
 
@@ -100,12 +100,12 @@ struct
         else
           Complex.real 1.0
     in
-      One (bidx, Complex.* (weight, multiplier))
+      OutputOne (bidx, Complex.* (weight, multiplier))
     end
 
   fun x qi (bidx, weight) =
     let val bidx' = BasisIdx.flip bidx qi
-    in One (bidx', weight)
+    in OutputOne (bidx', weight)
     end
 
 
@@ -127,13 +127,13 @@ struct
 
   fun gateOutputToSeq go =
     case go of
-      One x => Seq.singleton x
-    | Two (x, y) => Seq.fromList [x, y]
+      OutputOne x => Seq.singleton x
+    | OutputTwo (x, y) => Seq.fromList [x, y]
 
 
   fun gateOutputToOne go =
     case go of
-      One x => x
+      OutputOne x => x
     | _ => raise Fail "bug: Gate.gateOutputToOne"
 
 

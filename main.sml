@@ -1,5 +1,6 @@
 structure CLA = CommandLineArgs
 
+val simName = CLA.parseString "sim" "par"
 val inputName = CLA.parseString "input" "random"
 val output = CLA.parseString "output" ""
 
@@ -37,6 +38,13 @@ val circuit =
 
 val _ = print ("gates  " ^ Int.toString (Circuit.numGates circuit) ^ "\n")
 val _ = print ("qubits " ^ Int.toString (Circuit.numQubits circuit) ^ "\n")
+
+val _ = print ("sim " ^ simName ^ "\n")
+val simulator =
+  case simName of
+    "seq" => Circuit.simulateSequential
+  | "par" => Circuit.simulate
+  | _ => Util.die ("Unknown -sim " ^ simName ^ "; valid options are: seq, par")
 
 val result = Benchmark.run "quantum simulator" (fn _ =>
   Circuit.simulate circuit)
