@@ -39,7 +39,7 @@ struct
             SparseState.compact (SparseState.merge (statel, stater))
           end
         else
-          loop (i + 1) (Gate.apply (gate i) state)
+          loop (i + 1) (Gate.applyState (gate i) state)
     in
       SparseState.compact (loop 0 SparseState.initial)
     end
