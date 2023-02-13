@@ -7,24 +7,56 @@ struct
 
   exception ParseError of string
 
+  structure RealExp =
+  struct
+    datatype t = LiteralPi | Slash of t * t | LiteralNum of char Seq.t
+
+    fun eval exp =
+      case exp of
+        LiteralPi => Math.pi
+      | Slash (e1, e2) => eval e1 / eval e2
+      | LiteralNum x =>
+          case Parse.parseReal x of
+            NONE =>
+              raise ParseError
+                ("could not convert to real: "
+                 ^ (CharVector.tabulate (Seq.length x, Seq.nth x)))
+          | SOME r => r
+  end
+
+  (* Examples:
+   *   h              GateName("h")
+   *   cx             GateName("cx")
+   *   cphase(pi/2)   GateNameAndArg("cphase", Slash(LiteralPi, LiteralNum "2"))
+   *)
+  datatype gate_desc =
+    GateName of string
+  | GateNameAndArg of string * RealExp.t
+
   (* see e.g.
    * https://github.com/Qiskit/qiskit-terra/blob/main/qiskit/qasm/libs/qelib1.inc
    *)
-  fun parseGate (name, args) =
+  fun parseGate (gateDesc, args) =
     let
       val arity = Seq.length args
       fun getArg i = Seq.nth args i
+
+      fun err name =
+        raise ParseError
+          ("unknown gate: " ^ name ^ " (arity: " ^ Int.toString arity ^ ")")
     in
-      case (name, arity) of
-        ("h", 1) => Gate.Hadamard (getArg 0)
-      | ("y", 1) => Gate.PauliY (getArg 0)
-      | ("z", 1) => Gate.PauliZ (getArg 0)
-      | ("t", 1) => Gate.T (getArg 0)
-      | ("x", 1) => Gate.X (getArg 0)
-      | ("cx", 2) => Gate.CX {control = getArg 0, target = getArg 1}
-      | _ =>
-          raise ParseError
-            ("unknown gate: " ^ name ^ " (arity: " ^ Int.toString arity ^ ")")
+      case (gateDesc, arity) of
+        (GateName "h", 1) => Gate.Hadamard (getArg 0)
+      | (GateName "y", 1) => Gate.PauliY (getArg 0)
+      | (GateName "z", 1) => Gate.PauliZ (getArg 0)
+      | (GateName "t", 1) => Gate.T (getArg 0)
+      | (GateName "x", 1) => Gate.X (getArg 0)
+      | (GateName "cx", 2) => Gate.CX {control = getArg 0, target = getArg 1}
+      | (GateNameAndArg ("cphase", realexp), 2) =>
+          Gate.CPhase
+            {control = getArg 0, target = getArg 1, rot = RealExp.eval realexp}
+      | (GateName name, _) => err name
+      | (GateNameAndArg (name, _), _) => err name
     end
 
   fun charSeqToString s =
@@ -170,14 +202,91 @@ struct
         let
           (* val _ = print "parse_gateAndArgs\n" *)
           val state = goPastWhitespace state
-          val (state, name) = parse_name state
+          val (state, gateDesc) = parse_gateDesc state
           val (state, args) = parse_args state
           val state = goPastWhitespace state
           val state = expectChar #";" state
 
-          val state = doGate (name, args) state
+          val state = doGate (gateDesc, args) state
         in
           state
+        end
+
+
+      and parse_gateDesc state =
+        let
+          val state = goPastWhitespace state
+          val (state, name) = parse_name state
+          val state = goPastWhitespace state
+        in
+          if not (isChar #"(" state) then
+            (state, GateName name)
+          else
+            let
+              val state = advanceBy 1 state
+              val (state, exp) = parse_realExp state
+              val state = goPastWhitespace state
+              val state = expectChar #")" state
+            in
+              (state, GateNameAndArg (name, exp))
+            end
+        end
+
+
+      (* TODO: this is NOT good. Mega hack. *)
+      and parse_realExp state =
+        let
+          fun loop acc state =
+            let
+              val state = goPastWhitespace state
+            in
+              if index state >= numChars then
+                raise ParseError "unexpected end of real expression"
+              else if isChar #")" state then
+                (state, acc)
+              else if isString "pi" state then
+                if Option.isSome acc then
+                  raise ParseError ("could not parse real expression")
+                else
+                  loop (SOME RealExp.LiteralPi) (advanceBy 2 state)
+              else if isChar #"/" state then
+                let
+                  val state = advanceBy 1 state
+                  val (state, yy) = parse_realExp state
+                  val acc =
+                    case acc of
+                      NONE =>
+                        raise ParseError ("could not parse real expression")
+                    | SOME xx => SOME (RealExp.Slash (xx, yy))
+                in
+                  loop acc state
+                end
+              else if checkChar Char.isDigit state then
+                let
+                  val start = index state
+                  (* TODO: this is NOT good. Mega hack. *)
+                  val state =
+                    goUntilOrEndOfFile
+                      (fn s =>
+                         not (checkChar Char.isDigit s orelse isChar #"." s))
+                      state
+                  val stop = index state
+                  val stuff = Seq.subseq chars (start, stop - start)
+                in
+                  if Option.isSome acc then
+                    raise ParseError ("could not parse real expression")
+                  else
+                    loop (SOME (RealExp.LiteralNum stuff)) state
+                end
+              else
+                raise ParseError ("count not parse real expression!")
+            end
+
+          val (state, realExp) = loop NONE state
+        in
+          case realExp of
+            NONE => raise ParseError ("could not parse real expression")
+          | SOME re => (state, re)
         end
 
 
@@ -236,7 +345,7 @@ struct
           val state =
             goUntilOrEndOfFile
               (fn s =>
-                 isChar #";" s orelse isChar #"[" s
+                 isChar #"(" s orelse isChar #";" s orelse isChar #"[" s
                  orelse checkChar Char.isSpace s) state
           val stop = index state
 

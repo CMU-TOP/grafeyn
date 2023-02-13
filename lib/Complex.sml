@@ -6,6 +6,7 @@ sig
 
   val real: real -> t
   val imag: real -> t
+  val rotateBy: real -> t (* rotateBy x = e^(ix) *)
 
   val isNonZero: t -> bool
 
@@ -32,6 +33,9 @@ struct
 
   fun isNonZero c =
     not (isZero c)
+
+  fun rotateBy r =
+    C {re = Math.cos r, im = Math.sin r}
 
   fun real r = C {re = r, im = 0.0}
   fun imag i = C {re = 0.0, im = i}

@@ -9,6 +9,11 @@ sig
   | X of qubit_idx
   | T of qubit_idx
   | CX of {control: qubit_idx, target: qubit_idx}
+  | CPhase of
+      { control: qubit_idx
+      , target: qubit_idx
+      , rot: real (* rotation in [0,2pi) *)
+      }
 
   type t = gate
   type weight = Complex.t
@@ -33,6 +38,11 @@ struct
   | T of qubit_idx
   | X of qubit_idx
   | CX of {control: qubit_idx, target: qubit_idx}
+  | CPhase of
+      { control: qubit_idx
+      , target: qubit_idx
+      , rot: real (* rotation in [0,2pi) *)
+      }
 
   type t = gate
   type weight = Complex.t
@@ -109,6 +119,18 @@ struct
     end
 
 
+  fun cphase {control, target, rot} (bidx, weight) =
+    let
+      val weight =
+        if not (BasisIdx.get bidx control) orelse not (BasisIdx.get bidx target) then
+          weight
+        else
+          Complex.* (Complex.rotateBy rot, weight)
+    in
+      OutputOne (bidx, weight)
+    end
+
+
   fun expectBranching gate =
     case gate of
       Hadamard _ => true
@@ -117,12 +139,13 @@ struct
 
   fun apply gate widx =
     case gate of
-      PauliY qi => pauliy qi widx
-    | PauliZ qi => pauliz qi widx
-    | Hadamard qi => hadamard qi widx
-    | T qi => t qi widx
-    | X qi => x qi widx
-    | CX qis => cx qis widx
+      PauliY xx => pauliy xx widx
+    | PauliZ xx => pauliz xx widx
+    | Hadamard xx => hadamard xx widx
+    | T xx => t xx widx
+    | X xx => x xx widx
+    | CX xx => cx xx widx
+    | CPhase xx => cphase xx widx
 
 
   fun gateOutputToSeq go =
