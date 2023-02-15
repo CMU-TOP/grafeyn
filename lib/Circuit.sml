@@ -18,6 +18,8 @@ struct
   type t = circuit
 
   val splitThreshold = CommandLineArgs.parseInt "split-threshold" 100
+  val sequentialDepthAdvance =
+    CommandLineArgs.parseInt "sequential-depth-advance" 10
 
   fun numGates ({gates, ...}: circuit) = Seq.length gates
   fun numQubits ({numQubits = nq, ...}: circuit) = nq
@@ -45,10 +47,75 @@ struct
     end
 
 
+  (*
+    fun simulate {numQubits, gates} =
+      let
+        fun gate i = Seq.nth gates i
+        val depth = Seq.length gates
+  
+        fun sequentialLoop (i, stop) (acc, widx) =
+          if i >= stop then
+            widx :: acc
+          else
+            case Gate.apply (gate i) widx of
+              Gate.OutputOne widx' => sequentialLoop (i + 1, stop) (acc, widx')
+            | Gate.OutputTwo (widx1, widx2) =>
+                sequentialLoop (i + 1, stop)
+                  (sequentialLoop (i + 1, stop) (acc, widx1), widx2)
+  
+  
+        fun advanceState (i, stop) state =
+          SparseState.fromSeq (Seq.fromList
+            (Seq.iterate (sequentialLoop (i, stop)) [] (SparseState.toSeq state)))
+  
+  
+        fun loop i state =
+          if i >= depth then
+            state
+          else if SparseState.size state >= splitThreshold then
+            let
+              val state = SparseState.toSeq state
+              val half = Seq.length state div 2
+              val (statel, stater) =
+                ForkJoin.par
+                  ( fn _ => loop i (SparseState.fromSeq (Seq.take state half))
+                  , fn _ => loop i (SparseState.fromSeq (Seq.drop state half))
+                  )
+            in
+              (* SparseState.compact (SparseState.merge (statel, stater)) *)
+              SparseState.fromSeq
+                (Seq.append (SparseState.toSeq statel, SparseState.toSeq stater))
+            end
+          else
+            let val stop = Int.min (depth, i + sequentialDepthAdvance)
+            in loop stop (advanceState (i, stop) state)
+            end
+      in
+        SparseState.compact (loop 0 SparseState.initial)
+      end
+  *)
+
+
   fun simulate {numQubits, gates} =
     let
       fun gate i = Seq.nth gates i
       val depth = Seq.length gates
+
+      fun sequentialLoop (i, stop) (acc, widx) =
+        if i >= stop then
+          widx :: acc
+        else
+          case Gate.apply (gate i) widx of
+            Gate.OutputOne widx' => sequentialLoop (i + 1, stop) (acc, widx')
+          | Gate.OutputTwo (widx1, widx2) =>
+              sequentialLoop (i + 1, stop)
+                (sequentialLoop (i + 1, stop) (acc, widx1), widx2)
+
+
+      fun advanceState (i, stop) state =
+        SparseState.fromSeq (Seq.fromList
+          (Seq.iterate (sequentialLoop (i, stop)) [] (SparseState.toSeq state)))
+
 
       fun loop i state =
         if i >= depth then
@@ -68,11 +135,12 @@ struct
               (Seq.append (SparseState.toSeq statel, SparseState.toSeq stater))
           end
         else
-          loop (i + 1) (Gate.applyState (gate i) state)
+          let val stop = Int.min (depth, i + sequentialDepthAdvance)
+          in loop stop (advanceState (i, stop) state)
+          end
     in
       SparseState.compact (loop 0 SparseState.initial)
     end
-
 
   fun simulateSequential {numQubits, gates} =
     let

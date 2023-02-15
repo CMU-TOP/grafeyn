@@ -110,12 +110,20 @@ struct
         BasisIdx.toString {numQubits = numQubits} bidx ^ " "
         ^ Complex.toString weight ^ "\n"
 
+      (* This is a little silly, but we're working around a MPL bug. It's not
+       * safe to call Complex.toString in parallel because Complex.toString
+       * calls Real.fmt, and Real.fmt is an SML Basis Library function that
+       * is not safe for parallelism. Ugh. So, let's convert to strings
+       * sequentially...
+       *)
+      val elements = Array.tabulate (Seq.length state, element o Seq.nth state)
+      val elemSeq: string Seq.t = ArraySlice.full elements
+
       fun charsFromString str =
         DelayedSeq.tabulate (fn i => String.sub (str, i)) (String.size str)
 
       val allChars = DelayedSeq.toArraySeq (DelayedSeq.flatten
-        (DelayedSeq.map (charsFromString o element)
-           (DelayedSeq.fromArraySeq state)))
+        (DelayedSeq.map charsFromString (DelayedSeq.fromArraySeq elemSeq)))
     in
       CharVector.tabulate (Seq.length allChars, Seq.nth allChars)
     end
