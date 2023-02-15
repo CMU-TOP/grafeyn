@@ -58,8 +58,7 @@ val simulator =
   | "par" => Circuit.simulate
   | _ => Util.die ("Unknown -sim " ^ simName ^ "; valid options are: seq, par")
 
-val result = Benchmark.run "quantum simulator" (fn _ =>
-  Circuit.simulate circuit)
+val result = Benchmark.run "quantum simulator" (fn _ => simulator circuit)
 val _ = print
   ("num non-zero states " ^ Int.toString (SparseState.size result) ^ "\n")
 
@@ -68,10 +67,14 @@ val _ =
     ()
   else
     let
-      val outstream = TextIO.openOut output
+      val _ = print ("generating output...\n")
+
       val contents =
         SparseState.toString {numQubits = Circuit.numQubits circuit} result
         ^ "\n"
+
+      val _ = print ("writing to " ^ output ^ "\n")
+      val outstream = TextIO.openOut output
     in
       TextIO.output (outstream, contents);
       TextIO.closeOut outstream;

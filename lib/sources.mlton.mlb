@@ -2,6 +2,7 @@ local
   lib/github.com/mpllang/mpllib/sources.mlton.mlb
 in
   structure Seq
+  structure DelayedSeq
   structure CommandLineArgs
   structure ForkJoin
 end
@@ -22,4 +23,11 @@ in
   structure SparseState
   structure Gate
   structure Circuit
+end
+
+local
+  lib/github.com/mpllang/mpllib/sources.mlton.mlb
+  ParseQASM.sml
+in
+  structure ParseQASM
 end

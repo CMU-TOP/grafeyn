@@ -2,6 +2,7 @@ local
   lib/github.com/mpllang/mpllib/sources.mpl.mlb
 in
   structure Seq
+  structure DelayedSeq
   structure CommandLineArgs
   structure ForkJoin
 end

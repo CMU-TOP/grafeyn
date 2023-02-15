@@ -63,7 +63,9 @@ struct
                 , fn _ => loop i (SparseState.fromSeq (Seq.drop state half))
                 )
           in
-            SparseState.compact (SparseState.merge (statel, stater))
+            (* SparseState.compact (SparseState.merge (statel, stater)) *)
+            SparseState.fromSeq
+              (Seq.append (SparseState.toSeq statel, SparseState.toSeq stater))
           end
         else
           loop (i + 1) (Gate.applyState (gate i) state)

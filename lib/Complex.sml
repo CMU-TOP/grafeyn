@@ -20,7 +20,7 @@ end =
 struct
   datatype t = C of {re: real, im: real}
 
-  val rtos = Real.fmt (StringCvt.FIX (SOME 3))
+  val rtos = Real.fmt (StringCvt.FIX (SOME 4))
 
   fun toString (C {re, im}) =
     rtos re ^ " + " ^ rtos im ^ "i"

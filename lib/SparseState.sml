@@ -109,8 +109,15 @@ struct
       fun element (bidx, weight) =
         BasisIdx.toString {numQubits = numQubits} bidx ^ " "
         ^ Complex.toString weight ^ "\n"
+
+      fun charsFromString str =
+        DelayedSeq.tabulate (fn i => String.sub (str, i)) (String.size str)
+
+      val allChars = DelayedSeq.toArraySeq (DelayedSeq.flatten
+        (DelayedSeq.map (charsFromString o element)
+           (DelayedSeq.fromArraySeq state)))
     in
-      Seq.iterate op^ "" (Seq.map element state)
+      CharVector.tabulate (Seq.length allChars, Seq.nth allChars)
     end
 
   fun size state = Seq.length state
@@ -118,8 +125,14 @@ struct
   (* ====================================================================== *)
 
   fun toMap state =
-    Seq.reduce (BasisIdxMap.unionWith Complex.+) BasisIdxMap.empty
-      (Seq.map BasisIdxMap.singleton state)
+    Seq.iterate
+      (fn (map, (bidx, weight)) =>
+         BasisIdxMap.insertWith Complex.+ (map, bidx, weight))
+      (BasisIdxMap.empty) state
+  (*
+  Seq.reduce (BasisIdxMap.unionWith Complex.+) BasisIdxMap.empty
+    (Seq.map BasisIdxMap.singleton state)
+  *)
 
   fun fromMap statemap =
     Seq.fromList (BasisIdxMap.listItemsi statemap)
