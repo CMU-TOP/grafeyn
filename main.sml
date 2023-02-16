@@ -56,6 +56,7 @@ val simulator =
   case simName of
     "seq" => Circuit.simulateSequential
   | "par" => Circuit.simulate
+  | "bfs" => Circuit.simulateBreadthFirst
   | _ => Util.die ("Unknown -sim " ^ simName ^ "; valid options are: seq, par")
 
 val result = Benchmark.run "quantum simulator" (fn _ => simulator circuit)

@@ -9,10 +9,12 @@ sig
   val numQubits: circuit -> int
 
   val simulate: circuit -> SparseState.t
-
+  val simulateBreadthFirst: circuit -> SparseState.t
   val simulateSequential: circuit -> SparseState.t
 end =
 struct
+
+  structure HT = HashTable
 
   type circuit = {numQubits: int, gates: Gate.t Seq.t}
   type t = circuit
@@ -48,56 +50,69 @@ struct
     end
 
 
-  (*
-    fun simulate {numQubits, gates} =
-      let
-        fun gate i = Seq.nth gates i
-        val depth = Seq.length gates
-  
-        fun sequentialLoop (i, stop) (acc, widx) =
-          if i >= stop then
-            widx :: acc
-          else
-            case Gate.apply (gate i) widx of
-              Gate.OutputOne widx' => sequentialLoop (i + 1, stop) (acc, widx')
-            | Gate.OutputTwo (widx1, widx2) =>
-                sequentialLoop (i + 1, stop)
-                  (sequentialLoop (i + 1, stop) (acc, widx1), widx2)
-  
-  
-        fun advanceState (i, stop) state =
-          SparseState.fromSeq (Seq.fromList
-            (Seq.iterate (sequentialLoop (i, stop)) [] (SparseState.toSeq state)))
-  
-  
-        fun loop i state =
-          if i >= depth then
-            state
-          else if SparseState.size state >= splitThreshold then
-            let
-              val state = SparseState.toSeq state
-              val half = Seq.length state div 2
-              val (statel, stater) =
-                ForkJoin.par
-                  ( fn _ => loop i (SparseState.fromSeq (Seq.take state half))
-                  , fn _ => loop i (SparseState.fromSeq (Seq.drop state half))
-                  )
-            in
-              (* SparseState.compact (SparseState.merge (statel, stater)) *)
-              SparseState.fromSeq
-                (Seq.append (SparseState.toSeq statel, SparseState.toSeq stater))
-            end
-          else
-            let val stop = Int.min (depth, i + sequentialDepthAdvance)
-            in loop stop (advanceState (i, stop) state)
-            end
-      in
-        SparseState.compact (loop 0 SparseState.initial)
-      end
-  *)
+  fun compactSparseState s =
+    let
+      val s = SparseState.toSeq s
+
+      val table = HT.make
+        { hash = BasisIdx.hash
+        , eq = BasisIdx.equal
+        , capacity = 2 * Seq.length s
+        , maxload = 0.75
+        }
+
+      val _ = ForkJoin.parfor 1000 (0, Seq.length s) (fn i =>
+        HT.insertWith Complex.+ table (Seq.nth s i))
+    in
+      SparseState.fromSeq (HT.compact table)
+    end
 
 
-  structure HT = HashTable
+  fun simulateBreadthFirst {numQubits, gates} =
+    let
+      fun gate i = Seq.nth gates i
+      val depth = Seq.length gates
+
+      fun sequentialLoop (i, stop) (acc, widx) =
+        if i >= stop then
+          widx :: acc
+        else
+          case Gate.apply (gate i) widx of
+            Gate.OutputOne widx' => sequentialLoop (i + 1, stop) (acc, widx')
+          | Gate.OutputTwo (widx1, widx2) =>
+              sequentialLoop (i + 1, stop)
+                (sequentialLoop (i + 1, stop) (acc, widx1), widx2)
+
+
+      fun advanceState (i, stop) state =
+        SparseState.fromSeq (Seq.fromList
+          (Seq.iterate (sequentialLoop (i, stop)) [] (SparseState.toSeq state)))
+
+
+      fun loop i state =
+        if i >= depth then
+          state
+        else if SparseState.size state >= splitThreshold then
+          let
+            val state = SparseState.toSeq state
+            val half = Seq.length state div 2
+            val (statel, stater) =
+              ForkJoin.par
+                ( fn _ => loop i (SparseState.fromSeq (Seq.take state half))
+                , fn _ => loop i (SparseState.fromSeq (Seq.drop state half))
+                )
+          in
+            SparseState.compact (SparseState.merge (statel, stater))
+          (* SparseState.fromSeq
+            (Seq.append (SparseState.toSeq statel, SparseState.toSeq stater)) *)
+          end
+        else
+          let val stop = Int.min (depth, i + sequentialDepthAdvance)
+          in loop stop (advanceState (i, stop) state)
+          end
+    in
+      SparseState.compact (loop 0 SparseState.initial)
+    end
 
 
   fun simulate {numQubits, gates} =
