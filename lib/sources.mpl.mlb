@@ -1,15 +1,23 @@
 local
   lib/github.com/mpllang/mpllib/sources.mpl.mlb
+  HashTable.sml
 in
   structure Seq
+  structure SeqBasis
   structure DelayedSeq
   structure CommandLineArgs
   structure ForkJoin
+  structure Util
+  structure HashTable
 end
 
 local
   $(SML_LIB)/basis/basis.mlb
-  $(SML_LIB)/smlnj-lib/Util/smlnj-lib.mlb
+  local
+    $(SML_LIB)/smlnj-lib/Util/smlnj-lib.mlb
+  in
+    functor RedBlackMapFn
+  end
 
   Constants.sml
   Complex.sml

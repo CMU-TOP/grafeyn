@@ -1,11 +1,19 @@
+# MPL_COMPILER=mpl
+MPL_COMPILER=/usr0/home/swestric/proj/mpl/em/build/bin/mpl
+# MPL_COMPILER=/usr0/home/swestric/proj/mpl/sam-heartbeat/build/bin/mpl -mlb-path-var 'PICK_FJ greedy-work-amortized'
+
+MPL=$(MPL_COMPILER) -disable-pass splitTypes1 -disable-pass splitTypes2
+
+FLAGS=-default-type int64 -default-type word64
+
 main.mpl: phony
-	mpl -default-type int64 -default-type word64 -output main.mpl main.mpl.mlb
+	$(MPL) $(FLAGS) -output main.mpl main.mpl.mlb
 
 main.mlton: phony
-	mlton -default-type int64 -default-type word64 -output main.mlton main.mlton.mlb
+	mlton $(FLAGS) -output main.mlton main.mlton.mlb
 
 test: phony
-	mlton -default-type int64 -default-type word64 -output test test.mlton.mlb
+	mlton $(FLAGS) -output test test.mlton.mlb
 
 .PHONY: phony
 phony:

@@ -16,6 +16,8 @@ sig
    * ordered maps and whatever.
    *)
   val compare: t * t -> order
+  val equal: t * t -> bool
+  val hash: t -> int
 end =
 struct
   type qubit_idx = int
@@ -45,4 +47,9 @@ struct
       if get bidx (numQubits - i - 1) then #"1" else #"0") ^ ">"
 
   fun compare (bidx1: t, bidx2: t) = Word64.compare (bidx1, bidx2)
+
+  fun equal (b1, b2) = b1 = b2
+
+  fun hash bidx =
+    Word64.toIntX (Util.hash64_2 bidx)
 end

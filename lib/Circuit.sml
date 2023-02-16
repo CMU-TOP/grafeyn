@@ -20,6 +20,7 @@ struct
   val splitThreshold = CommandLineArgs.parseInt "split-threshold" 100
   val sequentialDepthAdvance =
     CommandLineArgs.parseInt "sequential-depth-advance" 10
+  val expectOutputSize = CommandLineArgs.parseInt "expect-output-size" 1000
 
   fun numGates ({gates, ...}: circuit) = Seq.length gates
   fun numQubits ({numQubits = nq, ...}: circuit) = nq
@@ -96,70 +97,98 @@ struct
   *)
 
 
+  structure HT = HashTable
+
+
   fun simulate {numQubits, gates} =
     let
       fun gate i = Seq.nth gates i
       val depth = Seq.length gates
 
-      fun sequentialLoop (i, stop) (acc, widx) =
+      val initialCapacity = expectOutputSize * 2
+      val table = HT.make
+        { hash = BasisIdx.hash
+        , eq = BasisIdx.equal
+        , capacity = initialCapacity
+        , maxload = 0.75
+        }
+
+      fun loop taskDepth count (i, stop) widx =
         if i >= stop then
-          widx :: acc
+          (HT.insertWith Complex.+ table widx; count + 1)
         else
           case Gate.apply (gate i) widx of
-            Gate.OutputOne widx' => sequentialLoop (i + 1, stop) (acc, widx')
+            Gate.OutputOne widx' => loop taskDepth count (i + 1, stop) widx'
           | Gate.OutputTwo (widx1, widx2) =>
-              sequentialLoop (i + 1, stop)
-                (sequentialLoop (i + 1, stop) (acc, widx1), widx2)
+              if taskDepth >= 5 then
+                loop taskDepth (loop taskDepth count (i + 1, stop) widx1)
+                  (i + 1, stop) widx2
+              else
+                let
+                  val (countl, countr) =
+                    ForkJoin.par
+                      ( fn _ => loop (taskDepth + 1) 0 (i + 1, stop) widx1
+                      , fn _ => loop (taskDepth + 1) 0 (i + 1, stop) widx2
+                      )
+                in
+                  count + countl + countr
+                end
 
+      val initial = (BasisIdx.zeros, Complex.real 1.0)
+      val totalInserts = loop 0 0 (0, depth) initial
+      val result = HT.compact table
 
-      fun advanceState (i, stop) state =
-        SparseState.fromSeq (Seq.fromList
-          (Seq.iterate (sequentialLoop (i, stop)) [] (SparseState.toSeq state)))
+      val _ = print
+        ("duplicates " ^ Int.toString (totalInserts - Seq.length result) ^ "\n")
 
+      val resultNoZeros =
+        Seq.filter (fn (bidx, w) => Complex.isNonZero w) result
 
-      fun loop i state =
-        if i >= depth then
-          state
-        else if SparseState.size state >= splitThreshold then
-          let
-            val state = SparseState.toSeq state
-            val half = Seq.length state div 2
-            val (statel, stater) =
-              ForkJoin.par
-                ( fn _ => loop i (SparseState.fromSeq (Seq.take state half))
-                , fn _ => loop i (SparseState.fromSeq (Seq.drop state half))
-                )
-          in
-            (* SparseState.compact (SparseState.merge (statel, stater)) *)
-            SparseState.fromSeq
-              (Seq.append (SparseState.toSeq statel, SparseState.toSeq stater))
-          end
-        else
-          let val stop = Int.min (depth, i + sequentialDepthAdvance)
-          in loop stop (advanceState (i, stop) state)
-          end
+      val _ = print
+        ("zeros " ^ Int.toString (Seq.length result - Seq.length resultNoZeros)
+         ^ "\n")
     in
-      SparseState.compact (loop 0 SparseState.initial)
+      SparseState.fromSeq resultNoZeros
     end
+
 
   fun simulateSequential {numQubits, gates} =
     let
       fun gate i = Seq.nth gates i
       val depth = Seq.length gates
 
-      fun loop acc i widx =
+      val initialCapacity = expectOutputSize * 2
+      val table = HT.make
+        { hash = BasisIdx.hash
+        , eq = BasisIdx.equal
+        , capacity = initialCapacity
+        , maxload = 0.75
+        }
+
+      fun loop count i widx =
         if i >= depth then
-          widx :: acc
+          (HT.insertWith Complex.+ table widx; count + 1)
         else
           case Gate.apply (gate i) widx of
-            Gate.OutputOne widx' => loop acc (i + 1) widx'
+            Gate.OutputOne widx' => loop count (i + 1) widx'
           | Gate.OutputTwo (widx1, widx2) =>
-              loop (loop acc (i + 1) widx1) (i + 1) widx2
+              loop (loop count (i + 1) widx1) (i + 1) widx2
 
       val initial = (BasisIdx.zeros, Complex.real 1.0)
-      val result = loop [] 0 initial
+      val totalInserts = loop 0 0 initial
+      val result = HT.compact table
+
+      val _ = print
+        ("duplicates " ^ Int.toString (totalInserts - Seq.length result) ^ "\n")
+
+      val resultNoZeros =
+        Seq.filter (fn (bidx, w) => Complex.isNonZero w) result
+
+      val _ = print
+        ("zeros " ^ Int.toString (Seq.length result - Seq.length resultNoZeros)
+         ^ "\n")
     in
-      SparseState.compact (SparseState.fromSeq (Seq.fromList result))
+      SparseState.fromSeq resultNoZeros
     end
 
 
