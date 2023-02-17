@@ -19,6 +19,8 @@ sig
   type weight = Complex.t
   type weighted_idx = BasisIdx.t * weight
 
+  val expectBranching: gate -> bool
+
   datatype gate_output =
     OutputOne of weighted_idx
   | OutputTwo of weighted_idx * weighted_idx

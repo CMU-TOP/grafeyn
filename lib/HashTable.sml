@@ -14,6 +14,11 @@ sig
   val insertIfNotPresent: ('a, 'b) table -> 'a * 'b -> bool
   val insertWith: ('b * 'b -> 'b) -> ('a, 'b) table -> 'a * 'b -> unit
   val compact: ('a, 'b) table -> ('a * 'b) Seq.t
+
+  (* Unsafe because underlying array is shared. If the table is mutated,
+   * then the Seq would not appear to be immutable.
+   *)
+  val unsafeViewContents: ('a, 'b) table -> ('a * 'b) option Seq.t
 end =
 struct
 
@@ -34,6 +39,8 @@ struct
     in T {data = data, hash = hash, eq = eq, maxload = maxload}
     end
 
+  fun unsafeViewContents (T {data, ...}) = ArraySlice.full data
+
   fun bcas (arr, i) (old, new) =
     MLton.eq (old, Concurrency.casArray (arr, i) (old, new))
 
@@ -49,7 +56,7 @@ struct
       val n = Array.length data
       val start = (hash x) mod (Array.length data)
 
-      val tolerance = 10 * Real.ceil (1.0 / (1.0 - maxload))
+      val tolerance = 20 * Real.ceil (1.0 / (1.0 - maxload))
 
       fun loop i probes =
         if probes >= tolerance then
