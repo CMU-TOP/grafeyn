@@ -73,45 +73,21 @@ struct
       fun gate i = Seq.nth gates i
       val depth = Seq.length gates
 
-      fun sequentialLoop (i, stop) (acc, widx) =
-        if i >= stop then
-          widx :: acc
-        else
-          case Gate.apply (gate i) widx of
-            Gate.OutputOne widx' => sequentialLoop (i + 1, stop) (acc, widx')
-          | Gate.OutputTwo (widx1, widx2) =>
-              sequentialLoop (i + 1, stop)
-                (sequentialLoop (i + 1, stop) (acc, widx1), widx2)
-
-
-      fun advanceState (i, stop) state =
-        SparseState.fromSeq (Seq.fromList
-          (Seq.iterate (sequentialLoop (i, stop)) [] (SparseState.toSeq state)))
-
-
-      fun loop i state =
+      fun loop i countGateApp state =
         if i >= depth then
-          state
-        else if SparseState.size state >= splitThreshold then
-          let
-            val state = SparseState.toSeq state
-            val half = Seq.length state div 2
-            val (statel, stater) =
-              ForkJoin.par
-                ( fn _ => loop i (SparseState.fromSeq (Seq.take state half))
-                , fn _ => loop i (SparseState.fromSeq (Seq.drop state half))
-                )
-          in
-            SparseState.compact (SparseState.merge (statel, stater))
-          (* SparseState.fromSeq
-            (Seq.append (SparseState.toSeq statel, SparseState.toSeq stater)) *)
-          end
+          (countGateApp, state)
         else
-          let val stop = Int.min (depth, i + sequentialDepthAdvance)
-          in loop stop (advanceState (i, stop) state)
+          let
+            val countGateApp = countGateApp + SparseState.size state
+          in
+            loop (i + 1) countGateApp (SparseState.compact
+              (Gate.applyState (gate i) state))
           end
+
+      val (totalGateApps, state) = loop 0 0 SparseState.initial
+      val _ = print ("gate app count " ^ Int.toString totalGateApps ^ "\n")
     in
-      SparseState.compact (loop 0 SparseState.initial)
+      state
     end
 
 
@@ -128,30 +104,43 @@ struct
         , maxload = 0.75
         }
 
-      fun loop taskDepth count (i, stop) widx =
+      fun loop taskDepth (gateAppCount, insertCount) (i, stop) widx =
         if i >= stop then
-          (HT.insertWith Complex.+ table widx; count + 1)
+          (HT.insertWith Complex.+ table widx; (gateAppCount, insertCount + 1))
         else
           case Gate.apply (gate i) widx of
-            Gate.OutputOne widx' => loop taskDepth count (i + 1, stop) widx'
+            Gate.OutputOne widx' =>
+              loop taskDepth (gateAppCount + 1, insertCount) (i + 1, stop) widx'
           | Gate.OutputTwo (widx1, widx2) =>
               if taskDepth >= 5 then
-                loop taskDepth (loop taskDepth count (i + 1, stop) widx1)
-                  (i + 1, stop) widx2
+                let
+                  val xx =
+                    loop taskDepth (gateAppCount + 1, insertCount) (i + 1, stop)
+                      widx1
+                in
+                  loop taskDepth xx (i + 1, stop) widx2
+                end
               else
                 let
-                  val (countl, countr) =
+                  val
+                    ( (gateAppCountL, insertCountL)
+                    , (gateAppCountR, insertCountR)
+                    ) =
                     ForkJoin.par
-                      ( fn _ => loop (taskDepth + 1) 0 (i + 1, stop) widx1
-                      , fn _ => loop (taskDepth + 1) 0 (i + 1, stop) widx2
+                      ( fn _ => loop (taskDepth + 1) (0, 0) (i + 1, stop) widx1
+                      , fn _ => loop (taskDepth + 1) (0, 0) (i + 1, stop) widx2
                       )
                 in
-                  count + countl + countr
+                  ( gateAppCount + 1 + gateAppCountL + gateAppCountR
+                  , insertCount + insertCountL + insertCountR
+                  )
                 end
 
       val initial = (BasisIdx.zeros, Complex.real 1.0)
-      val totalInserts = loop 0 0 (0, depth) initial
+      val (totalGateApps, totalInserts) = loop 0 (0, 0) (0, depth) initial
       val result = HT.compact table
+
+      val _ = print ("gate app count " ^ Int.toString totalGateApps ^ "\n")
 
       val _ = print
         ("duplicates " ^ Int.toString (totalInserts - Seq.length result) ^ "\n")
@@ -180,18 +169,23 @@ struct
         , maxload = 0.75
         }
 
-      fun loop count i widx =
+      fun loop (gateAppCount, insertCount) i widx =
         if i >= depth then
-          (HT.insertWith Complex.+ table widx; count + 1)
+          (HT.insertWith Complex.+ table widx; (gateAppCount, insertCount + 1))
         else
           case Gate.apply (gate i) widx of
-            Gate.OutputOne widx' => loop count (i + 1) widx'
+            Gate.OutputOne widx' =>
+              loop (gateAppCount + 1, insertCount) (i + 1) widx'
           | Gate.OutputTwo (widx1, widx2) =>
-              loop (loop count (i + 1) widx1) (i + 1) widx2
+              let val xx = loop (gateAppCount + 1, insertCount) (i + 1) widx1
+              in loop xx (i + 1) widx2
+              end
 
       val initial = (BasisIdx.zeros, Complex.real 1.0)
-      val totalInserts = loop 0 0 initial
+      val (totalGateApps, totalInserts) = loop (0, 0) 0 initial
       val result = HT.compact table
+
+      val _ = print ("gate app count " ^ Int.toString totalGateApps ^ "\n")
 
       val _ = print
         ("duplicates " ^ Int.toString (totalInserts - Seq.length result) ^ "\n")
