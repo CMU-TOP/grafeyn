@@ -25,12 +25,22 @@ local
   SparseState.sml
   Gate.sml
   Circuit.sml
+
+  SimulateSequential.sml
+  SimulateNaivePar.sml
+  SimulateBFS.sml
+  SimulateStridedBFS.sml
 in
   structure Complex
   structure BasisIdx
   structure SparseState
   structure Gate
   structure Circuit
+
+  structure SimulateSequential
+  structure SimulateNaivePar
+  structure SimulateBFS
+  structure SimulateStridedBFS
 end
 
 local

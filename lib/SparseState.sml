@@ -21,6 +21,8 @@ sig
   (* combine duplicates, eliminate zeros *)
   val compact: state -> state
   val merge: state * state -> state
+
+  val compactFromTable: (BasisIdx.t, Complex.t) HashTable.t -> state
 end =
 struct
 
@@ -153,5 +155,17 @@ struct
 
   fun toSeq state = compact state
   fun fromSeq elems = elems
+
+  (* ======================================================================= *)
+
+  fun compactFromTable (table: (BasisIdx.t, Complex.t) HashTable.t) : state =
+    let
+      fun intoWidx x =
+        case x of
+          NONE => NONE
+        | SOME (bidx, weight) => if Complex.isNonZero weight then x else NONE
+    in
+      fromSeq (Seq.mapOption intoWidx (HashTable.unsafeViewContents table))
+    end
 
 end

@@ -54,16 +54,17 @@ val _ =
 val _ = print ("sim " ^ simName ^ "\n")
 val simulator =
   case simName of
-    "seq" => Circuit.simulateSequential
-  | "par" => Circuit.simulate
-  | "bfs" => Circuit.simulateBreadthFirst
-  | "strided-bfs" => Circuit.simulateStridedBreadthFirst
+    "seq" => SimulateSequential.run
+  | "naive-par" => SimulateNaivePar.run
+  | "bfs" => SimulateBFS.run
+  | "strided-bfs" => SimulateStridedBFS.run
   | _ =>
       Util.die
         ("Unknown -sim " ^ simName
-         ^ "; valid options are: seq, par, bfs, strided-bfs")
+         ^ "; valid options are: seq, naive-par, bfs, strided-bfs")
 
-val result = Benchmark.run "quantum simulator" (fn _ => simulator circuit)
+val msg = "quantum simulator (" ^ simName ^ ")"
+val result = Benchmark.run msg (fn _ => simulator circuit)
 val _ = print
   ("num non-zero states " ^ Int.toString (SparseState.size result) ^ "\n")
 
