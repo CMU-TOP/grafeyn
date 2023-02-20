@@ -20,9 +20,6 @@ struct
   type circuit = {numQubits: int, gates: Gate.t Seq.t}
   type t = circuit
 
-  val splitThreshold = CommandLineArgs.parseInt "split-threshold" 100
-  val expectOutputSize = CommandLineArgs.parseInt "expect-output-size" 1000
-
   fun numGates ({gates, ...}: circuit) = Seq.length gates
   fun numQubits ({numQubits = nq, ...}: circuit) = nq
 
@@ -236,49 +233,61 @@ struct
       fun gate i = Seq.nth gates i
       val depth = Seq.length gates
 
-      val initialCapacity = expectOutputSize * 2
-      val table = HT.make
-        { hash = BasisIdx.hash
-        , eq = BasisIdx.equal
-        , capacity = initialCapacity
-        , maxload = 0.75
-        }
+      fun attemptWithTableSize capacity =
+        let
+          val table = HT.make
+            { hash = BasisIdx.hash
+            , eq = BasisIdx.equal
+            , capacity = capacity
+            , maxload = 0.75
+            }
 
-      fun loop taskDepth (gateAppCount, insertCount) (i, stop) widx =
-        if i >= stop then
-          (HT.insertWith Complex.+ table widx; (gateAppCount, insertCount + 1))
-        else
-          case Gate.apply (gate i) widx of
-            Gate.OutputOne widx' =>
-              loop taskDepth (gateAppCount + 1, insertCount) (i + 1, stop) widx'
-          | Gate.OutputTwo (widx1, widx2) =>
-              if taskDepth >= 5 then
-                let
-                  val xx =
-                    loop taskDepth (gateAppCount + 1, insertCount) (i + 1, stop)
-                      widx1
-                in
-                  loop taskDepth xx (i + 1, stop) widx2
-                end
-              else
-                let
-                  val
-                    ( (gateAppCountL, insertCountL)
-                    , (gateAppCountR, insertCountR)
-                    ) =
-                    ForkJoin.par
-                      ( fn _ => loop (taskDepth + 1) (0, 0) (i + 1, stop) widx1
-                      , fn _ => loop (taskDepth + 1) (0, 0) (i + 1, stop) widx2
+          fun loop taskDepth (gateAppCount, insertCount) (i, stop) widx =
+            if i >= stop then
+              ( HT.insertWith Complex.+ table widx
+              ; (gateAppCount, insertCount + 1)
+              )
+            else
+              case Gate.apply (gate i) widx of
+                Gate.OutputOne widx' =>
+                  loop taskDepth (gateAppCount + 1, insertCount) (i + 1, stop)
+                    widx'
+              | Gate.OutputTwo (widx1, widx2) =>
+                  if taskDepth >= 5 then
+                    let
+                      val xx =
+                        loop taskDepth (gateAppCount + 1, insertCount)
+                          (i + 1, stop) widx1
+                    in
+                      loop taskDepth xx (i + 1, stop) widx2
+                    end
+                  else
+                    let
+                      val
+                        ( (gateAppCountL, insertCountL)
+                        , (gateAppCountR, insertCountR)
+                        ) =
+                        ForkJoin.par
+                          ( fn _ =>
+                              loop (taskDepth + 1) (0, 0) (i + 1, stop) widx1
+                          , fn _ =>
+                              loop (taskDepth + 1) (0, 0) (i + 1, stop) widx2
+                          )
+                    in
+                      ( gateAppCount + 1 + gateAppCountL + gateAppCountR
+                      , insertCount + insertCountL + insertCountR
                       )
-                in
-                  ( gateAppCount + 1 + gateAppCountL + gateAppCountR
-                  , insertCount + insertCountL + insertCountR
-                  )
-                end
+                    end
 
-      val initial = (BasisIdx.zeros, Complex.real 1.0)
-      val (totalGateApps, totalInserts) = loop 0 (0, 0) (0, depth) initial
-      val result = compactTable table
+          val initial = (BasisIdx.zeros, Complex.real 1.0)
+          val (totalGateApps, totalInserts) = loop 0 (0, 0) (0, depth) initial
+          val result = compactTable table
+        in
+          (result, totalGateApps, totalInserts)
+        end
+        handle HT.Full => attemptWithTableSize (2 * capacity)
+
+      val (result, totalGateApps, totalInserts) = attemptWithTableSize 100
       val _ = print ("gate app count " ^ Int.toString totalGateApps ^ "\n")
       val _ = print
         ("duplicates and zeros "
@@ -293,29 +302,40 @@ struct
       fun gate i = Seq.nth gates i
       val depth = Seq.length gates
 
-      val initialCapacity = expectOutputSize * 2
-      val table = HT.make
-        { hash = BasisIdx.hash
-        , eq = BasisIdx.equal
-        , capacity = initialCapacity
-        , maxload = 0.75
-        }
+      fun attemptWithTableSize capacity =
+        let
+          val table = HT.make
+            { hash = BasisIdx.hash
+            , eq = BasisIdx.equal
+            , capacity = capacity
+            , maxload = 0.75
+            }
+          fun loop (gateAppCount, insertCount) i widx =
+            if i >= depth then
+              ( HT.insertWith Complex.+ table widx
+              ; (gateAppCount, insertCount + 1)
+              )
+            else
+              case Gate.apply (gate i) widx of
+                Gate.OutputOne widx' =>
+                  loop (gateAppCount + 1, insertCount) (i + 1) widx'
+              | Gate.OutputTwo (widx1, widx2) =>
+                  let
+                    val xx = loop (gateAppCount + 1, insertCount) (i + 1) widx1
+                  in
+                    loop xx (i + 1) widx2
+                  end
 
-      fun loop (gateAppCount, insertCount) i widx =
-        if i >= depth then
-          (HT.insertWith Complex.+ table widx; (gateAppCount, insertCount + 1))
-        else
-          case Gate.apply (gate i) widx of
-            Gate.OutputOne widx' =>
-              loop (gateAppCount + 1, insertCount) (i + 1) widx'
-          | Gate.OutputTwo (widx1, widx2) =>
-              let val xx = loop (gateAppCount + 1, insertCount) (i + 1) widx1
-              in loop xx (i + 1) widx2
-              end
+          val initial = (BasisIdx.zeros, Complex.real 1.0)
+          val (totalGateApps, totalInserts) = loop (0, 0) 0 initial
+          val result = compactTable table
+        in
+          (result, totalGateApps, totalInserts)
+        end
+        handle HT.Full => attemptWithTableSize (2 * capacity)
 
-      val initial = (BasisIdx.zeros, Complex.real 1.0)
-      val (totalGateApps, totalInserts) = loop (0, 0) 0 initial
-      val result = compactTable table
+      val (result, totalGateApps, totalInserts) = attemptWithTableSize 100
+
       val _ = print ("gate app count " ^ Int.toString totalGateApps ^ "\n")
       val _ = print
         ("duplicates and zeros "
@@ -323,24 +343,5 @@ struct
     in
       result
     end
-
-
-(*
-  fun simulate {numQubits: int} circuit =
-    let
-      fun dump isFirst state =
-        let val front = if isFirst then "" else "--------\n"
-        in print (front ^ SparseState.toString {numQubits = numQubits} state)
-        end
-
-      fun doGate (state, gate) =
-        let val result = SparseState.compact (Gate.apply gate state)
-        in dump false result; result
-        end
-    in
-      dump true SparseState.initial;
-      Seq.iterate doGate SparseState.initial circuit
-    end
-*)
 
 end
