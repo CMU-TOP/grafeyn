@@ -8,6 +8,7 @@ sig
   val imag: real -> t
   val rotateBy: real -> t (* rotateBy x = e^(ix) *)
 
+  val isZero: t -> bool
   val isNonZero: t -> bool
 
   val zero: t
@@ -26,7 +27,7 @@ struct
     rtos re ^ " + " ^ rtos im ^ "i"
 
   fun closeEnough (x, y) =
-    Real.abs (x - y) <= 0.000001
+    Real.abs (x - y) <= 0.000000001
 
   fun isZero (C {re, im}) =
     closeEnough (re, 0.0) andalso closeEnough (im, 0.0)
