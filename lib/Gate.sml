@@ -69,6 +69,7 @@ struct
       OutputOne (bidx', weight')
     end
 
+
   fun pauliz qi (bidx, weight) =
     let
       val multiplier =
@@ -78,7 +79,7 @@ struct
       OutputOne (bidx, weight')
     end
 
-  
+
   fun sqrty qi (bidx, weight) =
     let
       val bidx1 = BasisIdx.set bidx qi false
@@ -86,10 +87,8 @@ struct
 
       val multiplier1 = Complex.make (0.5, ~0.5)
       val multiplier2 =
-        if BasisIdx.get bidx qi then 
-          Complex.make (0.5, ~0.5)
-        else
-          Complex.make (~0.5, 0.5)
+        if BasisIdx.get bidx qi then Complex.make (0.5, ~0.5)
+        else Complex.make (~0.5, 0.5)
 
       val weight1 = Complex.* (weight, multiplier1)
       val weight2 = Complex.* (weight, multiplier2)
@@ -97,7 +96,7 @@ struct
       OutputTwo ((bidx1, weight1), (bidx2, weight2))
     end
 
-  
+
   fun sqrtx qi (bidx, weight) =
     let
       val bidx1 = BasisIdx.set bidx qi false

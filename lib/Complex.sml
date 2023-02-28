@@ -28,7 +28,7 @@ struct
   fun toString (C {re, im}) =
     rtos re ^ " + " ^ rtos im ^ "i"
 
-  fun make (re, im) = C {re=re, im=im}
+  fun make (re, im) = C {re = re, im = im}
 
   fun closeEnough (x, y) =
     Real.abs (x - y) <= 0.000000001
