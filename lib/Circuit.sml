@@ -31,6 +31,7 @@ struct
         | Gate.Hadamard i => "h " ^ qi i
         | Gate.T i => "t " ^ qi i
         | Gate.SqrtY i => "sqrt(y) " ^ qi i
+        | Gate.SqrtX i => "sqrt(x) " ^ qi i
         | Gate.X i => "x " ^ qi i
         | Gate.CX {control, target} => "cx " ^ qi control ^ ", " ^ qi target
         | Gate.CPhase {control, target, rot} =>

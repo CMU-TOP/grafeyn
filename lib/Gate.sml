@@ -7,6 +7,7 @@ sig
   | PauliZ of qubit_idx
   | Hadamard of qubit_idx
   | SqrtY of qubit_idx
+  | SqrtX of qubit_idx
   | X of qubit_idx
   | T of qubit_idx
   | CX of {control: qubit_idx, target: qubit_idx}
@@ -39,6 +40,7 @@ struct
   | PauliZ of qubit_idx
   | Hadamard of qubit_idx
   | SqrtY of qubit_idx
+  | SqrtX of qubit_idx
   | T of qubit_idx
   | X of qubit_idx
   | CX of {control: qubit_idx, target: qubit_idx}
@@ -93,6 +95,21 @@ struct
       val weight2 = Complex.* (weight, multiplier2)
     in
       OutputTwo ((bidx1, weight1), (bidx2, weight2))
+    end
+
+  
+  fun sqrtx qi (bidx, weight) =
+    let
+      val bidx1 = BasisIdx.set bidx qi false
+      val bidx2 = BasisIdx.set bidx qi true
+
+      val weightA = Complex.* (weight, Complex.make (0.5, 0.5))
+      val weightB = Complex.* (weight, Complex.make (0.5, ~0.5))
+    in
+      if BasisIdx.get bidx qi then
+        OutputTwo ((bidx1, weightB), (bidx2, weightA))
+      else
+        OutputTwo ((bidx1, weightA), (bidx2, weightB))
     end
 
 
@@ -158,6 +175,7 @@ struct
     case gate of
       Hadamard _ => true
     | SqrtY _ => true
+    | SqrtX _ => true
     | _ => false
 
 
@@ -168,6 +186,7 @@ struct
     | Hadamard xx => hadamard xx widx
     | T xx => t xx widx
     | SqrtY xx => sqrty xx widx
+    | SqrtX xx => sqrtx xx widx
     | X xx => x xx widx
     | CX xx => cx xx widx
     | CPhase xx => cphase xx widx
