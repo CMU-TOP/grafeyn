@@ -6,6 +6,7 @@ sig
     PauliY of qubit_idx
   | PauliZ of qubit_idx
   | Hadamard of qubit_idx
+  | SqrtY of qubit_idx
   | X of qubit_idx
   | T of qubit_idx
   | CX of {control: qubit_idx, target: qubit_idx}
@@ -37,6 +38,7 @@ struct
     PauliY of qubit_idx
   | PauliZ of qubit_idx
   | Hadamard of qubit_idx
+  | SqrtY of qubit_idx
   | T of qubit_idx
   | X of qubit_idx
   | CX of {control: qubit_idx, target: qubit_idx}
@@ -72,6 +74,25 @@ struct
       val weight' = Complex.* (weight, multiplier)
     in
       OutputOne (bidx, weight')
+    end
+
+  
+  fun sqrty qi (bidx, weight) =
+    let
+      val bidx1 = BasisIdx.set bidx qi false
+      val bidx2 = BasisIdx.set bidx qi true
+
+      val multiplier1 = Complex.make (0.5, ~0.5)
+      val multiplier2 =
+        if BasisIdx.get bidx qi then 
+          Complex.make (0.5, ~0.5)
+        else
+          Complex.make (~0.5, 0.5)
+
+      val weight1 = Complex.* (weight, multiplier1)
+      val weight2 = Complex.* (weight, multiplier2)
+    in
+      OutputTwo ((bidx1, weight1), (bidx2, weight2))
     end
 
 
@@ -136,6 +157,7 @@ struct
   fun expectBranching gate =
     case gate of
       Hadamard _ => true
+    | SqrtY _ => true
     | _ => false
 
 
@@ -145,6 +167,7 @@ struct
     | PauliZ xx => pauliz xx widx
     | Hadamard xx => hadamard xx widx
     | T xx => t xx widx
+    | SqrtY xx => sqrty xx widx
     | X xx => x xx widx
     | CX xx => cx xx widx
     | CPhase xx => cphase xx widx

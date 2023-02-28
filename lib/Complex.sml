@@ -4,6 +4,8 @@ sig
 
   val toString: t -> string
 
+  val make: (real * real) -> t
+
   val real: real -> t
   val imag: real -> t
   val rotateBy: real -> t (* rotateBy x = e^(ix) *)
@@ -25,6 +27,8 @@ struct
 
   fun toString (C {re, im}) =
     rtos re ^ " + " ^ rtos im ^ "i"
+
+  fun make (re, im) = C {re=re, im=im}
 
   fun closeEnough (x, y) =
     Real.abs (x - y) <= 0.000000001
