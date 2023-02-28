@@ -8,6 +8,7 @@ sig
   | Hadamard of qubit_idx
   | SqrtY of qubit_idx
   | SqrtX of qubit_idx
+  | SqrtW of qubit_idx
   | X of qubit_idx
   | T of qubit_idx
   | CX of {control: qubit_idx, target: qubit_idx}
@@ -41,6 +42,7 @@ struct
   | Hadamard of qubit_idx
   | SqrtY of qubit_idx
   | SqrtX of qubit_idx
+  | SqrtW of qubit_idx
   | T of qubit_idx
   | X of qubit_idx
   | CX of {control: qubit_idx, target: qubit_idx}
@@ -112,6 +114,24 @@ struct
     end
 
 
+  fun sqrtw qi (bidx, weight) =
+    let
+      val bidx1 = BasisIdx.set bidx qi false
+      val bidx2 = BasisIdx.set bidx qi true
+
+      val (mult1, mult2) =
+        if BasisIdx.get bidx qi then
+          (Complex.imag Constants.RECP_SQRT_2, Complex.make (~0.5, ~0.5))
+        else
+          (Complex.make (~0.5, ~0.5), Complex.real (~ Constants.RECP_SQRT_2))
+
+      val weight1 = Complex.* (weight, mult1)
+      val weight2 = Complex.* (weight, mult2)
+    in
+      OutputTwo ((bidx1, weight1), (bidx2, weight2))
+    end
+
+
   fun hadamard qi (bidx, weight) =
     let
       val bidx1 = bidx
@@ -175,6 +195,7 @@ struct
       Hadamard _ => true
     | SqrtY _ => true
     | SqrtX _ => true
+    | SqrtW _ => true
     | _ => false
 
 
@@ -186,6 +207,7 @@ struct
     | T xx => t xx widx
     | SqrtY xx => sqrty xx widx
     | SqrtX xx => sqrtx xx widx
+    | SqrtW xx => sqrtw xx widx
     | X xx => x xx widx
     | CX xx => cx xx widx
     | CPhase xx => cphase xx widx
