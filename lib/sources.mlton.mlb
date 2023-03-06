@@ -26,6 +26,8 @@ local
   Gate.sml
   Circuit.sml
 
+  GenerateGoogleCircuit.sml
+
   SimulateSequential.sml
   SimulateNaivePar.sml
   SimulateBFS.sml
@@ -36,6 +38,8 @@ in
   structure SparseState
   structure Gate
   structure Circuit
+
+  structure GenerateGoogleCircuit
 
   structure SimulateSequential
   structure SimulateNaivePar
