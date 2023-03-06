@@ -17,6 +17,7 @@ sig
       , target: qubit_idx
       , rot: real (* rotation in [0,2pi) *)
       }
+  | FSim of {left: qubit_idx, right: qubit_idx, theta: real, phi: real}
 
   type t = gate
   type weight = Complex.t
@@ -51,6 +52,14 @@ struct
       , target: qubit_idx
       , rot: real (* rotation in [0,2pi) *)
       }
+
+  (** fsim(theta, phi) :=
+    *   [ [ 1,   0,              0,              0          ],
+    *     [ 0,   cos(theta),     -i sin(theta),  0          ],
+    *     [ 0,   -i sin(theta),  cos(theta),     0          ],
+    *     [ 0,   0,              0,              e^(-i phi) ] ]
+    *)
+  | FSim of {left: qubit_idx, right: qubit_idx, theta: real, phi: real}
 
   type t = gate
   type weight = Complex.t
@@ -190,12 +199,37 @@ struct
     end
 
 
+  fun fsim {left, right, theta, phi} (bidx, weight) =
+    let
+      val l = BasisIdx.get bidx left
+      val r = BasisIdx.get bidx right
+    in
+      case (l, r) of
+        (false, false) => OutputOne (bidx, weight)
+      | (true, true) =>
+          OutputOne (bidx, Complex.* (weight, Complex.rotateBy (~phi)))
+      | _ =>
+          let
+            val bidx1 = bidx
+            val bidx2 = BasisIdx.flip (BasisIdx.flip bidx left) right
+            val weight1 = Complex.* (weight, Complex.real (Math.cos theta))
+            val weight2 = Complex.* (weight, Complex.imag (~(Math.sin theta)))
+          in
+            if BasisIdx.get bidx left then
+              OutputTwo ((bidx1, weight2), (bidx2, weight1))
+            else
+              OutputTwo ((bidx1, weight1), (bidx2, weight2))
+          end
+    end
+
+
   fun expectBranching gate =
     case gate of
       Hadamard _ => true
     | SqrtY _ => true
     | SqrtX _ => true
     | SqrtW _ => true
+    | FSim _ => true
     | _ => false
 
 
@@ -211,6 +245,7 @@ struct
     | X xx => x xx widx
     | CX xx => cx xx widx
     | CPhase xx => cphase xx widx
+    | FSim xx => fsim xx widx
 
 
   fun gateOutputToSeq go =

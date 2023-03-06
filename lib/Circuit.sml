@@ -37,6 +37,9 @@ struct
         | Gate.CX {control, target} => "cx " ^ qi control ^ ", " ^ qi target
         | Gate.CPhase {control, target, rot} =>
             "cphase(" ^ Real.toString rot ^ ") " ^ qi control ^ ", " ^ qi target
+        | Gate.FSim {left, right, theta, phi} =>
+            "fsim(" ^ Real.toString theta ^ ", " ^ Real.toString phi ^ ") "
+            ^ qi left ^ ", " ^ qi right
     in
       Seq.iterate op^ header (Seq.map (fn g => gateToString g ^ ";\n") gates)
     end
