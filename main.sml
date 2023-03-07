@@ -6,6 +6,11 @@ val output = CLA.parseString "output" ""
 
 val _ = print ("input " ^ inputName ^ "\n")
 
+val _ = print
+  ("-------------------------------\n\
+   \--- input-specific specs\n\
+   \-------------------------------\n")
+
 val circuit =
   case inputName of
     "random" =>
@@ -31,10 +36,41 @@ val circuit =
         {numQubits = numQubits, gates = gates}
       end
 
+  | "google-circuit" =>
+      let
+        val numRows = CLA.parseInt "google-circuit-num-rows" 9
+        val numCols = CLA.parseInt "google-circuit-num-cols" 6
+        val numCycles = CLA.parseInt "google-circuit-num-cycles" 14
+        val patterns = CLA.parseString "google-circuit-patterns" "EFGH"
+        val seed = CLA.parseInt "google-circuit-seed" 15210
+
+        val _ = print ("google-circuit-num-rows " ^ Int.toString numRows ^ "\n")
+        val _ = print ("google-circuit-num-cols " ^ Int.toString numCols ^ "\n")
+        val _ = print
+          ("google-circuit-num-cycles " ^ Int.toString numCycles ^ "\n")
+        val _ = print ("google-circuit-patterns " ^ patterns ^ "\n")
+        val _ = print ("google-circuit-seed " ^ Int.toString seed ^ "\n")
+
+        val patterns =
+          Seq.tabulate
+            (fn i =>
+               GenerateGoogleCircuit.twoQubitPatternFromChar
+                 (String.sub (patterns, i))) (String.size patterns)
+      in
+        GenerateGoogleCircuit.generate
+          { numQubitRows = numRows
+          , numQubitCols = numCols
+          , numCycles = numCycles
+          , patterns = patterns
+          , seed = seed
+          }
+      end
+
   | _ =>
       (ParseQASM.loadFromFile inputName
        handle ParseQASM.ParseError msg => Util.die (inputName ^ ": " ^ msg))
 
+val _ = print ("-------------------------------\n")
 
 val _ = print ("gates  " ^ Int.toString (Circuit.numGates circuit) ^ "\n")
 val _ = print ("qubits " ^ Int.toString (Circuit.numQubits circuit) ^ "\n")

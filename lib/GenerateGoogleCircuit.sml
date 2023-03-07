@@ -137,6 +137,7 @@
 structure GenerateGoogleCircuit:
 sig
   datatype two_qubit_pattern = A | B | C | D | E | F | G | H
+  val twoQubitPatternFromChar: char -> two_qubit_pattern
 
   val generate:
     { numQubitRows: int
@@ -152,23 +153,128 @@ struct
 
   datatype two_qubit_pattern = A | B | C | D | E | F | G | H
 
+  fun twoQubitPatternFromChar c =
+    case c of
+      #"A" => A
+    | #"B" => B
+    | #"C" => C
+    | #"D" => D
+    | #"E" => E
+    | #"F" => F
+    | #"G" => G
+    | #"H" => H
+    | _ =>
+        raise Fail
+          ("GenerateGoogleCircuit.twoQubitPatternFromChar: no such pattern: "
+           ^ Char.toString c)
+
+
   datatype desired_gate_type = SqrtX | SqrtY | SqrtW
 
 
-  fun randomGate seed =
+  fun randomDesiredGate seed =
     let val p = Real.fromInt ((Util.hash seed) mod 1000000) / 1000000.0
     in if p < 1.0 / 3.0 then SqrtX else if p < 2.0 / 3.0 then SqrtY else SqrtW
     end
 
 
-  fun randomGateExcept gate seed =
-    let val gate' = randomGate seed
-    in if gate' <> gate then gate' else randomGateExcept gate (Util.hash seed)
+  fun randomDesiredGateExcept gate seed =
+    let
+      val gate' = randomDesiredGate seed
+    in
+      if gate' <> gate then gate'
+      else randomDesiredGateExcept gate (Util.hash seed)
     end
 
 
   fun genTwoQubitPattern {numRows, numCols, pattern} =
-    raise Fail "TODO: CONTINUE HERE: not yet implemented"
+    let
+      fun coordToQubitIdx (row, col) = row * numCols + col
+      fun qubitIdxToCoord qi = (qi div numCols, qi mod numCols)
+      val numQubits = numRows * numCols
+
+      fun idxInBounds qi = 0 <= qi andalso qi < numQubits
+      fun rowInBounds r = 0 <= r andalso r < numRows
+      fun colInBounds c = 0 <= c andalso c < numCols
+
+      fun fsim (qi1, qi2) =
+        Gate.FSim
+          {left = qi1, right = qi2, theta = Math.pi / 2.0, phi = Math.pi / 6.0}
+
+      (* qi1 is guaranteed okay. but there might not be a qubit at (row2, col2) *)
+      fun checkEdge qi1 (row2, col2) =
+        if idxInBounds qi1 andalso rowInBounds row2 andalso colInBounds col2 then
+          SOME (fsim (qi1, coordToQubitIdx (row2, col2)))
+        else
+          NONE
+
+      fun onlyIf b x =
+        if b then x else NONE
+
+      fun mapOptionQubits f =
+        ArraySlice.full (SeqBasis.tabFilter 1000 (0, numQubits) (fn qi =>
+          let val (row, col) = qubitIdxToCoord qi
+          in f (qi, row, col)
+          end))
+
+      fun genA () =
+        mapOptionQubits (fn (qi, row, col) =>
+          if row mod 2 = 1 then checkEdge qi (row + 1, col) else NONE)
+
+      fun genB () =
+        mapOptionQubits (fn (qi, row, col) =>
+          if row mod 2 = 0 then checkEdge qi (row + 1, col - 1) else NONE)
+
+      fun genC () =
+        mapOptionQubits (fn (qi, row, col) =>
+          if row mod 2 = 0 then checkEdge qi (row + 1, col) else NONE)
+
+      fun genD () =
+        mapOptionQubits (fn (qi, row, col) =>
+          if row mod 2 = 1 then checkEdge qi (row + 1, col + 1) else NONE)
+
+      fun genE () =
+        mapOptionQubits (fn (qi, row, col) =>
+          case row mod 4 of
+            0 => onlyIf (col mod 2 = 0) (checkEdge qi (row + 1, col))
+          | 1 => onlyIf (col mod 2 = 1) (checkEdge qi (row + 1, col + 1))
+          | 2 => onlyIf (col mod 2 = 1) (checkEdge qi (row + 1, col))
+          | _ => onlyIf (col mod 2 = 0) (checkEdge qi (row + 1, col + 1)))
+
+      fun genF () =
+        mapOptionQubits (fn (qi, row, col) =>
+          case row mod 4 of
+            0 => onlyIf (col mod 2 = 1) (checkEdge qi (row + 1, col))
+          | 1 => onlyIf (col mod 2 = 0) (checkEdge qi (row + 1, col + 1))
+          | 2 => onlyIf (col mod 2 = 0) (checkEdge qi (row + 1, col))
+          | _ => onlyIf (col mod 2 = 1) (checkEdge qi (row + 1, col + 1)))
+
+      fun genG () =
+        mapOptionQubits (fn (qi, row, col) =>
+          case row mod 4 of
+            0 => onlyIf (col mod 2 = 1) (checkEdge qi (row + 1, col - 1))
+          | 1 => onlyIf (col mod 2 = 1) (checkEdge qi (row + 1, col))
+          | 2 => onlyIf (col mod 2 = 0) (checkEdge qi (row + 1, col - 1))
+          | _ => onlyIf (col mod 2 = 0) (checkEdge qi (row + 1, col)))
+
+      fun genH () =
+        mapOptionQubits (fn (qi, row, col) =>
+          case row mod 4 of
+            0 => onlyIf (col mod 2 = 0) (checkEdge qi (row + 1, col - 1))
+          | 1 => onlyIf (col mod 2 = 0) (checkEdge qi (row + 1, col))
+          | 2 => onlyIf (col mod 2 = 1) (checkEdge qi (row + 1, col - 1))
+          | _ => onlyIf (col mod 2 = 1) (checkEdge qi (row + 1, col)))
+    in
+      case pattern of
+        A => genA ()
+      | B => genB ()
+      | C => genC ()
+      | D => genD ()
+      | E => genE ()
+      | F => genF ()
+      | G => genG ()
+      | H => genH ()
+    end
 
 
   fun generate {numQubitRows, numQubitCols, numCycles, patterns, seed} =
@@ -179,15 +285,11 @@ struct
       fun pickSeed (qubitIdx, cycle) =
         seed + cycle * numQubits + qubitIdx
 
-      fun fsim (qi1, qi2) =
-        Gate.FSim
-          {left = qi1, right = qi2, theta = Math.pi / 2.0, phi = Math.pi / 6.0}
-
       fun desiredGateType (qubitIdx, cycle) =
         if cycle = 0 then
-          randomGate (pickSeed (qubitIdx, cycle))
+          randomDesiredGate (pickSeed (qubitIdx, cycle))
         else
-          randomGateExcept (desiredGateType (qubitIdx, cycle - 1))
+          randomDesiredGateExcept (desiredGateType (qubitIdx, cycle - 1))
             (pickSeed (qubitIdx, cycle))
 
       fun pickGate cycle qubitIdx =
