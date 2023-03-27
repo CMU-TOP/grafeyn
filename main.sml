@@ -86,39 +86,55 @@ val _ =
        ^ Circuit.toString circuit
        ^ "=========================================================\n")
 
+fun wrapFullSim runner () =
+  let
+    val result = runner circuit
+  in
+    print
+      ("num non-zero states " ^ Int.toString (SparseState.size result) ^ "\n")
+  end
+
+fun wrapQuerySim runner () =
+  let val result = runner circuit BasisIdx.zeros
+  in print ("result " ^ Complex.toString result ^ "\n")
+  end
 
 val _ = print ("sim " ^ simName ^ "\n")
 val simulator =
   case simName of
-    "full-seq" => FullSimSequential.run
-  | "full-naive-par" => FullSimNaivePar.run
-  | "full-bfs" => FullSimBFS.run
-  | "full-strided-bfs" => FullSimStridedBFS.run
+    "full-seq" => wrapFullSim FullSimSequential.run
+  | "full-naive-par" => wrapFullSim FullSimNaivePar.run
+  | "full-bfs" => wrapFullSim FullSimBFS.run
+  | "full-strided-bfs" => wrapFullSim FullSimStridedBFS.run
+
+  | "query-seq" => wrapQuerySim QuerySimSequential.query
+  | "query-naive-par" => wrapQuerySim QuerySimNaivePar.query
+
   | _ =>
       Util.die
         ("Unknown -sim " ^ simName
          ^ "; valid options are: seq, naive-par, bfs, strided-bfs")
 
 val msg = "quantum simulator (" ^ simName ^ ")"
-val result = Benchmark.run msg (fn _ => simulator circuit)
-val _ = print
-  ("num non-zero states " ^ Int.toString (SparseState.size result) ^ "\n")
-
-val _ =
-  if output = "" then
-    ()
-  else
-    let
-      val _ = print ("generating output...\n")
-
-      val contents =
-        SparseState.toString {numQubits = Circuit.numQubits circuit} result
-        ^ "\n"
-
-      val _ = print ("writing to " ^ output ^ "\n")
-      val outstream = TextIO.openOut output
-    in
-      TextIO.output (outstream, contents);
-      TextIO.closeOut outstream;
-      print ("output written to " ^ output ^ "\n")
-    end
+val () = Benchmark.run msg (fn _ =>
+  simulator ())
+    (*
+    val _ =
+      if output = "" then
+        ()
+      else
+        let
+          val _ = print ("generating output...\n")
+    
+          val contents =
+            SparseState.toString {numQubits = Circuit.numQubits circuit} result
+            ^ "\n"
+    
+          val _ = print ("writing to " ^ output ^ "\n")
+          val outstream = TextIO.openOut output
+        in
+          TextIO.output (outstream, contents);
+          TextIO.closeOut outstream;
+          print ("output written to " ^ output ^ "\n")
+        end
+    *)
