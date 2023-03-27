@@ -11,6 +11,11 @@ struct
       fun gate i = Seq.nth gates i
       val depth = Seq.length gates
 
+      val _ =
+        if numQubits > 63 then raise Fail "whoops, too many qubits" else ()
+      val maxNumStates = Word64.toInt
+        (Word64.<< (0w1, Word64.fromInt numQubits))
+
       fun makeNewState cap =
         HT.make
           { hash = BasisIdx.hash
@@ -58,6 +63,12 @@ struct
                 | SOME (bidx, weight) =>
                     if Complex.isNonZero weight then 1 else 0)
 
+            val density = Real.fromInt nonZeroSize / Real.fromInt maxNumStates
+            val _ = print
+              ("gate " ^ Int.toString i ^ ": non-zeros: "
+               ^ Int.toString nonZeroSize ^ "; density: "
+               ^ Real.fmt (StringCvt.FIX (SOME 8)) density ^ "\n")
+            val _ = TextIO.flushOut TextIO.stdOut
 
             val multiplier = if Gate.expectBranching (gate i) then 3.0 else 1.5
             val guess = Real.ceil (multiplier * Real.fromInt nonZeroSize)
