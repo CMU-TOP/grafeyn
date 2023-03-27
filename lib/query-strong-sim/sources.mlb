@@ -4,7 +4,9 @@ local
   ../common/sources.mlb
   QuerySimSequential.sml
   QuerySimNaivePar.sml
+  QuerySimBFS.sml
 in
   structure QuerySimSequential
   structure QuerySimNaivePar
+  structure QuerySimBFS
 end

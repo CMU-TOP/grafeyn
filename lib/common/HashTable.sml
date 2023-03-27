@@ -13,6 +13,7 @@ sig
   val resize: ('a, 'b) table -> ('a, 'b) table
   val insertIfNotPresent: ('a, 'b) table -> 'a * 'b -> bool
   val insertWith: ('b * 'b -> 'b) -> ('a, 'b) table -> 'a * 'b -> unit
+  val lookup: ('a, 'b) table -> 'a -> 'b option
   val compact: ('a, 'b) table -> ('a * 'b) Seq.t
 
   (* Unsafe because underlying array is shared. If the table is mutated,
@@ -54,8 +55,6 @@ struct
   fun insertWith combine (input as T {data, hash, eq, maxload}) (x, v) =
     let
       val n = Array.length data
-      val start = (hash x) mod (Array.length data)
-
       val tolerance = 20 * Real.ceil (1.0 / (1.0 - maxload))
 
       fun loop i probes =
@@ -90,9 +89,7 @@ struct
   fun insertIfNotPresent' (input as T {data, hash, eq, maxload}) (x, v) force =
     let
       val n = Array.length data
-      val start = (hash x) mod (Array.length data)
-
-      val tolerance = 2 * Real.ceil (1.0 / (1.0 - maxload))
+      val tolerance = 20 * Real.ceil (1.0 / (1.0 - maxload))
 
       fun loop i probes =
         if not force andalso probes >= tolerance then
@@ -122,6 +119,23 @@ struct
 
   fun insertIfNotPresent s x =
     insertIfNotPresent' s x false
+
+
+  fun lookup (T {data, hash, eq, ...}) x =
+    let
+      val n = Array.length data
+      val start = (hash x) mod n
+
+      fun loop i =
+        case Array.sub (data, i) of
+          NONE => NONE
+        | SOME (y, v) => if eq (x, y) then SOME v else loopCheck (i + 1)
+
+      and loopCheck i =
+        if i >= n then loopCheck 0 else if i = start then NONE else loop i
+    in
+      if n = 0 then NONE else loop start
+    end
 
 
   fun resize (input as T {data, hash, eq, maxload}) =

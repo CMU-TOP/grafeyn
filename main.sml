@@ -109,11 +109,13 @@ val simulator =
 
   | "query-seq" => wrapQuerySim QuerySimSequential.query
   | "query-naive-par" => wrapQuerySim QuerySimNaivePar.query
+  | "query-bfs" => wrapQuerySim QuerySimBFS.query
 
   | _ =>
       Util.die
-        ("Unknown -sim " ^ simName
-         ^ "; valid options are: seq, naive-par, bfs, strided-bfs")
+        ("Unknown -sim " ^ simName ^ "; valid options are: "
+         ^ "full-seq, full-naive-par, full-bfs, full-strided-bfs, "
+         ^ "query-seq, query-naive-par, query-bfs")
 
 val msg = "quantum simulator (" ^ simName ^ ")"
 val () = Benchmark.run msg (fn _ =>
