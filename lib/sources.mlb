@@ -1,0 +1,11 @@
+common/sources.mlb
+full-strong-sim/sources.mlb
+
+local
+  lib/github.com/mpllang/mpllib/sources.$(COMPILER).mlb
+  ParseQASM.sml
+  GenerateGoogleCircuit.sml
+in
+  structure ParseQASM
+  structure GenerateGoogleCircuit
+end

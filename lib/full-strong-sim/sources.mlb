@@ -1,0 +1,14 @@
+local
+  $(SML_LIB)/basis/basis.mlb
+  ../lib/github.com/mpllang/mpllib/sources.$(COMPILER).mlb
+  ../common/sources.mlb
+  FullSimSequential.sml
+  FullSimNaivePar.sml
+  FullSimBFS.sml
+  FullSimStridedBFS.sml
+in
+  structure FullSimSequential
+  structure FullSimNaivePar
+  structure FullSimBFS
+  structure FullSimStridedBFS
+end

@@ -1,4 +1,4 @@
-structure SimulateStridedBFS:
+structure FullSimStridedBFS:
 sig
   val run: Circuit.t -> SparseState.t
 end =

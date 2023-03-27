@@ -1,4 +1,4 @@
-structure SimulateNaivePar:
+structure FullSimNaivePar:
 sig
   val run: Circuit.t -> SparseState.t
 end =

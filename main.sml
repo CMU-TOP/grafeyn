@@ -1,6 +1,6 @@
 structure CLA = CommandLineArgs
 
-val simName = CLA.parseString "sim" "bfs"
+val simName = CLA.parseString "sim" "full-bfs"
 val inputName = CLA.parseString "input" "random"
 val output = CLA.parseString "output" ""
 
@@ -90,10 +90,10 @@ val _ =
 val _ = print ("sim " ^ simName ^ "\n")
 val simulator =
   case simName of
-    "seq" => SimulateSequential.run
-  | "naive-par" => SimulateNaivePar.run
-  | "bfs" => SimulateBFS.run
-  | "strided-bfs" => SimulateStridedBFS.run
+    "full-seq" => FullSimSequential.run
+  | "full-naive-par" => FullSimNaivePar.run
+  | "full-bfs" => FullSimBFS.run
+  | "full-strided-bfs" => FullSimStridedBFS.run
   | _ =>
       Util.die
         ("Unknown -sim " ^ simName

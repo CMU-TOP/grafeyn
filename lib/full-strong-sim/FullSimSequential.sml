@@ -1,4 +1,4 @@
-structure SimulateSequential:
+structure FullSimSequential:
 sig
   val run: Circuit.t -> SparseState.t
 end =
