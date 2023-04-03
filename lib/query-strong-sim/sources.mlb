@@ -5,8 +5,10 @@ local
   QuerySimSequential.sml
   QuerySimNaivePar.sml
   QuerySimBFS.sml
+  QuerySimWaveBFS.sml
 in
   structure QuerySimSequential
   structure QuerySimNaivePar
   structure QuerySimBFS
+  structure QuerySimWaveBFS
 end

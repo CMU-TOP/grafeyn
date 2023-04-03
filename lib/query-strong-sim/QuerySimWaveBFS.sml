@@ -7,9 +7,8 @@ struct
   structure HT = HashTable
 
   (* ========================================================================
-   * Waves
+   * Waves: a wave is essentially just a sparse state
    *)
-
   structure Wave:
   sig
     type t
@@ -31,6 +30,7 @@ struct
   end =
   struct
     type wave = (BasisIdx.t, Complex.t) HT.t
+    type t = wave
 
     fun makeNewWave cap =
       HT.make
@@ -94,6 +94,27 @@ struct
 
 
   (* ========================================================================
+   * Wave set: mapping of gatenum -> wave
+   *)
+  structure WaveSet:
+  sig
+    type waveset
+    type t = waveset
+
+    val removeOldest: waveset -> waveset * Wave.t
+  end =
+  struct
+    structure IntKey = struct open Int type ord_key = int end
+    structure M = RedBlackMapFn(IntKey)
+    type waveset = Wave.t M.map
+    type t = waveset
+
+    fun removeOldest waves =
+      raise Fail "QuerySimWaveBFS.WaveSet.removeOldest: not yet implemented"
+  end
+
+
+  (* ========================================================================
    * Main function
    *)
 
@@ -108,6 +129,6 @@ struct
 
       val initialWave = Wave.singleton (BasisIdx.zeros, Complex.real 1.0)
     in
-      ()
+      raise Fail "QuerySimWaveBFS.query: not yet implemented"
     end
 end

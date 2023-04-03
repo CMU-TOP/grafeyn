@@ -20,4 +20,6 @@ in
   structure Gate
   structure Circuit
   structure HashTable
+
+  functor RedBlackMapFn
 end
