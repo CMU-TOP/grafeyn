@@ -19,6 +19,10 @@ struct
     (* how many non-zeros? *)
     val nonZeroSize: wave -> int
 
+    val capacity: wave -> int
+
+    val lookup: wave -> BasisIdx.t -> Complex.t option
+
     datatype advance_result =
       AdvanceSuccess of wave
     | AdvancePartialSuccess of {advanced: wave, leftover: wave}
@@ -29,19 +33,20 @@ struct
       -> wave
       -> {numGateApps: int, result: advance_result}
 
-    val split: wave -> wave * wave
-
     val merge: wave * wave -> wave
   end =
   struct
-    type wave = (BasisIdx.t, Complex.t) HT.t
+    datatype wave =
+      Wave of {elems: (BasisIdx.t, Complex.t) HT.t, nonZeroSize: int}
+
     type t = wave
 
     datatype advance_result =
       AdvanceSuccess of wave
     | AdvancePartialSuccess of {advanced: wave, leftover: wave}
 
-    fun makeNewWave cap =
+
+    fun makeNewElems cap =
       HT.make
         { hash = BasisIdx.hash
         , eq = BasisIdx.equal
@@ -51,33 +56,49 @@ struct
 
 
     fun singleton (bidx, weight) =
-      let val wave = makeNewWave 1
-      in HT.insertIfNotPresent wave (bidx, weight); wave
+      let
+        val elems = makeNewElems 1
+      in
+        HT.insertIfNotPresent elems (bidx, weight);
+
+        Wave
+          { elems = elems
+          , nonZeroSize = if Complex.isNonZero weight then 1 else 0
+          }
       end
 
 
-    fun nonZeroSize wave =
+    fun lookup (Wave {elems, ...}) desired = HT.lookup elems desired
+
+
+    fun nonZeroSize (Wave {nonZeroSize = n, ...}) = n
+
+
+    fun capacity (Wave {elems, ...}) = HT.capacity elems
+
+
+    fun computeNonZeroSize elems =
       let
-        val currentElems = HT.unsafeViewContents wave
+        val data = HT.unsafeViewContents elems
       in
-        SeqBasis.reduce 1000 op+ 0 (0, Seq.length currentElems) (fn i =>
-          case Seq.nth currentElems i of
+        SeqBasis.reduce 1000 op+ 0 (0, Seq.length data) (fn i =>
+          case Seq.nth data i of
             NONE => 0
           | SOME (bidx, weight) => if Complex.isNonZero weight then 1 else 0)
       end
 
 
-    fun tryAdvanceWithSpaceConstraint capacity gate wave =
+    fun tryAdvanceWithSpaceConstraint capacity gate (Wave {elems, ...}) =
       let
-        val currentElems = HT.unsafeViewContents wave
-        val newWave = makeNewWave capacity
+        val currentElems = HT.unsafeViewContents elems
+        val newElems = makeNewElems capacity
 
         fun doGate widx =
           case Gate.apply gate widx of
-            Gate.OutputOne widx' => HT.insertWith Complex.+ newWave widx'
+            Gate.OutputOne widx' => HT.insertWith Complex.+ newElems widx'
           | Gate.OutputTwo (widx1, widx2) =>
-              ( HT.insertWith Complex.+ newWave widx1
-              ; HT.insertWith Complex.+ newWave widx2
+              ( HT.insertWith Complex.+ newElems widx1
+              ; HT.insertWith Complex.+ newElems widx2
               )
 
         val numGateApps =
@@ -87,17 +108,41 @@ struct
             | SOME (bidx, weight) =>
                 if Complex.isNonZero weight then (doGate (bidx, weight); 1)
                 else 0)
+
+        val newWave =
+          Wave {elems = newElems, nonZeroSize = computeNonZeroSize newElems}
       in
         {numGateApps = numGateApps, result = AdvanceSuccess newWave}
       end
 
 
-    fun split wave =
-      raise Fail "QuerySimWaveBFS.Wave.split: not yet implemented"
+    fun applyToElems (Wave {elems, ...}) f =
+      let
+        val contents = HT.unsafeViewContents elems
+      in
+        ForkJoin.parfor 1000 (0, Seq.length contents) (fn i =>
+          case Seq.nth contents i of
+            NONE => ()
+          | SOME (bidx, weight) => f (bidx, weight))
+      end
 
 
     fun merge (wave1, wave2) =
-      raise Fail "QuerySimWaveBFS.Wave.merge: not yet implemented"
+      let
+        val totalNonZeros = nonZeroSize wave1 + nonZeroSize wave2
+        val totalCapacities = capacity wave1 + capacity wave2
+        val desiredCapacity = Int.min (totalCapacities, Real.ceil
+          (1.5 * Real.fromInt totalNonZeros))
+        val newElems = makeNewElems desiredCapacity
+
+        fun insertNonZero (bidx, weight) =
+          if Complex.isZero weight then ()
+          else HT.insertWith Complex.+ newElems (bidx, weight)
+      in
+        applyToElems wave1 insertNonZero;
+        applyToElems wave2 insertNonZero;
+        Wave {elems = newElems, nonZeroSize = computeNonZeroSize newElems}
+      end
   end
 
 
@@ -125,17 +170,20 @@ struct
     type waveset = Wave.t M.map
     type t = waveset
 
-    fun singleton (gatenum, wave) =
-      raise Fail "QuerySimWaveBFS.WaveSet.singleton: not yet implemented"
+    fun singleton (gatenum, wave) = M.singleton (gatenum, wave)
 
-    fun numWaves waves =
-      raise Fail "QuerySimWaveBFS.WaveSet.numWaves: not yet implemented"
+    fun numWaves waves = M.numItems waves
 
     fun insert waves (gatenum, wave) =
-      raise Fail "QuerySimWaveBFS.WaveSet.insert: not yet implemented"
+      M.insertWith Wave.merge (waves, gatenum, wave)
 
     fun removeBest waves =
-      raise Fail "QuerySimWaveBFS.WaveSet.removeBest: not yet implemented"
+      case M.firsti waves of
+        SOME (gatenum, _) =>
+          let val (waves', wave) = M.remove (waves, gatenum)
+          in (waves', (gatenum, wave))
+          end
+      | NONE => raise Fail "QuerySimWaveBFS.WaveSet.removeBest: empty"
   end
 
 
@@ -153,7 +201,7 @@ struct
         if numQubits > 63 then raise Fail "whoops, too many qubits" else ()
 
       fun finishWave acc wave =
-        case HT.lookup wave desired of
+        case Wave.lookup wave desired of
           NONE => acc
         | SOME v => Complex.+ (v, acc)
 

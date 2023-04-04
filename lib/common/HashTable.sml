@@ -11,6 +11,7 @@ sig
   val size: ('a, 'b) table -> int
   val capacity: ('a, 'b) table -> int
   val resize: ('a, 'b) table -> ('a, 'b) table
+  val increaseCapacityTo: int -> ('a, 'b) table -> ('a, 'b) table
   val insertIfNotPresent: ('a, 'b) table -> 'a * 'b -> bool
   val insertWith: ('b * 'b -> 'b) -> ('a, 'b) table -> 'a * 'b -> unit
   val lookup: ('a, 'b) table -> 'a -> 'b option
@@ -138,19 +139,25 @@ struct
     end
 
 
-  fun resize (input as T {data, hash, eq, maxload}) =
-    let
-      val newcap = 2 * capacity input
-      val new = make
-        {hash = hash, eq = eq, capacity = newcap, maxload = maxload}
-    in
-      ForkJoin.parfor 1000 (0, Array.length data) (fn i =>
-        case Array.sub (data, i) of
-          NONE => ()
-        | SOME x => (insertIfNotPresent' new x true; ()));
+  fun increaseCapacityTo newcap (input as T {data, hash, eq, maxload}) =
+    if newcap < capacity input then
+      raise Fail "HashTable.increaseCapacityTo: new cap is too small"
+    else
+      let
+        val new = make
+          {hash = hash, eq = eq, capacity = newcap, maxload = maxload}
+      in
+        ForkJoin.parfor 1000 (0, Array.length data) (fn i =>
+          case Array.sub (data, i) of
+            NONE => ()
+          | SOME x => (insertIfNotPresent' new x true; ()));
 
-      new
-    end
+        new
+      end
+
+
+  fun resize x =
+    increaseCapacityTo (2 * capacity x) x
 
 
   fun compact (T {data, ...}) =
