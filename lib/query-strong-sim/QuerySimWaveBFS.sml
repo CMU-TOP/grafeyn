@@ -1,6 +1,10 @@
 structure QuerySimWaveBFS:
 sig
-  val query: Circuit.t -> BasisIdx.t -> Complex.t
+  (* first arg is space constraint, measured in terms of number of sparse
+   * elements.
+   * increasing this uses more space and decreases time.
+   *)
+  val query: int -> Circuit.t -> BasisIdx.t -> Complex.t
 end =
 struct
 
@@ -88,10 +92,43 @@ struct
       end
 
 
-    fun tryAdvanceWithSpaceConstraint capacity gate (Wave {elems, ...}) =
+    fun tryAdvanceWithSpaceConstraint constraint gate
+      (wave as Wave {elems, ...}) =
       let
-        val currentElems = HT.unsafeViewContents elems
-        val newElems = makeNewElems capacity
+        val desiredCapacity =
+          let
+            val currentNonZeroSize = Wave.nonZeroSize wave
+            val multiplier = if Gate.expectBranching gate then 3.0 else 1.5
+          in
+            Int.min (constraint, Real.ceil
+              (multiplier * Real.fromInt currentNonZeroSize))
+          end
+
+        val newElems = makeNewElems desiredCapacity
+
+        (* TODO: handle HT.Full (failed insert due to capacity)
+         *
+         * ideas:
+         *   - If an element was successfully fully expanded (all of its
+         *     outneighbors were inserted into newElems), then update it
+         *     with a weight of zero. This is effectively a tombstone; the
+         *     element will be ignored when we revisit this wave.
+         *   - If an element wasn't successfully expanded at all (none of its
+         *     outneighbors were inserted into newElems), then leave the element
+         *     alone. We will try again when we revisit this wave.
+         *   - But if an element was PARTIALLY expanded (branching gate where
+         *     at least one outneighbor succeeded and also at least one neighbor
+         *     failed)... what do we do???
+         *       - Keep a separate list around of partially expanded elements
+         *         for this wave?
+         *       - I.e., we tombstone the original element, and then insert it
+         *         into the auxiliary "partially expanded list".
+         *       - When we revisit this wave, we will handle the partially
+         *         exanded list specially (to continue where we left off).
+         *       - THIS IS IMPORTANT FOR CORRECTNESS. OTHERWISE WE MIGHT VISIT
+         *         THE SAME PATH MORE THAN ONCE, WHICH WILL MAKE THE RESULT
+         *         INCORRECT.
+         *)
 
         fun doGate widx =
           case Gate.apply gate widx of
@@ -102,12 +139,16 @@ struct
               )
 
         val numGateApps =
-          SeqBasis.reduce 100 op+ 0 (0, Seq.length currentElems) (fn i =>
-            case Seq.nth currentElems i of
-              NONE => 0
-            | SOME (bidx, weight) =>
-                if Complex.isNonZero weight then (doGate (bidx, weight); 1)
-                else 0)
+          let
+            val currentElems = HT.unsafeViewContents elems
+          in
+            SeqBasis.reduce 100 op+ 0 (0, Seq.length currentElems) (fn i =>
+              case Seq.nth currentElems i of
+                NONE => 0
+              | SOME (bidx, weight) =>
+                  if Complex.isNonZero weight then (doGate (bidx, weight); 1)
+                  else 0)
+          end
 
         val newWave =
           Wave {elems = newElems, nonZeroSize = computeNonZeroSize newElems}
@@ -158,6 +199,8 @@ struct
 
     val numWaves: waveset -> int
 
+    val totalSize: waveset -> int
+
     (* (gatenum, wave) pairs *)
     val insert: waveset -> int * Wave.t -> waveset
 
@@ -173,6 +216,9 @@ struct
     fun singleton (gatenum, wave) = M.singleton (gatenum, wave)
 
     fun numWaves waves = M.numItems waves
+
+    fun totalSize waves =
+      M.foldl (fn (wave, acc) => acc + Wave.nonZeroSize wave) 0 waves
 
     fun insert waves (gatenum, wave) =
       M.insertWith Wave.merge (waves, gatenum, wave)
@@ -192,7 +238,7 @@ struct
    *)
 
 
-  fun query {numQubits, gates} desired =
+  fun query spaceConstraint {numQubits, gates} desired =
     let
       fun gate i = Seq.nth gates i
       val depth = Seq.length gates
@@ -211,8 +257,10 @@ struct
           (totalGateApps, acc)
         else
           let
+            val availableSpace = Int.max
+              (1, spaceConstraint - WaveSet.totalSize waves)
+
             val (waves', (gateNum, chosenWave)) = WaveSet.removeBest waves
-            val availableSpace = raise Fail "todo"
           in
             if gateNum >= depth then
               loop totalGateApps (finishWave acc chosenWave) waves'
