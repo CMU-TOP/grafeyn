@@ -11,7 +11,7 @@ struct
   structure HT = HashTable
 
   (* ========================================================================
-   * Waves: a wave is essentially just a sparse state
+   * Waves: a wave is essentially just a sparse state... 
    *)
   structure Wave:
   sig
@@ -40,8 +40,13 @@ struct
     val merge: wave * wave -> wave
   end =
   struct
+    datatype expanded_status = NotExpanded | PartiallyExpanded
+
     datatype wave =
-      Wave of {elems: (BasisIdx.t, Complex.t) HT.t, nonZeroSize: int}
+      Wave of
+        { elems: (BasisIdx.t, Complex.t * expanded_status) HT.t
+        , nonZeroSize: int
+        }
 
     type t = wave
 
@@ -63,7 +68,8 @@ struct
       let
         val elems = makeNewElems 1
       in
-        HT.insertIfNotPresent elems (bidx, weight);
+        HT.insertIfNotPresent elems (bidx, (weight, NotExpanded))
+        handle HT.Full => raise Fail "QuerySimWaveBFS.Wave.singleton: bug!";
 
         Wave
           { elems = elems
@@ -72,7 +78,8 @@ struct
       end
 
 
-    fun lookup (Wave {elems, ...}) desired = HT.lookup elems desired
+    fun lookup (Wave {elems, ...}) desired =
+      Option.map (fn (w, _) => w) (HT.lookup elems desired)
 
 
     fun nonZeroSize (Wave {nonZeroSize = n, ...}) = n
@@ -88,8 +95,30 @@ struct
         SeqBasis.reduce 1000 op+ 0 (0, Seq.length data) (fn i =>
           case Seq.nth data i of
             NONE => 0
-          | SOME (bidx, weight) => if Complex.isNonZero weight then 1 else 0)
+          | SOME (_, (weight, _)) => if Complex.isNonZero weight then 1 else 0)
       end
+
+
+    fun makeWaveFromSeq items =
+      let
+        val desiredCapacity = Real.ceil (2.0 * Real.fromInt (Seq.length items))
+
+        val newElems = makeNewElems desiredCapacity
+      in
+        ForkJoin.parfor 1000 (0, Seq.length items) (fn i =>
+          let
+            val (bidx, weight, status) = Seq.nth items i
+          in
+            if HT.insertIfNotPresent newElems (bidx, (weight, status)) then ()
+            else raise Fail "QuerySimWaveBFS.Wave.makeWaveFromSeq: bug!"
+          end);
+
+        Wave {elems = newElems, nonZeroSize = computeNonZeroSize newElems}
+      end
+
+
+    fun combiner ((weight1, status1), (weight2, status2)) =
+      (Complex.+ (weight1, weight2), NotExpanded)
 
 
     fun tryAdvanceWithSpaceConstraint constraint gate
@@ -97,8 +126,8 @@ struct
       let
         val desiredCapacity =
           let
-            val currentNonZeroSize = Wave.nonZeroSize wave
-            val multiplier = if Gate.expectBranching gate then 3.0 else 1.5
+            val currentNonZeroSize = nonZeroSize wave
+            val multiplier = if Gate.expectBranching gate then 4.0 else 2.0
           in
             Int.min (constraint, Real.ceil
               (multiplier * Real.fromInt currentNonZeroSize))
@@ -130,30 +159,70 @@ struct
          *         INCORRECT.
          *)
 
-        fun doGate widx =
+        fun doGate widx status =
           case Gate.apply gate widx of
-            Gate.OutputOne widx' => HT.insertWith Complex.+ newElems widx'
-          | Gate.OutputTwo (widx1, widx2) =>
-              ( HT.insertWith Complex.+ newElems widx1
-              ; HT.insertWith Complex.+ newElems widx2
-              )
+            Gate.OutputOne (bidx', weight') =>
+              (( HT.insertWith combiner newElems (bidx', (weight', NotExpanded))
+               ; NONE
+               )
+               handle HT.Full => SOME NotExpanded)
+          | Gate.OutputTwo ((bidx1, weight1), (bidx2, weight2)) =>
+              case status of
+                PartiallyExpanded =>
+                  (( HT.insertWith combiner newElems
+                       (bidx2, (weight2, NotExpanded))
+                   ; NONE
+                   )
+                   handle HT.Full => SOME PartiallyExpanded)
+              | NotExpanded =>
+                  let
+                    val result =
+                      ( HT.insertWith combiner newElems
+                          (bidx1, (weight1, NotExpanded))
+                      ; NONE
+                      )
+                      handle HT.Full => SOME NotExpanded
+                  in
+                    if Option.isSome result then
+                      result
+                    else
+                      (( HT.insertWith combiner newElems
+                           (bidx2, (weight2, NotExpanded))
+                       ; NONE
+                       )
+                       handle HT.Full => SOME PartiallyExpanded)
+                  end
 
-        val numGateApps =
+        val numGateApps = nonZeroSize wave
+
+        val leftover =
           let
             val currentElems = HT.unsafeViewContents elems
           in
-            SeqBasis.reduce 100 op+ 0 (0, Seq.length currentElems) (fn i =>
-              case Seq.nth currentElems i of
-                NONE => 0
-              | SOME (bidx, weight) =>
-                  if Complex.isNonZero weight then (doGate (bidx, weight); 1)
-                  else 0)
+            ArraySlice.full
+              (SeqBasis.tabFilter 100 (0, Seq.length currentElems) (fn i =>
+                 case Seq.nth currentElems i of
+                   NONE => NONE
+                 | SOME (bidx, (weight, status)) =>
+                     if Complex.isZero weight then
+                       NONE
+                     else
+                       case doGate (bidx, weight) status of
+                         NONE => NONE
+                       | SOME status' => SOME (bidx, weight, status')))
           end
 
         val newWave =
           Wave {elems = newElems, nonZeroSize = computeNonZeroSize newElems}
+
+        val result =
+          if Seq.length leftover = 0 then
+            AdvanceSuccess newWave
+          else
+            AdvancePartialSuccess
+              {advanced = newWave, leftover = makeWaveFromSeq leftover}
       in
-        {numGateApps = numGateApps, result = AdvanceSuccess newWave}
+        {numGateApps = numGateApps, result = result}
       end
 
 
@@ -170,20 +239,37 @@ struct
 
     fun merge (wave1, wave2) =
       let
+        fun loopGuessCapacity desiredCapacity =
+          let
+            val _ = print
+              ("trying desiredCapacity=" ^ Int.toString desiredCapacity ^ "\n")
+            val newElems = makeNewElems desiredCapacity
+
+            fun insertNonZero (bidx, stuff as (weight, _)) =
+              if Complex.isZero weight then ()
+              else HT.insertWith combiner newElems (bidx, stuff)
+          in
+            applyToElems wave1 insertNonZero;
+            applyToElems wave2 insertNonZero;
+            print "merge success\n";
+            Wave {elems = newElems, nonZeroSize = computeNonZeroSize newElems}
+          end
+          handle HT.Full =>
+            loopGuessCapacity (Real.ceil (1.5 * Real.fromInt desiredCapacity))
+
+
         val totalNonZeros = nonZeroSize wave1 + nonZeroSize wave2
         val totalCapacities = capacity wave1 + capacity wave2
-        val desiredCapacity = Int.min (totalCapacities, Real.ceil
-          (1.5 * Real.fromInt totalNonZeros))
-        val newElems = makeNewElems desiredCapacity
+        val desiredCapacity = Int.min (totalCapacities, totalNonZeros)
+        val desiredCapacity = Real.ceil (1.5 * Real.fromInt desiredCapacity)
 
-        fun insertNonZero (bidx, weight) =
-          if Complex.isZero weight then ()
-          else HT.insertWith Complex.+ newElems (bidx, weight)
+        val _ = print
+          ("merging totalNonZeros=" ^ Int.toString totalNonZeros
+           ^ " totalCapacities=" ^ Int.toString totalCapacities ^ "\n")
       in
-        applyToElems wave1 insertNonZero;
-        applyToElems wave2 insertNonZero;
-        Wave {elems = newElems, nonZeroSize = computeNonZeroSize newElems}
+        loopGuessCapacity desiredCapacity
       end
+
   end
 
 

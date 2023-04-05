@@ -110,12 +110,20 @@ val simulator =
   | "query-seq" => wrapQuerySim QuerySimSequential.query
   | "query-naive-par" => wrapQuerySim QuerySimNaivePar.query
   | "query-bfs" => wrapQuerySim QuerySimBFS.query
+  | "query-wave-bfs" =>
+      let
+        val spaceConstraint =
+          CommandLineArgs.parseInt "max-wave-space" (1000 * 1000)
+      in
+        print ("max-wave-space " ^ Int.toString spaceConstraint ^ "\n");
+        wrapQuerySim (QuerySimWaveBFS.query spaceConstraint)
+      end
 
   | _ =>
       Util.die
         ("Unknown -sim " ^ simName ^ "; valid options are: "
          ^ "full-seq, full-naive-par, full-bfs, full-strided-bfs, "
-         ^ "query-seq, query-naive-par, query-bfs")
+         ^ "query-seq, query-naive-par, query-bfs, query-wave-bfs")
 
 val msg = "quantum simulator (" ^ simName ^ ")"
 val () = Benchmark.run msg (fn _ =>
