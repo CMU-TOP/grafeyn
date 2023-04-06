@@ -35,7 +35,7 @@ struct
       int
       -> Gate.t
       -> wave
-      -> {numGateApps: int, result: advance_result}
+      -> {numGateApps: int, result: advance_result option}
 
     val merge: wave * wave -> wave
   end =
@@ -123,107 +123,115 @@ struct
 
     fun tryAdvanceWithSpaceConstraint constraint gate
       (wave as Wave {elems, ...}) =
-      let
-        val desiredCapacity =
-          let
-            val currentNonZeroSize = nonZeroSize wave
-            val multiplier = if Gate.expectBranching gate then 4.0 else 2.0
-          in
-            Int.min (constraint, Real.ceil
-              (multiplier * Real.fromInt currentNonZeroSize))
-          end
+      if nonZeroSize wave = 0 then
+        {numGateApps = 0, result = NONE}
+      else
+        let
+          val desiredCapacity =
+            let
+              val currentNonZeroSize = nonZeroSize wave
+              val multiplier = if Gate.expectBranching gate then 4.0 else 2.0
+            in
+              Int.min (constraint, Real.ceil
+                (multiplier * Real.fromInt currentNonZeroSize))
+            end
 
-        val newElems = makeNewElems desiredCapacity
+          val _ = print
+            ("tryAdvance: desiredCapacity=" ^ Int.toString desiredCapacity
+             ^ "\n")
+          val newElems = makeNewElems desiredCapacity
 
-        (* TODO: handle HT.Full (failed insert due to capacity)
-         *
-         * ideas:
-         *   - If an element was successfully fully expanded (all of its
-         *     outneighbors were inserted into newElems), then update it
-         *     with a weight of zero. This is effectively a tombstone; the
-         *     element will be ignored when we revisit this wave.
-         *   - If an element wasn't successfully expanded at all (none of its
-         *     outneighbors were inserted into newElems), then leave the element
-         *     alone. We will try again when we revisit this wave.
-         *   - But if an element was PARTIALLY expanded (branching gate where
-         *     at least one outneighbor succeeded and also at least one neighbor
-         *     failed)... what do we do???
-         *       - Keep a separate list around of partially expanded elements
-         *         for this wave?
-         *       - I.e., we tombstone the original element, and then insert it
-         *         into the auxiliary "partially expanded list".
-         *       - When we revisit this wave, we will handle the partially
-         *         exanded list specially (to continue where we left off).
-         *       - THIS IS IMPORTANT FOR CORRECTNESS. OTHERWISE WE MIGHT VISIT
-         *         THE SAME PATH MORE THAN ONCE, WHICH WILL MAKE THE RESULT
-         *         INCORRECT.
-         *)
+          (* TODO: handle HT.Full (failed insert due to capacity)
+           *
+           * ideas:
+           *   - If an element was successfully fully expanded (all of its
+           *     outneighbors were inserted into newElems), then update it
+           *     with a weight of zero. This is effectively a tombstone; the
+           *     element will be ignored when we revisit this wave.
+           *   - If an element wasn't successfully expanded at all (none of its
+           *     outneighbors were inserted into newElems), then leave the element
+           *     alone. We will try again when we revisit this wave.
+           *   - But if an element was PARTIALLY expanded (branching gate where
+           *     at least one outneighbor succeeded and also at least one neighbor
+           *     failed)... what do we do???
+           *       - Keep a separate list around of partially expanded elements
+           *         for this wave?
+           *       - I.e., we tombstone the original element, and then insert it
+           *         into the auxiliary "partially expanded list".
+           *       - When we revisit this wave, we will handle the partially
+           *         exanded list specially (to continue where we left off).
+           *       - THIS IS IMPORTANT FOR CORRECTNESS. OTHERWISE WE MIGHT VISIT
+           *         THE SAME PATH MORE THAN ONCE, WHICH WILL MAKE THE RESULT
+           *         INCORRECT.
+           *)
 
-        fun doGate widx status =
-          case Gate.apply gate widx of
-            Gate.OutputOne (bidx', weight') =>
-              (( HT.insertWith combiner newElems (bidx', (weight', NotExpanded))
-               ; NONE
-               )
-               handle HT.Full => SOME NotExpanded)
-          | Gate.OutputTwo ((bidx1, weight1), (bidx2, weight2)) =>
-              case status of
-                PartiallyExpanded =>
-                  (( HT.insertWith combiner newElems
-                       (bidx2, (weight2, NotExpanded))
-                   ; NONE
-                   )
-                   handle HT.Full => SOME PartiallyExpanded)
-              | NotExpanded =>
-                  let
-                    val result =
-                      ( HT.insertWith combiner newElems
-                          (bidx1, (weight1, NotExpanded))
-                      ; NONE
-                      )
-                      handle HT.Full => SOME NotExpanded
-                  in
-                    if Option.isSome result then
-                      result
-                    else
-                      (( HT.insertWith combiner newElems
-                           (bidx2, (weight2, NotExpanded))
-                       ; NONE
-                       )
-                       handle HT.Full => SOME PartiallyExpanded)
-                  end
+          fun doGate widx status =
+            case Gate.apply gate widx of
+              Gate.OutputOne (bidx', weight') =>
+                (( HT.insertWith combiner newElems
+                     (bidx', (weight', NotExpanded))
+                 ; NONE
+                 )
+                 handle HT.Full => SOME NotExpanded)
+            | Gate.OutputTwo ((bidx1, weight1), (bidx2, weight2)) =>
+                case status of
+                  PartiallyExpanded =>
+                    (( HT.insertWith combiner newElems
+                         (bidx2, (weight2, NotExpanded))
+                     ; NONE
+                     )
+                     handle HT.Full => SOME PartiallyExpanded)
+                | NotExpanded =>
+                    let
+                      val result =
+                        ( HT.insertWith combiner newElems
+                            (bidx1, (weight1, NotExpanded))
+                        ; NONE
+                        )
+                        handle HT.Full => SOME NotExpanded
+                    in
+                      if Option.isSome result then
+                        result
+                      else
+                        (( HT.insertWith combiner newElems
+                             (bidx2, (weight2, NotExpanded))
+                         ; NONE
+                         )
+                         handle HT.Full => SOME PartiallyExpanded)
+                    end
 
-        val numGateApps = nonZeroSize wave
+          val numGateApps = nonZeroSize wave
 
-        val leftover =
-          let
-            val currentElems = HT.unsafeViewContents elems
-          in
-            ArraySlice.full
-              (SeqBasis.tabFilter 100 (0, Seq.length currentElems) (fn i =>
-                 case Seq.nth currentElems i of
-                   NONE => NONE
-                 | SOME (bidx, (weight, status)) =>
-                     if Complex.isZero weight then
-                       NONE
-                     else
-                       case doGate (bidx, weight) status of
-                         NONE => NONE
-                       | SOME status' => SOME (bidx, weight, status')))
-          end
+          val leftover =
+            let
+              val currentElems = HT.unsafeViewContents elems
+            in
+              ArraySlice.full
+                (SeqBasis.tabFilter 100 (0, Seq.length currentElems) (fn i =>
+                   case Seq.nth currentElems i of
+                     NONE => NONE
+                   | SOME (bidx, (weight, status)) =>
+                       if Complex.isZero weight then
+                         NONE
+                       else
+                         case doGate (bidx, weight) status of
+                           NONE => NONE
+                         | SOME status' => SOME (bidx, weight, status')))
+            end
 
-        val newWave =
-          Wave {elems = newElems, nonZeroSize = computeNonZeroSize newElems}
+          val newWave =
+            Wave {elems = newElems, nonZeroSize = computeNonZeroSize newElems}
 
-        val result =
-          if Seq.length leftover = 0 then
-            AdvanceSuccess newWave
-          else
-            AdvancePartialSuccess
-              {advanced = newWave, leftover = makeWaveFromSeq leftover}
-      in
-        {numGateApps = numGateApps, result = result}
-      end
+          val result =
+            if Seq.length leftover = 0 then
+              SOME (AdvanceSuccess newWave)
+            else
+              SOME
+                (AdvancePartialSuccess
+                   {advanced = newWave, leftover = makeWaveFromSeq leftover})
+        in
+          {numGateApps = numGateApps, result = result}
+        end
 
 
     fun applyToElems (Wave {elems, ...}) f =
@@ -291,7 +299,8 @@ struct
     val insert: waveset -> int * Wave.t -> waveset
 
     (* returns (updated wave set, (gatenum, wave)) *)
-    val removeBest: waveset -> waveset * (int * Wave.t)
+    val removeOldest: waveset -> waveset * (int * Wave.t)
+    val removeNewest: waveset -> waveset * (int * Wave.t)
   end =
   struct
     structure IntKey = struct open Int type ord_key = int end
@@ -309,13 +318,25 @@ struct
     fun insert waves (gatenum, wave) =
       M.insertWith Wave.merge (waves, gatenum, wave)
 
-    fun removeBest waves =
+    fun removeOldest waves =
       case M.firsti waves of
         SOME (gatenum, _) =>
           let val (waves', wave) = M.remove (waves, gatenum)
           in (waves', (gatenum, wave))
           end
-      | NONE => raise Fail "QuerySimWaveBFS.WaveSet.removeBest: empty"
+      | NONE => raise Fail "QuerySimWaveBFS.WaveSet.removeOldest: empty"
+
+    fun removeNewest waves =
+      let
+        (* TODO: why does this signature not have `last`...? *)
+        val lastkey = List.hd (List.rev (M.listKeys waves))
+
+        val gatenum = lastkey
+        val (waves', wave) = M.remove (waves, gatenum)
+      in
+        (waves', (gatenum, wave))
+      end
+      handle _ => raise Fail "QuerySimWaveBFS.WaveSet.removeNewest"
   end
 
 
@@ -343,10 +364,15 @@ struct
           (totalGateApps, acc)
         else
           let
-            val availableSpace = Int.max
-              (1, spaceConstraint - WaveSet.totalSize waves)
+            val currentUsage = WaveSet.totalSize waves
+            val availableSpace = Int.max (1, spaceConstraint - currentUsage)
 
-            val (waves', (gateNum, chosenWave)) = WaveSet.removeBest waves
+            val _ = print ("using " ^ Int.toString currentUsage ^ "\n")
+            val _ = print ("available " ^ Int.toString availableSpace ^ "\n")
+
+            val (waves', (gateNum, chosenWave)) = (*WaveSet.removeOldest waves*)
+              if availableSpace = 1 then WaveSet.removeNewest waves
+              else WaveSet.removeOldest waves
           in
             if gateNum >= depth then
               loop totalGateApps (finishWave acc chosenWave) waves'
@@ -357,9 +383,10 @@ struct
                     (gate gateNum) chosenWave
                 val advancedWaves =
                   case result of
-                    Wave.AdvanceSuccess newWave =>
+                    NONE => waves'
+                  | SOME (Wave.AdvanceSuccess newWave) =>
                       WaveSet.insert waves' (gateNum + 1, newWave)
-                  | Wave.AdvancePartialSuccess {advanced, leftover} =>
+                  | SOME (Wave.AdvancePartialSuccess {advanced, leftover}) =>
                       WaveSet.insert (WaveSet.insert waves' (gateNum, leftover))
                         (gateNum + 1, advanced)
               in

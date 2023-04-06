@@ -37,9 +37,12 @@ struct
   type ('a, 'b) table = ('a, 'b) t
 
   fun make {hash, eq, capacity, maxload} =
-    let val data = SeqBasis.tabulate 5000 (0, capacity) (fn _ => NONE)
-    in T {data = data, hash = hash, eq = eq, maxload = maxload}
-    end
+    if capacity = 0 then
+      raise Fail "HashTable.make: capacity 0"
+    else
+      let val data = SeqBasis.tabulate 5000 (0, capacity) (fn _ => NONE)
+      in T {data = data, hash = hash, eq = eq, maxload = maxload}
+      end
 
   fun unsafeViewContents (T {data, ...}) = ArraySlice.full data
 
