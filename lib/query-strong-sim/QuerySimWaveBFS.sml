@@ -18,42 +18,34 @@ struct
     type t
     type wave = t
 
-    val singleton: BasisIdx.t * Complex.t -> wave
+    (* wave at position 0 *)
+    val initSingleton: BasisIdx.t * Complex.t -> wave
+
+    (* how far has this wave advanced? *)
+    val position: wave -> int
 
     (* how many non-zeros? *)
     val nonZeroSize: wave -> int
 
-    val capacity: wave -> int
-
-    val lookup: wave -> BasisIdx.t -> Complex.t option
-
-    datatype advance_result =
-      AdvanceSuccess of wave
-    | AdvancePartialSuccess of {advanced: wave, leftover: wave}
+    val lookup: wave -> BasisIdx.t -> Complex.t
 
     val tryAdvanceWithSpaceConstraint:
       int
       -> Gate.t
       -> wave
-      -> {numGateApps: int, result: advance_result option}
+      -> {numGateApps: int, results: wave Seq.t}
 
     val merge: wave * wave -> wave
   end =
   struct
-    datatype expanded_status = NotExpanded | PartiallyExpanded
 
-    datatype wave =
-      Wave of
-        { elems: (BasisIdx.t, Complex.t * expanded_status) HT.t
-        , nonZeroSize: int
-        }
+    datatype elems =
+      Organized of (BasisIdx.t, Complex.t) HT.t
+    | Unorganized of (BasisIdx.t * Complex.t) Seq.t
+
+    datatype wave = Wave of {elems: elems, position: int, nonZeroSize: int}
 
     type t = wave
-
-    datatype advance_result =
-      AdvanceSuccess of wave
-    | AdvancePartialSuccess of {advanced: wave, leftover: wave}
-
 
     fun makeNewElems cap =
       HT.make
@@ -64,67 +56,87 @@ struct
         }
 
 
-    fun singleton (bidx, weight) =
-      let
-        val elems = makeNewElems 1
-      in
-        HT.insertIfNotPresent elems (bidx, (weight, NotExpanded))
-        handle HT.Full => raise Fail "QuerySimWaveBFS.Wave.singleton: bug!";
-
-        Wave
-          { elems = elems
-          , nonZeroSize = if Complex.isNonZero weight then 1 else 0
-          }
-      end
+    fun initSingleton (bidx, weight) =
+      Wave
+        { elems = Unorganized (Seq.singleton (bidx, weight))
+        , position = 0
+        , nonZeroSize = if Complex.isNonZero weight then 1 else 0
+        }
 
 
     fun lookup (Wave {elems, ...}) desired =
-      Option.map (fn (w, _) => w) (HT.lookup elems desired)
+      case elems of
+        Organized ht => Option.getOpt (HT.lookup ht desired, Complex.zero)
+      | Unorganized s =>
+          Seq.reduce Complex.+ Complex.zero
+            (Seq.mapOption
+               (fn (bidx, weight) =>
+                  if BasisIdx.equal (bidx, desired) then SOME weight else NONE)
+               s)
 
 
     fun nonZeroSize (Wave {nonZeroSize = n, ...}) = n
 
 
-    fun capacity (Wave {elems, ...}) = HT.capacity elems
+    fun position (Wave {position = p, ...}) = p
+
+
+    fun capacity (Wave {elems, ...}) =
+      case elems of
+        Organized ht => HT.capacity ht
+      | Unorganized s => Seq.length s
+
+
+    fun viewElemsContents elems =
+      case elems of
+        Organized ht =>
+          let val s = HT.unsafeViewContents ht
+          in (Seq.length s, Seq.nth s)
+          end
+      | Unorganized s => (Seq.length s, fn i => SOME (Seq.nth s i))
 
 
     fun computeNonZeroSize elems =
       let
-        val data = HT.unsafeViewContents elems
+        val (n, getElem) = viewElemsContents elems
       in
-        SeqBasis.reduce 1000 op+ 0 (0, Seq.length data) (fn i =>
-          case Seq.nth data i of
+        SeqBasis.reduce 1000 op+ 0 (0, n) (fn i =>
+          case getElem i of
             NONE => 0
-          | SOME (_, (weight, _)) => if Complex.isNonZero weight then 1 else 0)
+          | SOME (_, weight) => if Complex.isNonZero weight then 1 else 0)
       end
 
 
-    fun makeWaveFromSeq items =
+    fun makeWaveFromSeq (position, items) =
       let
-        val desiredCapacity = Real.ceil (2.0 * Real.fromInt (Seq.length items))
-
+        val desiredCapacity = Int.max (1, Real.ceil
+          (2.0 * Real.fromInt (Seq.length items)))
         val newElems = makeNewElems desiredCapacity
       in
         ForkJoin.parfor 1000 (0, Seq.length items) (fn i =>
           let
-            val (bidx, weight, status) = Seq.nth items i
+            val (bidx, weight) = Seq.nth items i
           in
-            if HT.insertIfNotPresent newElems (bidx, (weight, status)) then ()
-            else raise Fail "QuerySimWaveBFS.Wave.makeWaveFromSeq: bug!"
+            if Complex.isZero weight then ()
+            else HT.insertWith Complex.+ newElems (bidx, weight)
           end);
 
-        Wave {elems = newElems, nonZeroSize = computeNonZeroSize newElems}
+        Wave
+          { elems = Organized newElems
+          , position = position
+          , nonZeroSize = computeNonZeroSize (Organized newElems)
+          }
       end
 
 
-    fun combiner ((weight1, status1), (weight2, status2)) =
-      (Complex.+ (weight1, weight2), NotExpanded)
+    datatype leftover =
+      NextPosition of BasisIdx.t * Complex.t
+    | SamePosition of BasisIdx.t * Complex.t
 
 
-    fun tryAdvanceWithSpaceConstraint constraint gate
-      (wave as Wave {elems, ...}) =
+    fun tryAdvanceWithSpaceConstraint constraint gate wave =
       if nonZeroSize wave = 0 then
-        {numGateApps = 0, result = NONE}
+        {numGateApps = 0, results = Seq.empty ()}
       else
         let
           val desiredCapacity =
@@ -139,144 +151,124 @@ struct
           val _ = print
             ("tryAdvance: desiredCapacity=" ^ Int.toString desiredCapacity
              ^ "\n")
+
           val newElems = makeNewElems desiredCapacity
 
-          (* TODO: handle HT.Full (failed insert due to capacity)
-           *
-           * ideas:
-           *   - If an element was successfully fully expanded (all of its
-           *     outneighbors were inserted into newElems), then update it
-           *     with a weight of zero. This is effectively a tombstone; the
-           *     element will be ignored when we revisit this wave.
-           *   - If an element wasn't successfully expanded at all (none of its
-           *     outneighbors were inserted into newElems), then leave the element
-           *     alone. We will try again when we revisit this wave.
-           *   - But if an element was PARTIALLY expanded (branching gate where
-           *     at least one outneighbor succeeded and also at least one neighbor
-           *     failed)... what do we do???
-           *       - Keep a separate list around of partially expanded elements
-           *         for this wave?
-           *       - I.e., we tombstone the original element, and then insert it
-           *         into the auxiliary "partially expanded list".
-           *       - When we revisit this wave, we will handle the partially
-           *         exanded list specially (to continue where we left off).
-           *       - THIS IS IMPORTANT FOR CORRECTNESS. OTHERWISE WE MIGHT VISIT
-           *         THE SAME PATH MORE THAN ONCE, WHICH WILL MAKE THE RESULT
-           *         INCORRECT.
-           *)
+          fun tryPut widx =
+            (HT.insertWith Complex.+ newElems widx; true)
+            handle HT.Full => false
 
-          fun doGate widx status =
+          fun doGate widx =
             case Gate.apply gate widx of
-              Gate.OutputOne (bidx', weight') =>
-                (( HT.insertWith combiner newElems
-                     (bidx', (weight', NotExpanded))
-                 ; NONE
-                 )
-                 handle HT.Full => SOME NotExpanded)
-            | Gate.OutputTwo ((bidx1, weight1), (bidx2, weight2)) =>
-                case status of
-                  PartiallyExpanded =>
-                    (( HT.insertWith combiner newElems
-                         (bidx2, (weight2, NotExpanded))
-                     ; NONE
-                     )
-                     handle HT.Full => SOME PartiallyExpanded)
-                | NotExpanded =>
-                    let
-                      val result =
-                        ( HT.insertWith combiner newElems
-                            (bidx1, (weight1, NotExpanded))
-                        ; NONE
-                        )
-                        handle HT.Full => SOME NotExpanded
-                    in
-                      if Option.isSome result then
-                        result
-                      else
-                        (( HT.insertWith combiner newElems
-                             (bidx2, (weight2, NotExpanded))
-                         ; NONE
-                         )
-                         handle HT.Full => SOME PartiallyExpanded)
-                    end
+              Gate.OutputOne widx' =>
+                if tryPut widx' then NONE else SOME (NextPosition widx')
+            | Gate.OutputTwo (widx1, widx2) =>
+                let
+                  val success1 = tryPut widx1
+                  val success2 = tryPut widx2
+                in
+                  if success1 andalso success2 then
+                    NONE
+                  else if success1 then
+                    SOME (NextPosition widx2)
+                  else if success2 then
+                    SOME (NextPosition widx1)
+                  else
+                    (* outside of path duplication, this is the only way we
+                     * waste a gate application. *)
+                    SOME (SamePosition widx)
+                end
 
           val numGateApps = nonZeroSize wave
 
-          val leftover =
+          (* TODO: could be optimized... *)
+          val (leftoverSame, leftoverNext) =
             let
-              val currentElems = HT.unsafeViewContents elems
+              val Wave {elems, ...} = wave
+              val (sz, getElem) = viewElemsContents elems
+              val leftovers =
+                ArraySlice.full (SeqBasis.tabFilter 100 (0, sz) (fn i =>
+                  case getElem i of
+                    NONE => NONE
+                  | SOME (bidx, weight) =>
+                      if Complex.isZero weight then NONE
+                      else doGate (bidx, weight)))
+              val leftoverSame =
+                Seq.mapOption (fn SamePosition widx => SOME widx | _ => NONE)
+                  leftovers
+              val leftoverNext =
+                Seq.mapOption (fn NextPosition widx => SOME widx | _ => NONE)
+                  leftovers
             in
-              ArraySlice.full
-                (SeqBasis.tabFilter 100 (0, Seq.length currentElems) (fn i =>
-                   case Seq.nth currentElems i of
-                     NONE => NONE
-                   | SOME (bidx, (weight, status)) =>
-                       if Complex.isZero weight then
-                         NONE
-                       else
-                         case doGate (bidx, weight) status of
-                           NONE => NONE
-                         | SOME status' => SOME (bidx, weight, status')))
+              ( makeWaveFromSeq (position wave, leftoverSame)
+              , makeWaveFromSeq (1 + position wave, leftoverNext)
+              )
             end
 
-          val newWave =
-            Wave {elems = newElems, nonZeroSize = computeNonZeroSize newElems}
-
-          val result =
-            if Seq.length leftover = 0 then
-              SOME (AdvanceSuccess newWave)
-            else
-              SOME
-                (AdvancePartialSuccess
-                   {advanced = newWave, leftover = makeWaveFromSeq leftover})
+          val newWave = Wave
+            { elems = Organized newElems
+            , position = 1 + position wave
+            , nonZeroSize = computeNonZeroSize (Organized newElems)
+            }
         in
-          {numGateApps = numGateApps, result = result}
+          { numGateApps = numGateApps
+          , results = Seq.fromList [newWave, leftoverSame, leftoverNext]
+          }
         end
 
 
     fun applyToElems (Wave {elems, ...}) f =
       let
-        val contents = HT.unsafeViewContents elems
+        val (n, getElem) = viewElemsContents elems
       in
-        ForkJoin.parfor 1000 (0, Seq.length contents) (fn i =>
-          case Seq.nth contents i of
+        ForkJoin.parfor 1000 (0, n) (fn i =>
+          case getElem i of
             NONE => ()
           | SOME (bidx, weight) => f (bidx, weight))
       end
 
 
     fun merge (wave1, wave2) =
-      let
-        fun loopGuessCapacity desiredCapacity =
-          let
-            val _ = print
-              ("trying desiredCapacity=" ^ Int.toString desiredCapacity ^ "\n")
-            val newElems = makeNewElems desiredCapacity
+      if position wave1 <> position wave2 then
+        raise Fail "QuerySimWaveBFS.Wave.merge: different positions"
+      else
+        let
+          val pos = position wave1
 
-            fun insertNonZero (bidx, stuff as (weight, _)) =
-              if Complex.isZero weight then ()
-              else HT.insertWith combiner newElems (bidx, stuff)
-          in
-            applyToElems wave1 insertNonZero;
-            applyToElems wave2 insertNonZero;
-            print "merge success\n";
-            Wave {elems = newElems, nonZeroSize = computeNonZeroSize newElems}
-          end
-          handle HT.Full =>
-            loopGuessCapacity (Real.ceil (1.5 * Real.fromInt desiredCapacity))
+          fun loopGuessCapacity desiredCapacity =
+            let
+              val _ = print
+                ("trying desiredCapacity=" ^ Int.toString desiredCapacity ^ "\n")
+              val newElems = makeNewElems desiredCapacity
+
+              fun insertNonZero (bidx, weight) =
+                if Complex.isZero weight then ()
+                else HT.insertWith Complex.+ newElems (bidx, weight)
+            in
+              applyToElems wave1 insertNonZero;
+              applyToElems wave2 insertNonZero;
+              print "merge success\n";
+              Wave
+                { elems = Organized newElems
+                , position = pos
+                , nonZeroSize = computeNonZeroSize (Organized newElems)
+                }
+            end
+            handle HT.Full =>
+              loopGuessCapacity (Real.ceil (1.5 * Real.fromInt desiredCapacity))
 
 
-        val totalNonZeros = nonZeroSize wave1 + nonZeroSize wave2
-        val totalCapacities = capacity wave1 + capacity wave2
-        val desiredCapacity = Int.min (totalCapacities, totalNonZeros)
-        val desiredCapacity = Real.ceil (1.5 * Real.fromInt desiredCapacity)
+          val totalNonZeros = nonZeroSize wave1 + nonZeroSize wave2
+          val totalCapacities = capacity wave1 + capacity wave2
+          val desiredCapacity = Int.min (totalCapacities, totalNonZeros)
+          val desiredCapacity = Real.ceil (1.5 * Real.fromInt desiredCapacity)
 
-        val _ = print
-          ("merging totalNonZeros=" ^ Int.toString totalNonZeros
-           ^ " totalCapacities=" ^ Int.toString totalCapacities ^ "\n")
-      in
-        loopGuessCapacity desiredCapacity
-      end
+          val _ = print
+            ("merging totalNonZeros=" ^ Int.toString totalNonZeros
+             ^ " totalCapacities=" ^ Int.toString totalCapacities ^ "\n")
+        in
+          loopGuessCapacity desiredCapacity
+        end
 
   end
 
@@ -289,18 +281,17 @@ struct
     type waveset
     type t = waveset
 
-    val singleton: int * Wave.t -> waveset
+    val singleton: Wave.t -> waveset
 
     val numWaves: waveset -> int
 
     val totalSize: waveset -> int
 
-    (* (gatenum, wave) pairs *)
-    val insert: waveset -> int * Wave.t -> waveset
+    val insert: waveset -> Wave.t -> waveset
 
     (* returns (updated wave set, (gatenum, wave)) *)
-    val removeOldest: waveset -> waveset * (int * Wave.t)
-    val removeNewest: waveset -> waveset * (int * Wave.t)
+    val removeOldest: waveset -> waveset * Wave.t
+    val removeNewest: waveset -> waveset * Wave.t
   end =
   struct
     structure IntKey = struct open Int type ord_key = int end
@@ -308,21 +299,22 @@ struct
     type waveset = Wave.t M.map
     type t = waveset
 
-    fun singleton (gatenum, wave) = M.singleton (gatenum, wave)
+    fun singleton wave =
+      M.singleton (Wave.position wave, wave)
 
     fun numWaves waves = M.numItems waves
 
     fun totalSize waves =
       M.foldl (fn (wave, acc) => acc + Wave.nonZeroSize wave) 0 waves
 
-    fun insert waves (gatenum, wave) =
-      M.insertWith Wave.merge (waves, gatenum, wave)
+    fun insert waves wave =
+      M.insertWith Wave.merge (waves, Wave.position wave, wave)
 
     fun removeOldest waves =
       case M.firsti waves of
-        SOME (gatenum, _) =>
-          let val (waves', wave) = M.remove (waves, gatenum)
-          in (waves', (gatenum, wave))
+        SOME (pos, _) =>
+          let val (waves', wave) = M.remove (waves, pos)
+          in (waves', wave)
           end
       | NONE => raise Fail "QuerySimWaveBFS.WaveSet.removeOldest: empty"
 
@@ -330,11 +322,9 @@ struct
       let
         (* TODO: why does this signature not have `last`...? *)
         val lastkey = List.hd (List.rev (M.listKeys waves))
-
-        val gatenum = lastkey
-        val (waves', wave) = M.remove (waves, gatenum)
+        val (waves', wave) = M.remove (waves, lastkey)
       in
-        (waves', (gatenum, wave))
+        (waves', wave)
       end
       handle _ => raise Fail "QuerySimWaveBFS.WaveSet.removeNewest"
   end
@@ -354,10 +344,7 @@ struct
         if numQubits > 63 then raise Fail "whoops, too many qubits" else ()
 
       fun finishWave acc wave =
-        case Wave.lookup wave desired of
-          NONE => acc
-        | SOME v => Complex.+ (v, acc)
-
+        Complex.+ (acc, Wave.lookup wave desired)
 
       fun loop totalGateApps acc waves =
         if WaveSet.numWaves waves = 0 then
@@ -370,32 +357,32 @@ struct
             val _ = print ("using " ^ Int.toString currentUsage ^ "\n")
             val _ = print ("available " ^ Int.toString availableSpace ^ "\n")
 
-            val (waves', (gateNum, chosenWave)) = (*WaveSet.removeOldest waves*)
+            val (waves', chosenWave) =
+              (*WaveSet.removeOldest waves*)
               if availableSpace = 1 then WaveSet.removeNewest waves
               else WaveSet.removeOldest waves
+
+            val gateNum = Wave.position chosenWave
           in
             if gateNum >= depth then
               loop totalGateApps (finishWave acc chosenWave) waves'
             else
               let
-                val {numGateApps, result} =
+                val {numGateApps, results} =
                   Wave.tryAdvanceWithSpaceConstraint availableSpace
                     (gate gateNum) chosenWave
                 val advancedWaves =
-                  case result of
-                    NONE => waves'
-                  | SOME (Wave.AdvanceSuccess newWave) =>
-                      WaveSet.insert waves' (gateNum + 1, newWave)
-                  | SOME (Wave.AdvancePartialSuccess {advanced, leftover}) =>
-                      WaveSet.insert (WaveSet.insert waves' (gateNum, leftover))
-                        (gateNum + 1, advanced)
+                  Seq.iterate
+                    (fn (waves, wave) =>
+                       if Wave.nonZeroSize wave = 0 then waves
+                       else WaveSet.insert waves wave) waves' results
               in
                 loop (totalGateApps + numGateApps) acc advancedWaves
               end
           end
 
       val initialWaves = WaveSet.singleton
-        (0, Wave.singleton (BasisIdx.zeros, Complex.real 1.0))
+        (Wave.initSingleton (BasisIdx.zeros, Complex.real 1.0))
       val (totalGateApps, final) = loop 0 Complex.zero initialWaves
       val _ = print ("gate app count " ^ Int.toString totalGateApps ^ "\n")
     in
