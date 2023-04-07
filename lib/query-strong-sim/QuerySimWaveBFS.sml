@@ -19,21 +19,22 @@ struct
     type wave = t
 
     (* wave at position 0 *)
-    val initSingleton: BasisIdx.t * Complex.t -> wave
+    val initSingleton: {numGates: int} -> BasisIdx.t * Complex.t -> wave
 
     (* how far has this wave advanced? *)
     val position: wave -> int
+
+    val sizePotential: wave -> int
 
     (* how many non-zeros? *)
     val nonZeroSize: wave -> int
 
     val lookup: wave -> BasisIdx.t -> Complex.t
 
-    val tryAdvanceWithSpaceConstraint:
-      int
-      -> Gate.t
+    val advanceAndSplit:
+      {constraint: int, gate: Gate.t}
       -> wave
-      -> {numGateApps: int, results: wave Seq.t}
+      -> {numGateApps: int, result: wave option, leftover: wave Seq.t}
 
     val merge: wave * wave -> wave
   end =
@@ -43,7 +44,8 @@ struct
       Organized of (BasisIdx.t, Complex.t) HT.t
     | Unorganized of (BasisIdx.t * Complex.t) Seq.t
 
-    datatype wave = Wave of {elems: elems, position: int, nonZeroSize: int}
+    datatype wave =
+      Wave of {elems: elems, position: int, numGates: int, nonZeroSize: int}
 
     type t = wave
 
@@ -56,10 +58,11 @@ struct
         }
 
 
-    fun initSingleton (bidx, weight) =
+    fun initSingleton {numGates} (bidx, weight) =
       Wave
         { elems = Unorganized (Seq.singleton (bidx, weight))
         , position = 0
+        , numGates = numGates
         , nonZeroSize = if Complex.isNonZero weight then 1 else 0
         }
 
@@ -75,10 +78,15 @@ struct
                s)
 
 
+    fun sizePotential (Wave {numGates, position, nonZeroSize, ...}) =
+      (numGates - position) * nonZeroSize
+
+
     fun nonZeroSize (Wave {nonZeroSize = n, ...}) = n
 
 
     fun position (Wave {position = p, ...}) = p
+    fun numGates (Wave {numGates = g, ...}) = g
 
 
     fun capacity (Wave {elems, ...}) =
@@ -107,7 +115,7 @@ struct
       end
 
 
-    fun makeWaveFromSeq (position, items) =
+    fun makeWaveFromSeq (position, numGates, items) =
       let
         val desiredCapacity = Int.max (1, Real.ceil
           (2.0 * Real.fromInt (Seq.length items)))
@@ -124,6 +132,7 @@ struct
         Wave
           { elems = Organized newElems
           , position = position
+          , numGates = numGates
           , nonZeroSize = computeNonZeroSize (Organized newElems)
           }
       end
@@ -134,9 +143,9 @@ struct
     | SamePosition of BasisIdx.t * Complex.t
 
 
-    fun tryAdvanceWithSpaceConstraint constraint gate wave =
+    fun advanceAndSplit {constraint, gate} wave =
       if nonZeroSize wave = 0 then
-        {numGateApps = 0, results = Seq.empty ()}
+        {numGateApps = 0, result = NONE, leftover = Seq.empty ()}
       else
         let
           val desiredCapacity =
@@ -200,19 +209,21 @@ struct
                 Seq.mapOption (fn NextPosition widx => SOME widx | _ => NONE)
                   leftovers
             in
-              ( makeWaveFromSeq (position wave, leftoverSame)
-              , makeWaveFromSeq (1 + position wave, leftoverNext)
+              ( makeWaveFromSeq (position wave, numGates wave, leftoverSame)
+              , makeWaveFromSeq (1 + position wave, numGates wave, leftoverNext)
               )
             end
 
           val newWave = Wave
             { elems = Organized newElems
             , position = 1 + position wave
+            , numGates = numGates wave
             , nonZeroSize = computeNonZeroSize (Organized newElems)
             }
         in
           { numGateApps = numGateApps
-          , results = Seq.fromList [newWave, leftoverSame, leftoverNext]
+          , result = SOME newWave
+          , leftover = Seq.fromList [leftoverSame, leftoverNext]
           }
         end
 
@@ -251,6 +262,7 @@ struct
               Wave
                 { elems = Organized newElems
                 , position = pos
+                , numGates = numGates wave1
                 , nonZeroSize = computeNonZeroSize (Organized newElems)
                 }
             end
@@ -281,17 +293,21 @@ struct
     type waveset
     type t = waveset
 
+    val empty: waveset
+
     val singleton: Wave.t -> waveset
 
     val numWaves: waveset -> int
 
-    val totalSize: waveset -> int
+    val totalSizePotential: waveset -> int
 
     val insert: waveset -> Wave.t -> waveset
 
     (* returns (updated wave set, (gatenum, wave)) *)
     val removeOldest: waveset -> waveset * Wave.t
     val removeNewest: waveset -> waveset * Wave.t
+
+    val remove: waveset -> int -> (waveset * Wave.t) option
   end =
   struct
     structure IntKey = struct open Int type ord_key = int end
@@ -299,13 +315,15 @@ struct
     type waveset = Wave.t M.map
     type t = waveset
 
+    val empty = M.empty
+
     fun singleton wave =
       M.singleton (Wave.position wave, wave)
 
     fun numWaves waves = M.numItems waves
 
-    fun totalSize waves =
-      M.foldl (fn (wave, acc) => acc + Wave.nonZeroSize wave) 0 waves
+    fun totalSizePotential waves =
+      M.foldl (fn (wave, acc) => acc + Wave.sizePotential wave) 0 waves
 
     fun insert waves wave =
       M.insertWith Wave.merge (waves, Wave.position wave, wave)
@@ -327,6 +345,10 @@ struct
         (waves', wave)
       end
       handle _ => raise Fail "QuerySimWaveBFS.WaveSet.removeNewest"
+
+    fun remove waves gatenum =
+      if M.inDomain (waves, gatenum) then SOME (M.remove (waves, gatenum))
+      else NONE
   end
 
 
@@ -338,7 +360,7 @@ struct
   fun query spaceConstraint {numQubits, gates} desired =
     let
       fun gate i = Seq.nth gates i
-      val depth = Seq.length gates
+      val numGates = Seq.length gates
 
       val _ =
         if numQubits > 63 then raise Fail "whoops, too many qubits" else ()
@@ -346,44 +368,67 @@ struct
       fun finishWave acc wave =
         Complex.+ (acc, Wave.lookup wave desired)
 
-      fun loop totalGateApps acc waves =
-        if WaveSet.numWaves waves = 0 then
-          (totalGateApps, acc)
+      fun pullMerge (waves, currentWave) =
+        case WaveSet.remove waves (Wave.position currentWave) of
+          NONE => (waves, currentWave)
+        | SOME (waves', wave) => (waves', Wave.merge (wave, currentWave))
+
+      fun loop totalGateApps acc (waves, currentWave) =
+        if Wave.position currentWave >= numGates then
+          let val acc = finishWave acc currentWave
+          in loopChooseWave totalGateApps acc waves
+          end
         else
           let
-            val currentUsage = WaveSet.totalSize waves
-            val availableSpace = Int.max (1, spaceConstraint - currentUsage)
+            val potentialSpace =
+              WaveSet.totalSizePotential waves + Wave.sizePotential currentWave
+            val availableSpace = Int.max (1, spaceConstraint - potentialSpace)
 
-            val _ = print ("using " ^ Int.toString currentUsage ^ "\n")
+            val _ = print ("potential " ^ Int.toString potentialSpace ^ "\n")
             val _ = print ("available " ^ Int.toString availableSpace ^ "\n")
 
-            val (waves', chosenWave) =
-              (*WaveSet.removeOldest waves*)
-              if availableSpace = 1 then WaveSet.removeNewest waves
-              else WaveSet.removeOldest waves
+            val gateNum = Wave.position currentWave
 
-            val gateNum = Wave.position chosenWave
+            val {numGateApps, result, leftover} =
+              Wave.advanceAndSplit
+                {constraint = availableSpace, gate = gate gateNum} currentWave
+            val totalGateApps = totalGateApps + numGateApps
+
+            val waves =
+              Seq.iterate
+                (fn (waves, wave) =>
+                   if Wave.nonZeroSize wave = 0 then waves
+                   else WaveSet.insert waves wave) waves leftover
           in
-            if gateNum >= depth then
-              loop totalGateApps (finishWave acc chosenWave) waves'
-            else
-              let
-                val {numGateApps, results} =
-                  Wave.tryAdvanceWithSpaceConstraint availableSpace
-                    (gate gateNum) chosenWave
-                val advancedWaves =
-                  Seq.iterate
-                    (fn (waves, wave) =>
-                       if Wave.nonZeroSize wave = 0 then waves
-                       else WaveSet.insert waves wave) waves' results
-              in
-                loop (totalGateApps + numGateApps) acc advancedWaves
-              end
+            case result of
+              NONE => loopChooseWave totalGateApps acc waves
+            | SOME wave =>
+                loopMaybeSwitchWaves totalGateApps acc (pullMerge (waves, wave))
+                  potentialSpace
           end
 
-      val initialWaves = WaveSet.singleton
-        (Wave.initSingleton (BasisIdx.zeros, Complex.real 1.0))
-      val (totalGateApps, final) = loop 0 Complex.zero initialWaves
+      and loopMaybeSwitchWaves totalGateApps acc (waves, currentWave)
+        prevPotential =
+        let
+          val currentPotential =
+            WaveSet.totalSizePotential waves + Wave.sizePotential currentWave
+        in
+          if prevPotential < currentPotential then
+            loop totalGateApps acc (waves, currentWave)
+          else
+            loopChooseWave totalGateApps acc (WaveSet.insert waves currentWave)
+        end
+
+      and loopChooseWave totalGateApps acc waves =
+        if WaveSet.numWaves waves = 0 then (totalGateApps, acc)
+        else loop totalGateApps acc (WaveSet.removeOldest waves)
+
+
+      val initialWave =
+        Wave.initSingleton {numGates = numGates}
+          (BasisIdx.zeros, Complex.real 1.0)
+      val (totalGateApps, final) =
+        loop 0 Complex.zero (WaveSet.empty, initialWave)
       val _ = print ("gate app count " ^ Int.toString totalGateApps ^ "\n")
     in
       final
