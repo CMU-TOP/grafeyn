@@ -19,6 +19,10 @@ sig
 
   (* Unsafe because underlying array is shared. If the table is mutated,
    * then the Seq would not appear to be immutable.
+   *
+   * Could also imagine a function `freezeViewContents` which marks the
+   * table as immutable (preventing further inserts). That would be a safer
+   * version of this function.
    *)
   val unsafeViewContents: ('a, 'b) table -> ('a * 'b) option Seq.t
 end =

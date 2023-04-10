@@ -42,14 +42,14 @@ struct
 
     datatype elems =
       Organized of (BasisIdx.t, Complex.t) HT.t
-    | Unorganized of (BasisIdx.t * Complex.t) Seq.t
+    | Unorganized of (BasisIdx.t * Complex.t) option Seq.t
 
     datatype wave =
       Wave of {elems: elems, position: int, numGates: int, nonZeroSize: int}
 
     type t = wave
 
-    fun makeNewElems cap =
+    fun makeNewOrganizedElems cap =
       HT.make
         { hash = BasisIdx.hash
         , eq = BasisIdx.equal
@@ -60,7 +60,7 @@ struct
 
     fun initSingleton {numGates} (bidx, weight) =
       Wave
-        { elems = Unorganized (Seq.singleton (bidx, weight))
+        { elems = Unorganized (Seq.singleton (SOME (bidx, weight)))
         , position = 0
         , numGates = numGates
         , nonZeroSize = if Complex.isNonZero weight then 1 else 0
@@ -73,7 +73,8 @@ struct
       | Unorganized s =>
           Seq.reduce Complex.+ Complex.zero
             (Seq.mapOption
-               (fn (bidx, weight) =>
+               (fn NONE => NONE
+                 | SOME (bidx, weight) =>
                   if BasisIdx.equal (bidx, desired) then SOME weight else NONE)
                s)
 
@@ -101,7 +102,7 @@ struct
           let val s = HT.unsafeViewContents ht
           in (Seq.length s, Seq.nth s)
           end
-      | Unorganized s => (Seq.length s, fn i => SOME (Seq.nth s i))
+      | Unorganized s => (Seq.length s, Seq.nth s)
 
 
     fun computeNonZeroSize elems =
@@ -115,11 +116,11 @@ struct
       end
 
 
-    fun makeWaveFromSeq (position, numGates, items) =
+    fun makeOrganizedWaveFromSeq (position, numGates, items) =
       let
         val desiredCapacity = Int.max (1, Real.ceil
           (2.0 * Real.fromInt (Seq.length items)))
-        val newElems = makeNewElems desiredCapacity
+        val newElems = makeNewOrganizedElems desiredCapacity
       in
         ForkJoin.parfor 1000 (0, Seq.length items) (fn i =>
           let
@@ -136,6 +137,9 @@ struct
           , nonZeroSize = computeNonZeroSize (Organized newElems)
           }
       end
+
+
+    fun waveDrop n (Wave {elems, position, numGates, nonZeroSize}) =
 
 
     datatype leftover =
@@ -161,57 +165,71 @@ struct
             ("tryAdvance: desiredCapacity=" ^ Int.toString desiredCapacity
              ^ "\n")
 
-          val newElems = makeNewElems desiredCapacity
+          val newElems = makeNewOrganizedElems desiredCapacity
 
           fun tryPut widx =
             (HT.insertWith Complex.+ newElems widx; true)
             handle HT.Full => false
 
+          val markSuccess = ApplyUntilFailure.Success
+          val markFailed = ApplyUntilFailure.Failure
+
           fun doGate widx =
             case Gate.apply gate widx of
               Gate.OutputOne widx' =>
-                if tryPut widx' then NONE else SOME (NextPosition widx')
+                if tryPut widx' then markSuccess
+                else markFailed (NextPosition widx')
             | Gate.OutputTwo (widx1, widx2) =>
                 let
                   val success1 = tryPut widx1
                   val success2 = tryPut widx2
                 in
                   if success1 andalso success2 then
-                    NONE
+                    markSuccess
                   else if success1 then
-                    SOME (NextPosition widx2)
+                    markFailed (NextPosition widx2)
                   else if success2 then
-                    SOME (NextPosition widx1)
+                    markFailed (NextPosition widx1)
                   else
                     (* outside of path duplication, this is the only way we
                      * waste a gate application. *)
-                    SOME (SamePosition widx)
+                    markFailed (SamePosition widx)
                 end
 
           val numGateApps = nonZeroSize wave
 
           (* TODO: could be optimized... *)
-          val (leftoverSame, leftoverNext) =
+          val leftover =
             let
               val Wave {elems, ...} = wave
               val (sz, getElem) = viewElemsContents elems
-              val leftovers =
-                ArraySlice.full (SeqBasis.tabFilter 100 (0, sz) (fn i =>
-                  case getElem i of
-                    NONE => NONE
-                  | SOME (bidx, weight) =>
-                      if Complex.isZero weight then NONE
-                      else doGate (bidx, weight)))
-              val leftoverSame =
+              val {numApplied, failed} =
+                ApplyUntilFailure.doPrefix {grain = 100, acceleration = 2.0}
+                  (0, sz)
+                  (fn i =>
+                     case getElem i of
+                       NONE => markSuccess
+                     | SOME (bidx, weight) =>
+                         if Complex.isZero weight then markSuccess
+                         else doGate (bidx, weight))
+
+              val failedSame =
                 Seq.mapOption (fn SamePosition widx => SOME widx | _ => NONE)
-                  leftovers
-              val leftoverNext =
+                  failed
+
+              val failedNext =
                 Seq.mapOption (fn NextPosition widx => SOME widx | _ => NONE)
-                  leftovers
+                  failed
+
+              val leftoverSame = waveDrop numApplied wave
+
+              val failedSame =
+                makeOrganizedWaveFromSeq
+                  (position wave, numGates wave, failedSame)
+              val failedNext = makeOrganizedWaveFromSeq
+                (1 + position wave, numGates wave, failedNext)
             in
-              ( makeWaveFromSeq (position wave, numGates wave, leftoverSame)
-              , makeWaveFromSeq (1 + position wave, numGates wave, leftoverNext)
-              )
+              Seq.fromList [leftoverSame, failedSame, failedNext]
             end
 
           val newWave = Wave
@@ -223,7 +241,7 @@ struct
         in
           { numGateApps = numGateApps
           , result = SOME newWave
-          , leftover = Seq.fromList [leftoverSame, leftoverNext]
+          , leftover = leftover
           }
         end
 
@@ -250,7 +268,7 @@ struct
             let
               val _ = print
                 ("trying desiredCapacity=" ^ Int.toString desiredCapacity ^ "\n")
-              val newElems = makeNewElems desiredCapacity
+              val newElems = makeNewOrganizedElems desiredCapacity
 
               fun insertNonZero (bidx, weight) =
                 if Complex.isZero weight then ()

@@ -7,6 +7,8 @@ local
   end
   ../lib/github.com/mpllang/mpllib/sources.$(COMPILER).mlb
   HashTable.sml
+  ApplyUntilFailure.sml
+
   Constants.sml
   Complex.sml
   BasisIdx.sml
@@ -14,12 +16,14 @@ local
   Gate.sml
   Circuit.sml
 in
+  structure HashTable
+  structure ApplyUntilFailure
+
   structure Complex
   structure BasisIdx
   structure SparseState
   structure Gate
   structure Circuit
-  structure HashTable
 
   functor RedBlackMapFn
 end
