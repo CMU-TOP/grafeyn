@@ -8,6 +8,7 @@ sig
   val singleton: int * Wave.t -> waveset
   val numWaves: waveset -> int
 
+  val totalSize: waveset -> int
   val totalSizePotential: {numGates: int} -> waveset -> int
 
   val insert: waveset -> int * Wave.t -> waveset
@@ -31,6 +32,13 @@ struct
   fun singleton (gatenum, wave) = M.singleton (gatenum, wave)
 
   fun numWaves waves = M.numItems waves
+
+  fun totalSize waves =
+    let
+      fun next (wave, acc) = acc + Wave.nonZeroSize wave
+    in
+      M.foldl next 0 waves
+    end
 
   fun totalSizePotential {numGates} waves =
     let

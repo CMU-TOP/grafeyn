@@ -160,18 +160,22 @@ struct
                 ; HT.insertWith Complex.+ table widx2
                 )
 
+          val _ = print ("advanceAndSplit inserting...\n")
           val _ = applyNonZero {grain = 100} prefix doGate
+          val _ = print ("advanceAndSplit finished inserting\n")
           val result = SOME (prefix, HT.unsafeViewContents table)
         in
           if prefixSize >= Seq.length wave then result
           else loop result (upPrefixSize prefixSize) cap
         end
         handle HT.Full =>
-          if cap >= constraint then previousResult
-          else loop previousResult prefixSize (upCapacity cap)
+          ( print "advanceAndSplit full!\n"
+          ; if cap >= constraint then previousResult
+            else loop previousResult prefixSize (upCapacity cap)
+          )
 
       val startingSize = Int.min
-        (Seq.length wave, Int.max (1, constraint div 2))
+        (Seq.length wave, Int.max (1, constraint div 8))
 
       val multiplier = if Gate.expectBranching gate then 4.0 else 2.0
       val startingCapacity = Int.min (constraint, Real.ceil

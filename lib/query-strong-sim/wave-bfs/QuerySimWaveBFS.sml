@@ -17,10 +17,10 @@ struct
         if numQubits > 63 then raise Fail "whoops, too many qubits" else ()
 
       (* Ensures that the potential increases by at most `availableSpace` *)
-      fun constraint availableSpace gatenum =
-        Real.ceil
+      (* fun constraint availableSpace gatenum =
+        Real.floor
           (Real.fromInt availableSpace
-           / (Real.fromInt (numGates - gatenum) / 2.0 - 1.0))
+           / Real.max (1.0, Real.fromInt (numGates - gatenum) / 2.0 - 1.0)) *)
 
       fun loopPushWave acc leftovers (gatenum, wave) =
         if gatenum >= numGates then
@@ -28,23 +28,23 @@ struct
         else
           let
             val sizeBefore = Wave.nonZeroSize wave
+            val numWaves = 1 + WaveSet.numWaves leftovers
+            val inUse = sizeBefore + WaveSet.totalSize leftovers
+            (* val available = spaceConstraint - inUse
+            val C = constraint available gatenum *)
 
-            val potential =
-              (numGates - gatenum) * Wave.nonZeroSize wave
-              + WaveSet.totalSizePotential {numGates = numGates} leftovers
+            val acc = SimAccumulator.logSpaceUsage acc inUse
+            val acc = SimAccumulator.logNumWaves acc numWaves
 
-            val available = spaceConstraint - potential
-            val C = constraint available gatenum
-
-            val _ = print
-              ("num waves  " ^ Int.toString (1 + WaveSet.numWaves leftovers)
-               ^ "\n")
-            val _ = print ("potential  " ^ Int.toString potential ^ "\n")
-            val _ = print ("available  " ^ Int.toString available ^ "\n")
-            val _ = print ("constraint " ^ Int.toString C ^ "\n")
+            val _ = print ("num waves  " ^ Int.toString numWaves ^ "\n")
+            val _ = print ("using      " ^ Int.toString inUse ^ "\n")
+            (* val _ = print ("available  " ^ Int.toString available ^ "\n")
+            val _ = print ("constraint " ^ Int.toString C ^ "\n") *)
 
             val {numGateApps, result, leftover} =
-              Wave.advanceAndSplit {constraint = C, gate = gate gatenum} wave
+              Wave.advanceAndSplit
+                {constraint = spaceConstraint, gate = gate gatenum} wave
+
             val leftovers = WaveSet.insert leftovers (gatenum, leftover)
             val acc = SimAccumulator.logGateApps acc numGateApps
             val (leftovers, result) =
@@ -52,7 +52,7 @@ struct
 
             val sizeAfter = Wave.nonZeroSize result
           in
-            if sizeAfter <= sizeBefore then
+            if gatenum + 1 >= numGates orelse sizeAfter <= sizeBefore then
               loopPushWave acc leftovers (gatenum + 1, result)
             else
               (acc, WaveSet.insert leftovers (gatenum + 1, result))
@@ -74,9 +74,12 @@ struct
       val initWaves = WaveSet.singleton
         (0, Wave.singleton (BasisIdx.zeros, Complex.real 1.0))
 
-      val {numGateApps, weight} = SimAccumulator.view (loop initAcc initWaves)
+      val {numGateApps, maxSpaceUsage, maxNumWaves, weight} =
+        SimAccumulator.view (loop initAcc initWaves)
 
       val _ = print ("gate app count " ^ Int.toString numGateApps ^ "\n")
+      val _ = print ("max space      " ^ Int.toString maxSpaceUsage ^ "\n")
+      val _ = print ("max num waves  " ^ Int.toString maxNumWaves ^ "\n")
     in
       weight
     end
