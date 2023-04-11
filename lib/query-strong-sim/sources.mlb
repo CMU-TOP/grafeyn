@@ -5,7 +5,11 @@ local
   QuerySimSequential.sml
   QuerySimNaivePar.sml
   QuerySimBFS.sml
-  QuerySimWaveBFS.sml
+
+  wave-bfs/Wave.sml
+  wave-bfs/WaveSet.sml
+  wave-bfs/SimAccumulator.sml
+  wave-bfs/QuerySimWaveBFS.sml
 in
   structure QuerySimSequential
   structure QuerySimNaivePar
