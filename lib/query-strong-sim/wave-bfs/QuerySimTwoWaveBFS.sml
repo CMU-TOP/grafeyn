@@ -21,9 +21,8 @@ struct
   datatype trend = IncreasingTrend | DecreasingTrend | UnknownTrend
 
 
-  datatype find_goal_result =
-    OneWave of gatenum * Wave.t
-  | TwoWaves of (gatenum * Wave.t) * (gatenum * Wave.t)
+  val tryPushGoalAfterMerge =
+    CommandLineArgs.parseFlag "try-push-goal-after-merge"
 
 
   fun query spaceConstraint {numQubits, gates} desired =
@@ -33,6 +32,43 @@ struct
 
       val _ =
         if numQubits > 63 then raise Fail "whoops, too many qubits" else ()
+
+      (* =====================================================================
+       * tryPushGoal
+       *)
+
+      fun tryPushGoal acc otherSize (gatenum, wave) =
+        if not tryPushGoalAfterMerge orelse gatenum >= numGates then
+          (acc, gatenum, wave)
+        else
+          let
+            val sizeBefore = Wave.nonZeroSize wave
+
+            (* TODO: fix pass the right constraint *)
+            val constraint = spaceConstraint - otherSize
+            val {numGateApps, result} =
+              Wave.tryAdvance
+                {constraint = spaceConstraint, gate = gate gatenum} wave
+
+            val acc = SimAccumulator.logGateApps acc numGateApps
+          in
+            case result of
+              NONE => (acc, gatenum, wave)
+            | SOME wave' =>
+                let
+                  val sizeAfter = Wave.nonZeroSize wave'
+                in
+                  if sizeAfter <= sizeBefore then
+                    ( print
+                        ("[WAVES] pushed goal to " ^ Int.toString (gatenum + 1)
+                         ^ "\n")
+                    ; tryPushGoal acc otherSize (gatenum + 1, wave')
+                    )
+                  else
+                    (acc, gatenum, wave)
+                end
+          end
+
 
       (* =====================================================================
        * push-to-goal machinery
@@ -47,6 +83,7 @@ struct
             val sizeBefore = Wave.nonZeroSize wave
             val acc = SimAccumulator.logSpaceUsage acc (otherSize + sizeBefore)
 
+            (* TODO: fix pass the right constraint *)
             val constraint = spaceConstraint - otherSize
             val {numGateApps, result} =
               Wave.tryAdvance
@@ -75,6 +112,8 @@ struct
             val sizeBefore = Wave.nonZeroSize wave
             val acc =
               SimAccumulator.logSpaceUsage acc (leftoverSize + sizeBefore)
+
+            (* TODO: fix pass the right constraint *)
             val constraint = spaceConstraint - leftoverSize
             val {numGateApps, result} =
               Wave.tryAdvance
@@ -190,6 +229,9 @@ struct
             | SOME wave' =>
                 let
                   val goalwave = Wave.merge (goalwave, wave')
+                  val (acc, goalgate, goalwave) =
+                    tryPushGoal acc (Wave.nonZeroSize leftover)
+                      (goalgate, goalwave)
                 in
                   loopFinishGoalBySplitting acc (goalgate, goalwave)
                     (gatenum, leftover) (Wave.capacity leftover)
