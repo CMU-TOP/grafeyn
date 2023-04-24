@@ -43,12 +43,10 @@ struct
         else
           let
             val sizeBefore = Wave.nonZeroSize wave
-
-            (* TODO: fix pass the right constraint *)
-            val constraint = spaceConstraint - otherSize
+            val constraint = Int.max (1000, spaceConstraint - otherSize)
             val {numGateApps, result} =
-              Wave.tryAdvance
-                {constraint = spaceConstraint, gate = gate gatenum} wave
+              Wave.tryAdvance {constraint = constraint, gate = gate gatenum}
+                wave
 
             val acc = SimAccumulator.logGateApps acc numGateApps
           in
@@ -82,12 +80,10 @@ struct
           let
             val sizeBefore = Wave.nonZeroSize wave
             val acc = SimAccumulator.logSpaceUsage acc (otherSize + sizeBefore)
-
-            (* TODO: fix pass the right constraint *)
-            val constraint = spaceConstraint - otherSize
+            val constraint = Int.max (1000, spaceConstraint - otherSize)
             val {numGateApps, result} =
-              Wave.tryAdvance
-                {constraint = spaceConstraint, gate = gate gatenum} wave
+              Wave.tryAdvance {constraint = constraint, gate = gate gatenum}
+                wave
             val acc = SimAccumulator.logGateApps acc numGateApps
           in
             case result of
@@ -112,12 +108,10 @@ struct
             val sizeBefore = Wave.nonZeroSize wave
             val acc =
               SimAccumulator.logSpaceUsage acc (leftoverSize + sizeBefore)
-
-            (* TODO: fix pass the right constraint *)
-            val constraint = spaceConstraint - leftoverSize
+            val constraint = Int.max (1000, spaceConstraint - leftoverSize)
             val {numGateApps, result} =
-              Wave.tryAdvance
-                {constraint = spaceConstraint, gate = gate gatenum} wave
+              Wave.tryAdvance {constraint = constraint, gate = gate gatenum}
+                wave
             val acc = SimAccumulator.logGateApps acc numGateApps
           in
             case result of
