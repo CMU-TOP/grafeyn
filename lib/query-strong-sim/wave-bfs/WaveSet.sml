@@ -15,9 +15,13 @@ sig
 
   (* returns (updated wave set, (gatenum, wave)) *)
   val removeOldest: waveset -> waveset * int * Wave.t
+  val removeSecondNewestOrNewest: waveset -> waveset * int * Wave.t
   val removeNewest: waveset -> waveset * int * Wave.t
 
   val remove: waveset -> int -> (waveset * Wave.t) option
+
+  val isWaveAt: int -> waveset -> bool
+  val isWaveAfter: int -> waveset -> bool
 
   val pullMerge: waveset -> int * Wave.t -> waveset * Wave.t
 end =
@@ -70,9 +74,32 @@ struct
     end
     handle _ => raise Fail "WaveSet.removeNewest"
 
+  fun secondNewestOrNewestKey waves =
+    let
+      val keys = List.rev (M.listKeys waves)
+    in
+      case keys of
+        _ :: second :: _ => second
+      | first :: _ => first
+      | [] => raise Fail "WaveSet.secondNewestOrNewestKey: empty"
+    end
+
+  fun removeSecondNewestOrNewest waves =
+    let
+      val gatenum = secondNewestOrNewestKey waves
+      val (waves', wave) = M.remove (waves, gatenum)
+    in
+      (waves', gatenum, wave)
+    end
+
   fun remove waves gatenum =
     if M.inDomain (waves, gatenum) then SOME (M.remove (waves, gatenum))
     else NONE
+
+  fun isWaveAt gatenum waves = M.inDomain (waves, gatenum)
+
+  fun isWaveAfter gatenum waves =
+    List.exists (fn key => key > gatenum) (M.listKeys waves)
 
   fun pullMerge waves (gatenum, currentWave) =
     case remove waves gatenum of

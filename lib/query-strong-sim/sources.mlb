@@ -10,9 +10,11 @@ local
   wave-bfs/WaveSet.sml
   wave-bfs/SimAccumulator.sml
   wave-bfs/QuerySimWaveBFS.sml
+  wave-bfs/QuerySimSingleGoalWaveBFS.sml
 in
   structure QuerySimSequential
   structure QuerySimNaivePar
   structure QuerySimBFS
   structure QuerySimWaveBFS
+  structure QuerySimSingleGoalWaveBFS
 end
