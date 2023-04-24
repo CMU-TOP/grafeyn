@@ -1,7 +1,7 @@
 (* ========================================================================
  * A little boilerplate, but hiding this behind an interface seems nice
  *)
-structure SimAccumulator:
+structure SimAccumulator :>
 sig
   type t
   val init: {desired: BasisIdx.t} -> t
@@ -48,12 +48,15 @@ struct
     }
 
   fun logSpaceUsage {desired, weight, numGateApps, maxSpaceUsage, maxNumWaves} n =
-    { desired = desired
-    , weight = weight
-    , numGateApps = numGateApps
-    , maxSpaceUsage = Int.max (maxSpaceUsage, n)
-    , maxNumWaves = maxNumWaves
-    }
+    ( if n <= maxSpaceUsage then ()
+      else print ("[ACC] space usage increase: " ^ Int.toString n ^ "\n")
+    ; { desired = desired
+      , weight = weight
+      , numGateApps = numGateApps
+      , maxSpaceUsage = Int.max (maxSpaceUsage, n)
+      , maxNumWaves = maxNumWaves
+      }
+    )
 
   fun logNumWaves {desired, weight, numGateApps, maxSpaceUsage, maxNumWaves} n =
     { desired = desired

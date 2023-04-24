@@ -123,13 +123,15 @@ val simulator =
       wrapQuerySim (QuerySimWaveBFS.query (parseMaxWaveSpace ()))
   | "query-single-goal-wave-bfs" =>
       wrapQuerySim (QuerySimSingleGoalWaveBFS.query (parseMaxWaveSpace ()))
+  | "query-two-wave-bfs" =>
+      wrapQuerySim (QuerySimTwoWaveBFS.query (parseMaxWaveSpace ()))
 
   | _ =>
       Util.die
         ("Unknown -sim " ^ simName ^ "; valid options are: "
          ^ "full-seq, full-naive-par, full-bfs, full-strided-bfs, "
          ^ "query-seq, query-naive-par, query-bfs, query-wave-bfs, "
-         ^ "query-single-gaol-wave-bfs")
+         ^ "query-single-goal-wave-bfs, query-two-wave-bfs")
 
 val msg = "quantum simulator (" ^ simName ^ ")"
 val () = Benchmark.run msg (fn _ =>

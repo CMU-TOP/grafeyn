@@ -24,6 +24,11 @@ sig
                        -> wave
                        -> {numGateApps: int, result: wave, leftover: wave}
 
+  val tryAdvance: {constraint: int, gate: Gate.t}
+                  -> wave
+                  -> {numGateApps: int, result: wave option}
+
+  val splitAt: int -> wave -> wave * wave
   val merge: wave * wave -> wave
 end =
 struct
@@ -86,6 +91,10 @@ struct
     end
 
 
+  fun splitAt mid wave =
+    (Seq.take wave mid, Seq.drop wave mid)
+
+
   fun applyAll {grain} wave f =
     ForkJoin.parfor grain (0, Seq.length wave) (fn i =>
       case Seq.nth wave i of
@@ -105,8 +114,8 @@ struct
     let
       fun loopGuessCapacity desiredCapacity =
         let
-          val _ = print
-            ("trying desiredCapacity=" ^ Int.toString desiredCapacity ^ "\n")
+          (* val _ = print
+            ("trying desiredCapacity=" ^ Int.toString desiredCapacity ^ "\n") *)
           val table = makeTable desiredCapacity
 
           fun put widx =
@@ -114,7 +123,7 @@ struct
         in
           applyNonZero {grain = 100} wave1 put;
           applyNonZero {grain = 100} wave2 put;
-          print "merge success\n";
+          (* print "merge success\n"; *)
           HT.unsafeViewContents table
         end
         handle HT.Full =>
@@ -123,14 +132,38 @@ struct
       val totalSize = size wave1 + size wave2
       val totalCapacities = capacity wave1 + capacity wave2
 
-      val _ = print
+      (* val _ = print
         ("merging totalSize=" ^ Int.toString totalSize ^ " totalCapacities="
-         ^ Int.toString totalCapacities ^ "\n")
+         ^ Int.toString totalCapacities ^ "\n") *)
 
       val desiredCapacity = Int.min (totalCapacities, Real.ceil
         (1.5 * Real.fromInt totalSize))
     in
       loopGuessCapacity desiredCapacity
+    end
+
+
+  fun tryAdvance {constraint, gate} wave =
+    let
+      val nzSize = nonZeroSize wave
+    in
+      let
+        val multiplier = if Gate.expectBranching gate then 4.0 else 2.0
+        val cap = Int.min (constraint, Real.ceil
+          (multiplier * Real.fromInt nzSize))
+        val table = makeTable cap
+        fun doGate widx =
+          case Gate.apply gate widx of
+            Gate.OutputOne widx' => HT.insertWith Complex.+ table widx'
+          | Gate.OutputTwo (widx1, widx2) =>
+              ( HT.insertWith Complex.+ table widx1
+              ; HT.insertWith Complex.+ table widx2
+              )
+      in
+        applyNonZero {grain = 100} wave doGate;
+        {numGateApps = nzSize, result = SOME (HT.unsafeViewContents table)}
+      end
+      handle HT.Full => {numGateApps = nzSize, result = NONE}
     end
 
 
