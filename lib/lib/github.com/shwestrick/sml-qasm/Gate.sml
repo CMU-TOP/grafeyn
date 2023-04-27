@@ -12,6 +12,7 @@ sig
   | X of qubit_idx
   | T of qubit_idx
   | CX of {control: qubit_idx, target: qubit_idx}
+  | CCX of {control1: qubit_idx, control2: qubit_idx, target: qubit_idx}
   | CPhase of
       { control: qubit_idx
       , target: qubit_idx
@@ -36,6 +37,7 @@ struct
   | T of qubit_idx
   | X of qubit_idx
   | CX of {control: qubit_idx, target: qubit_idx}
+  | CCX of {control1: qubit_idx, control2: qubit_idx, target: qubit_idx}
   | CPhase of
       { control: qubit_idx
       , target: qubit_idx
@@ -51,5 +53,5 @@ struct
   | FSim of {left: qubit_idx, right: qubit_idx, theta: real, phi: real}
 
   type t = gate
-  
+
 end

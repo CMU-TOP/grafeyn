@@ -35,6 +35,8 @@ struct
         | Gate.SqrtW i => "sqrt(w) " ^ qi i
         | Gate.X i => "x " ^ qi i
         | Gate.CX {control, target} => "cx " ^ qi control ^ ", " ^ qi target
+        | Gate.CCX {control1, control2, target} =>
+            "ccx " ^ qi control1 ^ ", " ^ qi control2 ^ ", " ^ qi target
         | Gate.CPhase {control, target, rot} =>
             "cphase(" ^ Real.toString rot ^ ") " ^ qi control ^ ", " ^ qi target
         | Gate.FSim {left, right, theta, phi} =>

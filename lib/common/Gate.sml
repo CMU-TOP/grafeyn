@@ -16,6 +16,7 @@ sig
   | X of qubit_idx
   | T of qubit_idx
   | CX of {control: qubit_idx, target: qubit_idx}
+  | CCX of {control1: qubit_idx, control2: qubit_idx, target: qubit_idx}
   | CPhase of
       { control: qubit_idx
       , target: qubit_idx
@@ -158,6 +159,18 @@ struct
     end
 
 
+  fun ccx {control1 = ci1, control2 = ci2, target = ti} (bidx, weight) =
+    let
+      val bidx' =
+        if BasisIdx.get bidx ci1 andalso BasisIdx.get bidx ci2 then
+          BasisIdx.flip bidx ti
+        else
+          bidx
+    in
+      OutputOne (bidx', weight)
+    end
+
+
   fun t qi (bidx, weight) =
     let
       val multiplier =
@@ -235,6 +248,7 @@ struct
     | SqrtW xx => sqrtw xx widx
     | X xx => x xx widx
     | CX xx => cx xx widx
+    | CCX xx => ccx xx widx
     | CPhase xx => cphase xx widx
     | FSim xx => fsim xx widx
 

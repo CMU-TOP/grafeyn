@@ -52,6 +52,8 @@ struct
       | (GateName "t", 1) => Gate.T (getArg 0)
       | (GateName "x", 1) => Gate.X (getArg 0)
       | (GateName "cx", 2) => Gate.CX {control = getArg 0, target = getArg 1}
+      | (GateName "ccx", 3) =>
+          Gate.CCX {control1 = getArg 0, control2 = getArg 1, target = getArg 2}
       | (GateNameAndArg ("cphase", realexp), 2) =>
           Gate.CPhase
             {control = getArg 0, target = getArg 1, rot = RealExp.eval realexp}
@@ -62,29 +64,64 @@ struct
   fun charSeqToString s =
     CharVector.tabulate (Seq.length s, Seq.nth s)
 
+
   type parser_state =
-    {index: int, qreg: (string * int) option, gates: Gate.t list}
+    { index: int
+    , numQubitsSoFar: int
+    , qreg: {name: string, start: int, stop: int} list
+    , gates: Gate.t list
+    }
+
 
   fun index ({index = i, ...}: parser_state) = i
 
-  fun advanceBy j ({index = i, qreg, gates}: parser_state) =
-    {index = i + j, qreg = qreg, gates = gates}
 
-  fun declareQReg (name, size) ({index, qreg, gates}: parser_state) =
-    case qreg of
-      NONE =>
-        ( (*print ("declaring qreg: " ^ name ^ "[" ^ Int.toString size ^ "]\n")
-          ;*){index = index, qreg = SOME (name, size), gates = gates})
-    | SOME _ => raise ParseError "only one qreg supported at the moment"
+  fun advanceBy k (state: parser_state) =
+    { index = #index state + k
+    , qreg = #qreg state
+    , gates = #gates state
+    , numQubitsSoFar = #numQubitsSoFar state
+    }
 
 
-  fun doGate (name, args) ({index, qreg, gates}: parser_state) =
-    let in
-      { index = index
-      , qreg = qreg
-      , gates = parseGate (name, Seq.map #index args) :: gates
+  fun declareQReg (name, size) (state: parser_state) =
+    if List.exists (fn x => #name x = name) (#qreg state) then
+      raise ParseError ("qreg '" ^ name ^ "' declared more than once")
+    else
+      { index = #index state
+      , numQubitsSoFar = #numQubitsSoFar state + size
+      , qreg =
+          { name = name
+          , start = #numQubitsSoFar state
+          , stop = #numQubitsSoFar state + size
+          } :: #qreg state
+      , gates = #gates state
       }
+
+
+  fun lookupQubits (state: parser_state)
+    (args: {name: string, index: int} Seq.t) =
+    let
+      fun lookupOne {name, index} =
+        case List.find (fn x => #name x = name) (#qreg state) of
+          NONE => raise ParseError ("unknown qreg '" ^ name ^ "'")
+        | SOME {start, stop, ...} =>
+            if index < 0 orelse index >= (stop - start) then
+              raise ParseError
+                ("out-of-bounds: " ^ name ^ "[" ^ Int.toString index ^ "]")
+            else
+              start + index
+    in
+      Seq.map lookupOne args
     end
+
+
+  fun doGate (gateDesc, args) (state: parser_state) =
+    { index = #index state
+    , qreg = #qreg state
+    , numQubitsSoFar = #numQubitsSoFar state
+    , gates = parseGate (gateDesc, lookupQubits state args) :: #gates state
+    }
 
 
   fun loadFromFile path =
@@ -197,6 +234,23 @@ struct
             let
               (* ignore for now *)
               val (state, _) = parse_nameWithIndex (advanceBy 4 state)
+              val state = goPastChar #";" state
+            in
+              parse_toplevel state
+            end
+
+          else if isString "measure" state then
+            let
+              (* ignore for now *)
+              val state = advanceBy 7 state
+              val state = goPastWhitespace state
+              val (state, _) = parse_nameWithIndex state
+              val state = goPastWhitespace state
+              val state =
+                if isString "->" state then advanceBy 2 state
+                else raise ParseError ("invalid measure")
+              val state = goPastWhitespace state
+              val (state, _) = parse_nameWithIndex state
               val state = goPastChar #";" state
             in
               parse_toplevel state
@@ -380,13 +434,14 @@ struct
           (state, x)
         end
 
-      val state: parser_state = {index = 0, qreg = NONE, gates = []}
+      val state: parser_state =
+        {index = 0, qreg = [], gates = [], numQubitsSoFar = 0}
       val state = parse_toplevel state
+
     (* val _ = print ("got to: " ^ Int.toString (index state) ^ "\n") *)
     in
-      case #qreg state of
-        NONE => raise ParseError "no qreg declared"
-      | SOME (_, numQubits) =>
-          {numQubits = numQubits, gates = Seq.fromRevList (#gates state)}
+      { numQubits = #numQubitsSoFar state
+      , gates = Seq.fromRevList (#gates state)
+      }
     end
 end
