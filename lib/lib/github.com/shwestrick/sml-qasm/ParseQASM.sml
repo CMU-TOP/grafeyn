@@ -193,6 +193,15 @@ struct
               parse_toplevel state
             end
 
+          else if isString "creg" state then
+            let
+              (* ignore for now *)
+              val (state, _) = parse_nameWithIndex (advanceBy 4 state)
+              val state = goPastChar #";" state
+            in
+              parse_toplevel state
+            end
+
           else
             parse_toplevel (parse_gateAndArgs state)
         end
