@@ -81,6 +81,22 @@ struct
         HT.insertIfNotPresent initialState (BasisIdx.zeros, Complex.real 1.0)
       val (totalGateApps, state) = loopGuessCapacity 0 0 initialState
 
+      val _ =
+        let
+          val currentElems = HT.unsafeViewContents state
+          val nonZeroSize =
+            SeqBasis.reduce 1000 op+ 0 (0, Seq.length currentElems) (fn i =>
+              case Seq.nth currentElems i of
+                NONE => 0
+              | SOME (bidx, weight) => if Complex.isNonZero weight then 1 else 0)
+          val density = Real.fromInt nonZeroSize / Real.fromInt maxNumStates
+        in
+          print
+            ("gate " ^ Int.toString depth ^ ": non-zeros: "
+             ^ Int.toString nonZeroSize ^ "; density: "
+             ^ Real.fmt (StringCvt.FIX (SOME 8)) density ^ "\n")
+        end
+
       val _ = print ("gate app count " ^ Int.toString totalGateApps ^ "\n")
     in
       case HT.lookup state desired of
