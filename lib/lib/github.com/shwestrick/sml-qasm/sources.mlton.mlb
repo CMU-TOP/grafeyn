@@ -1,0 +1,11 @@
+local
+  $(SML_LIB)/basis/basis.mlb
+  ../../mpllang/mpllib/sources.mlton.mlb
+  Gate.sml
+  Circuit.sml
+  ParseQASM.sml
+in
+  structure Gate
+  structure Circuit
+  structure ParseQASM
+end

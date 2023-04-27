@@ -6,6 +6,16 @@ local
     functor RedBlackMapFn
   end
   ../lib/github.com/mpllang/mpllib/sources.$(COMPILER).mlb
+
+  local
+    ../lib/github.com/shwestrick/sml-qasm/sources.$(COMPILER).mlb
+  in
+    (* base Gate structure, which is extended by Gate.sml here. *)
+    structure Gate
+    structure Circuit
+    structure ParseQASM
+  end
+
   HashTable.sml
   ApplyUntilFailure.sml
 
@@ -14,7 +24,6 @@ local
   BasisIdx.sml
   SparseState.sml
   Gate.sml
-  Circuit.sml
 in
   structure HashTable
   structure ApplyUntilFailure
@@ -24,6 +33,7 @@ in
   structure SparseState
   structure Gate
   structure Circuit
+  structure ParseQASM
 
   functor RedBlackMapFn
 end
