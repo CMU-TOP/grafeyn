@@ -8,6 +8,7 @@ sig
   val make: {capacity: int, maxload: real, emptykey: BasisIdx.t} -> table
 
   val size: table -> int
+  val nonZeroSize: table -> int
   val capacity: table -> int
 
   (* val insertIfNotPresent: table -> BasisIdx.t * Complex.t -> bool *)
@@ -157,6 +158,17 @@ struct
         if i >= n then loopCheck 0 else if i = start then NONE else loop i
     in
       if n = 0 then NONE else loop start
+    end
+
+
+  fun nonZeroSize state =
+    let
+      val currentElems = unsafeViewContents state
+    in
+      SeqBasis.reduce 1000 op+ 0 (0, DelayedSeq.length currentElems) (fn i =>
+        case DelayedSeq.nth currentElems i of
+          NONE => 0
+        | SOME (bidx, weight) => if Complex.isNonZero weight then 1 else 0)
     end
 
 end

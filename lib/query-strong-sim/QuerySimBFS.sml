@@ -17,6 +17,16 @@ struct
       val maxNumStates = Word64.toInt
         (Word64.<< (0w1, Word64.fromInt numQubits))
 
+      fun dumpDensity (i, nonZeroSize) =
+        let
+          val density = Real.fromInt nonZeroSize / Real.fromInt maxNumStates
+        in
+          print
+            ("gate " ^ Int.toString i ^ ": non-zeros: "
+             ^ Int.toString nonZeroSize ^ "; density: "
+             ^ Real.fmt (StringCvt.FIX (SOME 8)) density ^ "\n")
+        end
+
       val impossibleBasisIdx = BasisIdx.flip BasisIdx.zeros 63
 
       fun makeNewState cap =
@@ -53,21 +63,8 @@ struct
           (countGateApp, state)
         else
           let
-            val currentElems = SST.unsafeViewContents state
-            val nonZeroSize =
-              SeqBasis.reduce 1000 op+ 0 (0, DS.length currentElems) (fn i =>
-                case DS.nth currentElems i of
-                  NONE => 0
-                | SOME (bidx, weight) =>
-                    if Complex.isNonZero weight then 1 else 0)
-
-            val density = Real.fromInt nonZeroSize / Real.fromInt maxNumStates
-            val _ = print
-              ("gate " ^ Int.toString i ^ ": non-zeros: "
-               ^ Int.toString nonZeroSize ^ "; density: "
-               ^ Real.fmt (StringCvt.FIX (SOME 8)) density ^ "\n")
-            val _ = TextIO.flushOut TextIO.stdOut
-
+            val nonZeroSize = SST.nonZeroSize state
+            val _ = dumpDensity (i, nonZeroSize)
             val multiplier = if Gate.expectBranching (gate i) then 3.0 else 1.5
             val guess = Real.ceil (multiplier * Real.fromInt nonZeroSize)
           in
@@ -77,27 +74,12 @@ struct
       val initialState = makeNewState 1
       val _ =
         SST.insertAddWeights initialState (BasisIdx.zeros, Complex.real 1.0)
-      val (totalGateApps, state) = loopGuessCapacity 0 0 initialState
 
-      val _ =
-        let
-          val currentElems = SST.unsafeViewContents state
-          val nonZeroSize =
-            SeqBasis.reduce 1000 op+ 0 (0, DS.length currentElems) (fn i =>
-              case DS.nth currentElems i of
-                NONE => 0
-              | SOME (bidx, weight) => if Complex.isNonZero weight then 1 else 0)
-          val density = Real.fromInt nonZeroSize / Real.fromInt maxNumStates
-        in
-          print
-            ("gate " ^ Int.toString depth ^ ": non-zeros: "
-             ^ Int.toString nonZeroSize ^ "; density: "
-             ^ Real.fmt (StringCvt.FIX (SOME 8)) density ^ "\n")
-        end
-
+      val (totalGateApps, finalState) = loopGuessCapacity 0 0 initialState
+      val _ = dumpDensity (depth, SST.nonZeroSize finalState)
       val _ = print ("gate app count " ^ Int.toString totalGateApps ^ "\n")
     in
-      case SST.lookup state desired of
+      case SST.lookup finalState desired of
         NONE => Complex.zero
       | SOME v => v
     end
