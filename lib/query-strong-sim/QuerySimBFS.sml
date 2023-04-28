@@ -46,7 +46,7 @@ struct
                 )
 
           val numGateApps =
-            SeqBasis.reduce 100 op+ 0 (0, DS.length currentElems) (fn i =>
+            SeqBasis.reduce 1000 op+ 0 (0, DS.length currentElems) (fn i =>
               case DS.nth currentElems i of
                 NONE => 0
               | SOME (bidx, weight) =>
