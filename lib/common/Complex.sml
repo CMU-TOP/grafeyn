@@ -5,6 +5,7 @@ sig
   val toString: t -> string
 
   val make: (real * real) -> t
+  val view: t -> (real * real)
 
   val real: real -> t
   val imag: real -> t
@@ -29,6 +30,8 @@ struct
     rtos re ^ " + " ^ rtos im ^ "i"
 
   fun make (re, im) = C {re = re, im = im}
+
+  fun view (C {re, im}) = (re, im)
 
   fun closeEnough (x, y) =
     Real.abs (x - y) <= 0.000000001

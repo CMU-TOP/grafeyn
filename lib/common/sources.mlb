@@ -24,6 +24,8 @@ local
   BasisIdx.sml
   SparseState.sml
   Gate.sml
+
+  SparseStateTable.sml
 in
   structure HashTable
   structure ApplyUntilFailure
@@ -34,6 +36,8 @@ in
   structure Gate
   structure Circuit
   structure ParseQASM
+
+  structure SparseStateTable
 
   functor RedBlackMapFn
 end

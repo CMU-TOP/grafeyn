@@ -4,7 +4,8 @@ sig
 end =
 struct
 
-  structure HT = HashTable
+  structure SST = SparseStateTable
+  structure DS = DelayedSeq
 
   fun query {numQubits, gates} desired =
     let
@@ -16,30 +17,27 @@ struct
       val maxNumStates = Word64.toInt
         (Word64.<< (0w1, Word64.fromInt numQubits))
 
+      val impossibleBasisIdx = BasisIdx.flip BasisIdx.zeros 63
+
       fun makeNewState cap =
-        HT.make
-          { hash = BasisIdx.hash
-          , eq = BasisIdx.equal
-          , capacity = cap
-          , maxload = 0.75
-          }
+        SST.make {capacity = cap, maxload = 0.75, emptykey = impossibleBasisIdx}
 
       fun loopTryCapacity capacity i countGateApp state =
         let
-          val currentElems = HT.unsafeViewContents state
+          val currentElems = SST.unsafeViewContents state
           val newState = makeNewState capacity
 
           fun doGate widx =
             case Gate.apply (gate i) widx of
-              Gate.OutputOne widx' => HT.insertWith Complex.+ newState widx'
+              Gate.OutputOne widx' => SST.insertAddWeights newState widx'
             | Gate.OutputTwo (widx1, widx2) =>
-                ( HT.insertWith Complex.+ newState widx1
-                ; HT.insertWith Complex.+ newState widx2
+                ( SST.insertAddWeights newState widx1
+                ; SST.insertAddWeights newState widx2
                 )
 
           val numGateApps =
-            SeqBasis.reduce 100 op+ 0 (0, Seq.length currentElems) (fn i =>
-              case Seq.nth currentElems i of
+            SeqBasis.reduce 100 op+ 0 (0, DS.length currentElems) (fn i =>
+              case DS.nth currentElems i of
                 NONE => 0
               | SOME (bidx, weight) =>
                   if Complex.isNonZero weight then (doGate (bidx, weight); 1)
@@ -47,7 +45,7 @@ struct
         in
           loopGuessCapacity (i + 1) (countGateApp + numGateApps) newState
         end
-        handle HT.Full => loopTryCapacity (2 * capacity) i countGateApp state
+        handle SST.Full => loopTryCapacity (2 * capacity) i countGateApp state
 
 
       and loopGuessCapacity i countGateApp state =
@@ -55,10 +53,10 @@ struct
           (countGateApp, state)
         else
           let
-            val currentElems = HT.unsafeViewContents state
+            val currentElems = SST.unsafeViewContents state
             val nonZeroSize =
-              SeqBasis.reduce 1000 op+ 0 (0, Seq.length currentElems) (fn i =>
-                case Seq.nth currentElems i of
+              SeqBasis.reduce 1000 op+ 0 (0, DS.length currentElems) (fn i =>
+                case DS.nth currentElems i of
                   NONE => 0
                 | SOME (bidx, weight) =>
                     if Complex.isNonZero weight then 1 else 0)
@@ -78,15 +76,15 @@ struct
 
       val initialState = makeNewState 1
       val _ =
-        HT.insertIfNotPresent initialState (BasisIdx.zeros, Complex.real 1.0)
+        SST.insertAddWeights initialState (BasisIdx.zeros, Complex.real 1.0)
       val (totalGateApps, state) = loopGuessCapacity 0 0 initialState
 
       val _ =
         let
-          val currentElems = HT.unsafeViewContents state
+          val currentElems = SST.unsafeViewContents state
           val nonZeroSize =
-            SeqBasis.reduce 1000 op+ 0 (0, Seq.length currentElems) (fn i =>
-              case Seq.nth currentElems i of
+            SeqBasis.reduce 1000 op+ 0 (0, DS.length currentElems) (fn i =>
+              case DS.nth currentElems i of
                 NONE => 0
               | SOME (bidx, weight) => if Complex.isNonZero weight then 1 else 0)
           val density = Real.fromInt nonZeroSize / Real.fromInt maxNumStates
@@ -99,7 +97,7 @@ struct
 
       val _ = print ("gate app count " ^ Int.toString totalGateApps ^ "\n")
     in
-      case HT.lookup state desired of
+      case SST.lookup state desired of
         NONE => Complex.zero
       | SOME v => v
     end
