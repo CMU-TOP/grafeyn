@@ -32,7 +32,7 @@ struct
       fun makeNewState cap =
         SST.make {capacity = cap, maxload = 0.75, emptykey = impossibleBasisIdx}
 
-      fun loopTryCapacity capacity i countGateApp state =
+      fun tryCapacity capacity i state =
         let
           val currentElems = SST.unsafeViewContents state
           val newState = makeNewState capacity
@@ -53,9 +53,19 @@ struct
                   if Complex.isNonZero weight then (doGate (bidx, weight); 1)
                   else 0)
         in
-          loopGuessCapacity (i + 1) (countGateApp + numGateApps) newState
+          SOME (numGateApps, newState)
         end
-        handle SST.Full => loopTryCapacity (2 * capacity) i countGateApp state
+        handle SST.Full => NONE
+
+
+      fun loopTryCapacity capacity i countGateApp state =
+        case tryCapacity capacity i state of
+          NONE =>
+            ( print "upping capacity...\n"
+            ; loopTryCapacity (2 * capacity) i countGateApp state
+            )
+        | SOME (gateApps, newState) =>
+            loopGuessCapacity (i + 1) (countGateApp + gateApps) newState
 
 
       and loopGuessCapacity i countGateApp state =
@@ -65,7 +75,7 @@ struct
           let
             val nonZeroSize = SST.nonZeroSize state
             val _ = dumpDensity (i, nonZeroSize)
-            val multiplier = if Gate.expectBranching (gate i) then 3.0 else 1.5
+            val multiplier = if Gate.expectBranching (gate i) then 4.0 else 2.0
             val guess = Real.ceil (multiplier * Real.fromInt nonZeroSize)
           in
             loopTryCapacity guess i countGateApp state
