@@ -17,14 +17,17 @@ struct
       val maxNumStates = Word64.toInt
         (Word64.<< (0w1, Word64.fromInt numQubits))
 
-      fun dumpDensity (i, nonZeroSize) =
+      fun dumpDensity (i, nonZeroSize, capacity) =
         let
           val density = Real.fromInt nonZeroSize / Real.fromInt maxNumStates
+          val slackPct = Real.ceil
+            (100.0 * (1.0 - Real.fromInt nonZeroSize / Real.fromInt capacity))
         in
           print
             ("gate " ^ Int.toString i ^ ": non-zeros: "
-             ^ Int.toString nonZeroSize ^ "; density: "
-             ^ Real.fmt (StringCvt.FIX (SOME 8)) density ^ "\n")
+             ^ Int.toString nonZeroSize ^ "; slack: " ^ Int.toString slackPct
+             ^ "%" ^ "; density: " ^ Real.fmt (StringCvt.FIX (SOME 8)) density
+             ^ "\n")
         end
 
       val impossibleBasisIdx = BasisIdx.flip BasisIdx.zeros 63
@@ -46,7 +49,7 @@ struct
                 )
 
           val numGateApps =
-            SeqBasis.reduce 1000 op+ 0 (0, DS.length currentElems) (fn i =>
+            SeqBasis.reduce 10000 op+ 0 (0, DS.length currentElems) (fn i =>
               case DS.nth currentElems i of
                 NONE => 0
               | SOME (bidx, weight) =>
@@ -75,9 +78,11 @@ struct
         else
           let
             val nonZeroSize = SST.nonZeroSize state
-            val _ = dumpDensity (i, nonZeroSize)
-            val multiplier = if Gate.expectBranching (gate i) then 3.0 else 1.5
+            val _ = dumpDensity (i, nonZeroSize, SST.capacity state)
+            val multiplier = if Gate.expectBranching (gate i) then 2.5 else 1.25
             val guess = Real.ceil (multiplier * Real.fromInt nonZeroSize)
+            val guess = Int.min (guess, Real.ceil
+              (1.25 * Real.fromInt maxNumStates))
           in
             loopTryCapacity guess i countGateApp state
           end
@@ -87,7 +92,8 @@ struct
         SST.insertAddWeights initialState (BasisIdx.zeros, Complex.real 1.0)
 
       val (totalGateApps, finalState) = loopGuessCapacity 0 0 initialState
-      val _ = dumpDensity (depth, SST.nonZeroSize finalState)
+      val _ =
+        dumpDensity (depth, SST.nonZeroSize finalState, SST.capacity finalState)
       val _ = print ("gate app count " ^ Int.toString totalGateApps ^ "\n")
     in
       case SST.lookup finalState desired of

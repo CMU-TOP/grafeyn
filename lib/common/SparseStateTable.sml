@@ -98,7 +98,7 @@ struct
     (x, v) =
     let
       val n = Array.length keys
-      val tolerance = 20 * Real.ceil (1.0 / (1.0 - maxload))
+      val tolerance = 100 * Real.ceil (1.0 / (1.0 - maxload))
 
       fun claimSlotAt i = bcas (keys, i, emptykey, x)
 
