@@ -24,6 +24,9 @@ struct
       fun qi i =
         "q[" ^ Int.toString i ^ "]"
 
+      fun rtos r =
+        if r < 0.0 then "-" ^ Real.toString (~r) else Real.toString r
+
       fun gateToString gate =
         case gate of
           Gate.PauliY i => "y " ^ qi i
@@ -38,10 +41,11 @@ struct
         | Gate.CCX {control1, control2, target} =>
             "ccx " ^ qi control1 ^ ", " ^ qi control2 ^ ", " ^ qi target
         | Gate.CPhase {control, target, rot} =>
-            "cphase(" ^ Real.toString rot ^ ") " ^ qi control ^ ", " ^ qi target
+            "cphase(" ^ rtos rot ^ ") " ^ qi control ^ ", " ^ qi target
         | Gate.FSim {left, right, theta, phi} =>
-            "fsim(" ^ Real.toString theta ^ ", " ^ Real.toString phi ^ ") "
-            ^ qi left ^ ", " ^ qi right
+            "fsim(" ^ rtos theta ^ ", " ^ rtos phi ^ ") " ^ qi left ^ ", "
+            ^ qi right
+        | Gate.RZ {rot, target} => "rz(" ^ rtos rot ^ ") " ^ qi target
     in
       Seq.iterate op^ header (Seq.map (fn g => gateToString g ^ ";\n") gates)
     end

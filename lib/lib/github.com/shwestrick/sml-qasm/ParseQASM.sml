@@ -9,12 +9,17 @@ struct
 
   structure RealExp =
   struct
-    datatype t = LiteralPi | Slash of t * t | LiteralNum of char Seq.t
+    datatype t =
+      LiteralPi
+    | Slash of t * t
+    | LiteralNum of char Seq.t
+    | Neg of t
 
     fun eval exp =
       case exp of
         LiteralPi => Math.pi
       | Slash (e1, e2) => eval e1 / eval e2
+      | Neg e => ~(eval e)
       | LiteralNum x =>
           case Parse.parseReal x of
             NONE =>
@@ -57,6 +62,8 @@ struct
       | (GateNameAndArg ("cphase", realexp), 2) =>
           Gate.CPhase
             {control = getArg 0, target = getArg 1, rot = RealExp.eval realexp}
+      | (GateNameAndArg ("rz", realexp), 1) =>
+          Gate.RZ {rot = RealExp.eval realexp, target = getArg 0}
       | (GateName name, _) => err name
       | (GateNameAndArg (name, _), _) => err name
     end
@@ -78,6 +85,14 @@ struct
 
   fun advanceBy k (state: parser_state) =
     { index = #index state + k
+    , qreg = #qreg state
+    , gates = #gates state
+    , numQubitsSoFar = #numQubitsSoFar state
+    }
+
+
+  fun goto idx (state: parser_state) =
+    { index = idx
     , qreg = #qreg state
     , gates = #gates state
     , numQubitsSoFar = #numQubitsSoFar state
@@ -122,6 +137,10 @@ struct
     , numQubitsSoFar = #numQubitsSoFar state
     , gates = parseGate (gateDesc, lookupQubits state args) :: #gates state
     }
+
+
+  fun takeUpTo k s =
+    Seq.take s (Int.min (Seq.length s, k))
 
 
   fun loadFromFile path =
@@ -172,8 +191,12 @@ struct
           advanceBy 1 state
         else
           raise ParseError
-            ("expected " ^ Char.toString c ^ " but found: "
-             ^ charSeqToString (Seq.drop chars (index state)))
+            ("expected '" ^ Char.toString c ^ "' but found '"
+             ^ charSeqToString (takeUpTo 1 (Seq.drop chars (index state)))
+             ^ "'. context (10 chars before / after):\n"
+             ^
+             charSeqToString (takeUpTo 21 (Seq.drop chars (Int.max
+               (0, index state - 10)))))
 
 
       fun parse_toplevel state =
@@ -194,7 +217,8 @@ struct
           else if isString "reset" state then
             let
               val state = advanceBy 5 state
-              val (state, _) = parse_name state
+              val state = goPastWhitespace state
+              val (state, _) = parse_nameMaybeWithIndex state
               val state = goPastWhitespace state
               val state = expectChar #";" state
             in
@@ -203,10 +227,19 @@ struct
 
           else if isString "barrier" state then
             let
+              fun loop state =
+                let
+                  val state = goPastWhitespace state
+                  val (state, _) = parse_nameMaybeWithIndex state
+                  val state = goPastWhitespace state
+                in
+                  if isChar #";" state then advanceBy 1 state
+                  else if isChar #"," state then loop (advanceBy 1 state)
+                  else raise ParseError "invalid barrier"
+                end
+
               val state = advanceBy 7 state
-              val (state, _) = parse_name state
-              val state = goPastWhitespace state
-              val state = expectChar #";" state
+              val state = loop state
             in
               parse_toplevel state
             end
@@ -305,6 +338,18 @@ struct
             in
               if index state >= numChars then
                 raise ParseError "unexpected end of real expression"
+              else if isChar #"-" state then
+                let
+                  val state = advanceBy 1 state
+                  val (state, x) = parse_realExp state
+                  val _ =
+                    if Option.isSome acc then
+                      raise ParseError ("could not parse real expression")
+                    else
+                      ()
+                in
+                  (state, SOME (RealExp.Neg x))
+                end
               else if isChar #")" state then
                 (state, acc)
               else if isString "pi" state then
@@ -397,6 +442,25 @@ struct
           val state = expectChar #"]" state
         in
           (state, {name = name, index = index})
+        end
+
+
+      and parse_nameMaybeWithIndex state =
+        let
+          val startIndex = index state
+          val state = goPastWhitespace state
+          val (state, name) = parse_name state
+          val state = goPastWhitespace state
+        in
+          if isChar #"[" state then
+            let
+              val (state, {name, index}) = parse_nameWithIndex
+                (goto startIndex state)
+            in
+              (state, {name = name, index = SOME index})
+            end
+          else
+            (state, {name = name, index = NONE})
         end
 
 

@@ -19,6 +19,7 @@ sig
       , rot: real (* rotation in [0,2pi) *)
       }
   | FSim of {left: qubit_idx, right: qubit_idx, theta: real, phi: real}
+  | RZ of {rot: real, target: qubit_idx}
 
   type t = gate
 
@@ -51,6 +52,7 @@ struct
     *     [ 0,   0,              0,              e^(-i phi) ] ]
     *)
   | FSim of {left: qubit_idx, right: qubit_idx, theta: real, phi: real}
+  | RZ of {rot: real, target: qubit_idx}
 
   type t = gate
 

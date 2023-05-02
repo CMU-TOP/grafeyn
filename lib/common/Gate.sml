@@ -30,6 +30,7 @@ sig
     *     [ 0,   0,              0,              e^(-i phi) ] ]
     *)
   | FSim of {left: qubit_idx, right: qubit_idx, theta: real, phi: real}
+  | RZ of {rot: real, target: qubit_idx}
   *)
 
   type t = gate
@@ -227,6 +228,16 @@ struct
     end
 
 
+  fun rz {rot, target} (bidx, weight) =
+    let
+      val mult =
+        if BasisIdx.get bidx target then Complex.rotateBy (~(rot / 2.0))
+        else Complex.rotateBy (rot / 2.0)
+    in
+      OutputOne (bidx, Complex.* (mult, weight))
+    end
+
+
   fun expectBranching gate =
     case gate of
       Hadamard _ => true
@@ -251,6 +262,7 @@ struct
     | CCX xx => ccx xx widx
     | CPhase xx => cphase xx widx
     | FSim xx => fsim xx widx
+    | RZ xx => rz xx widx
 
 
   fun gateOutputToSeq go =
