@@ -31,6 +31,8 @@ sig
     *)
   | FSim of {left: qubit_idx, right: qubit_idx, theta: real, phi: real}
   | RZ of {rot: real, target: qubit_idx}
+  | RY of {rot: real, target: qubit_idx}
+  | CSwap of {control: qubit_idx, target1: qubit_idx, target2: qubit_idx}
   *)
 
   type t = gate
@@ -238,6 +240,39 @@ struct
     end
 
 
+  fun ry {rot, target} (bidx, weight) =
+    let
+      val bidx0 = BasisIdx.set bidx target false
+      val bidx1 = BasisIdx.set bidx target true
+
+      val s = Math.sin (rot / 2.0)
+      val c = Math.cos (rot / 2.0)
+
+      val (mult0, mult1) = if BasisIdx.get bidx target then (~s, c) else (c, s)
+      val (mult0, mult1) = (Complex.real mult0, Complex.real mult1)
+    in
+      OutputTwo
+        ((bidx0, Complex.* (mult0, weight)), (bidx1, Complex.* (mult1, weight)))
+    end
+
+
+  fun cswap {control, target1, target2} (bidx, weight) =
+    let
+      val bidx' =
+        if BasisIdx.get bidx control then
+          let
+            val t1 = BasisIdx.get bidx target1
+            val t2 = BasisIdx.get bidx target2
+          in
+            BasisIdx.set (BasisIdx.set bidx target1 t2) target2 t1
+          end
+        else
+          bidx
+    in
+      OutputOne (bidx', weight)
+    end
+
+
   fun expectBranching gate =
     case gate of
       Hadamard _ => true
@@ -245,6 +280,7 @@ struct
     | SqrtX _ => true
     | SqrtW _ => true
     | FSim _ => true
+    | RY _ => true
     | _ => false
 
 
@@ -263,6 +299,8 @@ struct
     | CPhase xx => cphase xx widx
     | FSim xx => fsim xx widx
     | RZ xx => rz xx widx
+    | RY xx => ry xx widx
+    | CSwap xx => cswap xx widx
 
 
   fun gateOutputToSeq go =

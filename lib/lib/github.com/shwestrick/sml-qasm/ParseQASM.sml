@@ -64,6 +64,11 @@ struct
             {control = getArg 0, target = getArg 1, rot = RealExp.eval realexp}
       | (GateNameAndArg ("rz", realexp), 1) =>
           Gate.RZ {rot = RealExp.eval realexp, target = getArg 0}
+      | (GateNameAndArg ("ry", realexp), 1) =>
+          Gate.RY {rot = RealExp.eval realexp, target = getArg 0}
+      | (GateName "cswap", 3) =>
+          Gate.CSwap
+            {control = getArg 0, target1 = getArg 1, target2 = getArg 2}
       | (GateName name, _) => err name
       | (GateNameAndArg (name, _), _) => err name
     end

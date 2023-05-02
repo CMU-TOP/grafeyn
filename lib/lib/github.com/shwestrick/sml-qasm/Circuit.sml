@@ -46,6 +46,9 @@ struct
             "fsim(" ^ rtos theta ^ ", " ^ rtos phi ^ ") " ^ qi left ^ ", "
             ^ qi right
         | Gate.RZ {rot, target} => "rz(" ^ rtos rot ^ ") " ^ qi target
+        | Gate.RY {rot, target} => "ry(" ^ rtos rot ^ ") " ^ qi target
+        | Gate.CSwap {control, target1, target2} =>
+            "cswap " ^ qi control ^ ", " ^ qi target1 ^ ", " ^ qi target2
     in
       Seq.iterate op^ header (Seq.map (fn g => gateToString g ^ ";\n") gates)
     end

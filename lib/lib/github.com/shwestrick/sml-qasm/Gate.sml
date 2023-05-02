@@ -18,8 +18,17 @@ sig
       , target: qubit_idx
       , rot: real (* rotation in [0,2pi) *)
       }
+
+  (** fsim(theta, phi) :=
+    *   [ [ 1,   0,              0,              0          ],
+    *     [ 0,   cos(theta),     -i sin(theta),  0          ],
+    *     [ 0,   -i sin(theta),  cos(theta),     0          ],
+    *     [ 0,   0,              0,              e^(-i phi) ] ]
+    *)
   | FSim of {left: qubit_idx, right: qubit_idx, theta: real, phi: real}
   | RZ of {rot: real, target: qubit_idx}
+  | RY of {rot: real, target: qubit_idx}
+  | CSwap of {control: qubit_idx, target1: qubit_idx, target2: qubit_idx}
 
   type t = gate
 
@@ -44,15 +53,10 @@ struct
       , target: qubit_idx
       , rot: real (* rotation in [0,2pi) *)
       }
-
-  (** fsim(theta, phi) :=
-    *   [ [ 1,   0,              0,              0          ],
-    *     [ 0,   cos(theta),     -i sin(theta),  0          ],
-    *     [ 0,   -i sin(theta),  cos(theta),     0          ],
-    *     [ 0,   0,              0,              e^(-i phi) ] ]
-    *)
   | FSim of {left: qubit_idx, right: qubit_idx, theta: real, phi: real}
   | RZ of {rot: real, target: qubit_idx}
+  | RY of {rot: real, target: qubit_idx}
+  | CSwap of {control: qubit_idx, target1: qubit_idx, target2: qubit_idx}
 
   type t = gate
 
