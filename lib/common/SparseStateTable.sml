@@ -18,6 +18,8 @@ sig
   (* not safe for concurrency with insertions *)
   val lookup: table -> BasisIdx.t -> Complex.t option
 
+  val compact: table -> (BasisIdx.t * Complex.t) DelayedSeq.t
+
   (* Unsafe because underlying array is shared. If the table is mutated,
    * then the Seq would not appear to be immutable.
    *
@@ -169,6 +171,31 @@ struct
         case DelayedSeq.nth currentElems i of
           NONE => 0
         | SOME (bidx, weight) => if Complex.isNonZero weight then 1 else 0)
+    end
+
+
+  fun compact (T {keys, emptykey, packedWeights, ...}) =
+    let
+      fun makeWeight i =
+        Complex.make (Array.sub (packedWeights, 2 * i), Array.sub
+          (packedWeights, 2 * i + 1))
+
+      fun makeElem i =
+        ( Array.sub (keys, i)
+        , Array.sub (packedWeights, 2 * i)
+        , Array.sub (packedWeights, 2 * i + 1)
+        )
+
+      fun keepElem i =
+        not (BasisIdx.equal (Array.sub (keys, i), emptykey))
+        andalso Complex.isNonZero (makeWeight i)
+
+      val data = SeqBasis.filter 10000 (0, Array.length keys) makeElem keepElem
+    in
+      DelayedSeq.tabulate
+        (fn i => let val (b, re, im) = Array.sub (data, i)
+                 in (b, Complex.make (re, im))
+                 end) (Array.length data)
     end
 
 end
