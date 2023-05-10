@@ -8,10 +8,26 @@ struct
   structure DS = DelayedSeq
 
 
-  fun nextBranchingGate gates gatenum =
-    if gatenum >= Seq.length gates then NONE
-    else if Gate.expectBranching (Seq.nth gates gatenum) then SOME gatenum
-    else nextBranchingGate gates (gatenum + 1)
+  val queryBfsMaxBranchingStride =
+    CommandLineArgs.parseInt "query-bfs-max-branching-stride" 1
+  val _ = print
+    ("query-bfs-max-branching-stride " ^ Int.toString queryBfsMaxBranchingStride
+     ^ "\n")
+
+
+  fun findNextGoal gates gatenum =
+    let
+      fun loop (i, branching) =
+        if i >= Seq.length gates then
+          (i, branching)
+        else if Gate.expectBranching (Seq.nth gates i) then
+          if branching >= queryBfsMaxBranchingStride then (i, branching)
+          else loop (i + 1, branching + 1)
+        else
+          loop (i + 1, branching)
+    in
+      loop (gatenum, 0)
+    end
 
 
   fun query {numQubits, gates} desired =
@@ -48,26 +64,31 @@ struct
 
       fun tryCapacity capacity (gatenum, goal) state =
         let
+          val _ = print
+            ("trying " ^ Int.toString gatenum ^ " -> " ^ Int.toString goal
+             ^ " with capacity " ^ Int.toString capacity ^ "\n")
+
           (* val currentElems = SST.unsafeViewContents state *)
           val newState = makeNewState capacity
 
-          fun doGates i widx =
+          fun doGates numGateApps i widx =
             if Complex.isZero (#2 widx) then
-              ()
+              numGateApps
             else if i >= goal then
-              SST.insertAddWeights newState widx
+              (SST.insertAddWeights newState widx; numGateApps)
             else
               case Gate.apply (gate i) widx of
-                Gate.OutputOne widx' => doGates (i + 1) widx'
+                Gate.OutputOne widx' => doGates (numGateApps + 1) (i + 1) widx'
               | Gate.OutputTwo (widx1, widx2) =>
-                  (doGates (i + 1) widx1; doGates (i + 1) widx2)
+                  let val numGateApps = doGates (numGateApps + 1) (i + 1) widx1
+                  in doGates numGateApps (i + 1) widx2
+                  end
 
-          val numGateApps = (goal - gatenum) * DelayedSeq.length state
-
-          val _ = ForkJoin.parfor 10000 (0, DelayedSeq.length state) (fn i =>
-            let val (bidx, weight) = DelayedSeq.nth state i
-            in doGates gatenum (bidx, weight)
-            end)
+          val numGateApps =
+            SeqBasis.reduce 10000 op+ 0 (0, DelayedSeq.length state) (fn i =>
+              let val (bidx, weight) = DelayedSeq.nth state i
+              in doGates 0 gatenum (bidx, weight)
+              end)
         in
           SOME (numGateApps, newState)
         end
@@ -77,32 +98,25 @@ struct
       fun advanceTryCapacity capacity (i, goal) countGateApp state =
         case tryCapacity capacity (i, goal) state of
           NONE =>
-            ( print "upping capacity...\n"
-            ; advanceTryCapacity (Real.ceil (1.25 * Real.fromInt capacity))
-                (i, goal) countGateApp state
-            )
+            advanceTryCapacity (Real.ceil (2.0 * Real.fromInt capacity))
+              (i, goal) countGateApp state
         | SOME (gateApps, newState) =>
-            loopGuessCapacity (i, goal) (countGateApp + gateApps) newState
+            loopGuessCapacity goal (countGateApp + gateApps) newState
 
 
-      and loopGuessCapacity (prev, next) countGateApp state =
+      and loopGuessCapacity next countGateApp state =
         let
           val capacityHere = SST.capacity state
           val nonZeros = SST.compact state
           val nonZeroSize = DelayedSeq.length nonZeros
-          (* val nonZeroSize = SST.nonZeroSize state *)
-          val _ = Util.for (prev + 1, next) (fn i =>
-            print ("gate " ^ Int.toString i ^ ": non-branching!\n"))
           val _ = dumpDensity (next, nonZeroSize, SOME capacityHere)
         in
           if next >= depth then
             (countGateApp, nonZeros)
           else
             let
-              val (goal, multiplier) =
-                case nextBranchingGate gates next of
-                  NONE => (depth, 1.25)
-                | SOME goal => (goal + 1, 2.5)
+              val (goal, numBranchingUntilGoal) = findNextGoal gates next
+              val multiplier = if numBranchingUntilGoal = 0 then 1.25 else 2.5
               val guess = Real.ceil (multiplier * Real.fromInt nonZeroSize)
               val guess = Int.min (guess, Real.ceil
                 (1.25 * Real.fromInt maxNumStates))
@@ -115,7 +129,7 @@ struct
       val _ =
         SST.insertAddWeights initialState (BasisIdx.zeros, Complex.real 1.0)
 
-      val (totalGateApps, finalState) = loopGuessCapacity (~1, 0) 0 initialState
+      val (totalGateApps, finalState) = loopGuessCapacity 0 0 initialState
       val _ = print ("gate app count " ^ Int.toString totalGateApps ^ "\n")
 
       val output =
