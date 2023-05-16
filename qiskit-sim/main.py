@@ -6,7 +6,7 @@ cfile = sys.argv[1]
 circ = qiskit.QuantumCircuit.from_qasm_file(cfile)
 
 sim = qiskit.Aer.get_backend('aer_simulator_statevector')
-sim.set_options(max_parallel_threads=10)
+sim.set_options(max_parallel_threads=144)
 circ = qiskit.transpile(circ, sim)
 # print(circ.qasm())
 circ.save_statevector()

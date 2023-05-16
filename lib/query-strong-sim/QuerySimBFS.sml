@@ -140,6 +140,14 @@ struct
              in if BasisIdx.equal (bidx, desired) then weight else Complex.zero
              end)
     in
+      if DelayedSeq.length finalState > 100 then () else
+        Util.for (0, DelayedSeq.length finalState) (fn i =>
+          let
+            val (bidx, weight) = DelayedSeq.nth finalState i
+          in
+            print (BasisIdx.toString {numQubits=numQubits} bidx ^ " " ^ Complex.toString weight ^ "\n")
+          end);
+
       output
     end
 end

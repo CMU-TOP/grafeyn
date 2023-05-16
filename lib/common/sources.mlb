@@ -21,7 +21,9 @@ local
 
   Constants.sml
   Complex.sml
-  BasisIdx.sml
+  ann "allowExtendedTextConsts true" in
+    BasisIdx.sml
+  end
   SparseState.sml
   Gate.sml
 
