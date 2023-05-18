@@ -8,6 +8,17 @@ from qiskit_braket_provider import BraketLocalBackend
 from qiskit.visualization import plot_histogram
 
 
+def ppl(heading, text):
+    """Pretty print long (multiline) text with heading"""    
+    log.info(f"# BEGIN {heading.upper()}")
+    log.info(f"{text}")
+    log.info(f"# END {heading.upper()}")
+
+    
+def pps(text):
+    """Pretty print short (single line) text"""        
+    log.info(text)
+
 def from_file(inputfile):
     c = qiskit.QuantumCircuit.from_qasm_file(inputfile)
     return c
@@ -28,9 +39,9 @@ def simple_circuit():
 # Simulate
 def simulate(circuit, outfile):
     local_simulator = BraketLocalBackend()
-    print("Simulationg circuit")
+    pps("Simulationg circuit")
     task = local_simulator.run(circuit, shots=100)
-    print("Done.")
+    pps("Done.")
     plot_histogram(task.result().get_counts(), filename=outfile)
 
     
