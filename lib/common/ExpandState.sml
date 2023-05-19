@@ -146,8 +146,16 @@ struct
             Seq.filter (fn b => blockHasPending b orelse blockHasRemaining b)
               remainingBlocks
         in
-          if Seq.length remainingBlocks' = 0 then table
-          else loop remainingBlocks' (SST.increaseCapacityByFactor 2.0 table)
+          if Seq.length remainingBlocks' = 0 then
+            table
+          else
+            ( print
+                ("growing to "
+                 ^
+                 Int.toString (Real.ceil
+                   (1.5 * Real.fromInt (SST.capacity table))) ^ "\n")
+            ; loop remainingBlocks' (SST.increaseCapacityByFactor 1.5 table)
+            )
         end
 
 
@@ -160,7 +168,9 @@ struct
           }
       val initialBlocks = Seq.tabulate (fn b => b) numBlocks
     in
-      loop initialBlocks initialTable
+      ( print ("expand state; guess = " ^ Int.toString expected ^ "\n")
+      ; loop initialBlocks initialTable
+      )
     end
 
 end

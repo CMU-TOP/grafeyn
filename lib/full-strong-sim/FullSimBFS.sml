@@ -127,7 +127,7 @@ struct
         end
       *)
 
-      fun loop next state =
+      fun loop next prevNonZeroSize state =
         let
           val capacityHere = SST.capacity state
           val nonZeros = SST.compact state
@@ -139,12 +139,21 @@ struct
           else
             let
               val (goal, numBranchingUntilGoal) = findNextGoal gates next
+
+              val rate = Real.fromInt nonZeroSize / Real.fromInt prevNonZeroSize
+              val guess = Real.ceil (1.25 * rate * Real.fromInt nonZeroSize)
+
+              (* val multiplier = if numBranchingUntilGoal = 0 then 1.25 else 2.5 *)
+              (* val guess = Real.ceil (multiplier * Real.fromInt nonZeroSize) *)
+              val guess = Int.min (guess, Real.ceil
+                (1.25 * Real.fromInt maxNumStates))
+
               val theseGates = Seq.subseq gates (next, goal - next)
               val state =
                 ExpandState.expand
-                  {gates = theseGates, state = nonZeros, expected = 1000}
+                  {gates = theseGates, state = nonZeros, expected = guess}
             in
-              loop goal state
+              loop goal nonZeroSize state
             end
         end
 
@@ -155,7 +164,7 @@ struct
       (* val (totalGateApps, finalState) = loopGuessCapacity 0 0 initialState 
       val _ = print ("gate app count " ^ Int.toString totalGateApps ^ "\n") *)
 
-      val finalState = loop 0 initialState
+      val finalState = loop 0 1 initialState
     in
       finalState
     end
