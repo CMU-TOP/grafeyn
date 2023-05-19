@@ -20,6 +20,8 @@ sig
 
   val compact: table -> (BasisIdx.t * Complex.t) DelayedSeq.t
 
+  val increaseCapacityByFactor: real -> table -> table
+
   (* Unsafe because underlying array is shared. If the table is mutated,
    * then the Seq would not appear to be immutable.
    *
@@ -136,6 +138,16 @@ struct
     in
       loop start 0
     end
+
+
+  fun forceInsertUnique (input as T {keys, packedWeights, emptykey, maxload})
+    (x, v) =
+    raise Fail "SparseStateTable.forceInsertUnique: NYI"
+
+
+  fun increaseCapacityByFactor alpha
+    (input as T {keys, packedWeights, emptykey, maxload}) =
+    raise Fail "SparseStateTable.increaseCapacityByFactor: NYI"
 
 
   fun lookup (T {keys, packedWeights, emptykey, ...}) x =

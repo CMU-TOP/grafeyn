@@ -28,6 +28,7 @@ local
   Gate.sml
 
   SparseStateTable.sml
+  ExpandState.sml
 in
   structure HashTable
   structure ApplyUntilFailure
@@ -40,6 +41,8 @@ in
   structure ParseQASM
 
   structure SparseStateTable
+
+  structure ExpandState
 
   functor RedBlackMapFn
 end
