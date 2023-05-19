@@ -1,0 +1,14 @@
+$(SML_LIB)/basis/basis.mlb
+
+local
+  lib/lib/github.com/mpllang/mpllib/sources.$(COMPILER).mlb
+in
+  structure Seq
+  structure CommandLineArgs
+  structure Util
+  structure Benchmark
+end
+
+lib/sources.mlb
+
+main.sml

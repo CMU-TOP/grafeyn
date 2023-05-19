@@ -1,5 +1,6 @@
 structure CLA = CommandLineArgs
 
+val simName = CLA.parseString "sim" "full-bfs"
 val inputName = CLA.parseString "input" "random"
 val output = CLA.parseString "output" ""
 
@@ -85,13 +86,56 @@ val _ =
        ^ Circuit.toString circuit
        ^ "=========================================================\n")
 
+fun wrapFullSim runner () =
+  let
+    val result = runner circuit
+  in
+    print
+      ("num non-zero states " ^ Int.toString (SparseState.size result) ^ "\n")
+  end
 
-fun simulator () = QuerySimBFS.query circuit BasisIdx.zeros
+fun wrapQuerySim runner () =
+  let val result = runner circuit BasisIdx.zeros
+  in print ("result " ^ Complex.toString result ^ "\n")
+  end
 
-val result = Benchmark.run "query-sim-bfs" (fn _ => simulator ())
+fun parseMaxWaveSpace () =
+  let
+    val spaceConstraint =
+      CommandLineArgs.parseInt "max-wave-space" (1000 * 1000)
+  in
+    print ("max-wave-space " ^ Int.toString spaceConstraint ^ "\n");
+    spaceConstraint
+  end
 
-val _ = print
-  ("result " ^ Complex.toString result ^ "\n")
+val _ = print ("sim " ^ simName ^ "\n")
+val simulator =
+  case simName of
+    "full-seq" => wrapFullSim FullSimSequential.run
+  | "full-naive-par" => wrapFullSim FullSimNaivePar.run
+  | "full-bfs" => wrapFullSim FullSimBFS.run
+  | "full-strided-bfs" => wrapFullSim FullSimStridedBFS.run
+
+  | "query-seq" => wrapQuerySim QuerySimSequential.query
+  | "query-naive-par" => wrapQuerySim QuerySimNaivePar.query
+  | "query-bfs" => wrapQuerySim QuerySimBFS.query
+  | "query-wave-bfs" =>
+      wrapQuerySim (QuerySimWaveBFS.query (parseMaxWaveSpace ()))
+  | "query-single-goal-wave-bfs" =>
+      wrapQuerySim (QuerySimSingleGoalWaveBFS.query (parseMaxWaveSpace ()))
+  | "query-two-wave-bfs" =>
+      wrapQuerySim (QuerySimTwoWaveBFS.query (parseMaxWaveSpace ()))
+
+  | _ =>
+      Util.die
+        ("Unknown -sim " ^ simName ^ "; valid options are: "
+         ^ "full-seq, full-naive-par, full-bfs, full-strided-bfs, "
+         ^ "query-seq, query-naive-par, query-bfs, query-wave-bfs, "
+         ^ "query-single-goal-wave-bfs, query-two-wave-bfs")
+
+val msg = "quantum simulator (" ^ simName ^ ")"
+val () = Benchmark.run msg (fn _ =>
+  simulator ())
     (*
     val _ =
       if output = "" then
