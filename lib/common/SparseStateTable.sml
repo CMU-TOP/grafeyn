@@ -6,15 +6,22 @@ sig
   exception Full
   exception DuplicateKey (* only raised by forceInsertUnique *)
 
-  val make: {capacity: int, maxload: real, emptykey: BasisIdx.t} -> table
+  val make: {capacity: int, emptykey: BasisIdx.t} -> table
 
   val size: table -> int
   val nonZeroSize: table -> int
+  val zeroSize: table -> int
   val capacity: table -> int
 
   (* val insertIfNotPresent: table -> BasisIdx.t * Complex.t -> bool *)
 
   val insertAddWeights: table -> BasisIdx.t * Complex.t -> unit
+
+  val insertAddWeightsLimitProbes: {probes: int}
+                                   -> table
+                                   -> BasisIdx.t * Complex.t
+                                   -> unit
+
   val forceInsertUnique: table -> BasisIdx.t * Complex.t -> unit
 
   (* not safe for concurrency with insertions *)
@@ -40,7 +47,6 @@ struct
       { keys: BasisIdx.t array
       , emptykey: BasisIdx.t
       , packedWeights: real array (* 2x capacity, for manual unboxing *)
-      , maxload: real
       }
 
   exception Full
@@ -48,7 +54,7 @@ struct
 
   type table = t
 
-  fun make {capacity, maxload, emptykey} =
+  fun make {capacity, emptykey} =
     if capacity = 0 then
       raise Fail "SparseStateTable.make: capacity 0"
     else
@@ -57,18 +63,11 @@ struct
         val packedWeights =
           SeqBasis.tabulate 5000 (0, 2 * capacity) (fn _ => 0.0)
       in
-        T { keys = keys
-          , maxload = maxload
-          , emptykey = emptykey
-          , packedWeights = packedWeights
-          }
+        T {keys = keys, emptykey = emptykey, packedWeights = packedWeights}
       end
 
 
   fun capacity (T {keys, ...}) = Array.length keys
-
-
-  fun maxload (T {maxload = m, ...}) = m
 
 
   fun size (T {keys, emptykey, ...}) =
@@ -108,13 +107,10 @@ struct
     Array.update (arr, i, x + Array.sub (arr, i))
 
 
-  fun insertAddWeights (input as T {keys, packedWeights, emptykey, maxload})
-    (x, v) =
+  fun insertAddWeightsLimitProbes {probes = tolerance}
+    (input as T {keys, packedWeights, emptykey}) (x, v) =
     let
       val n = Array.length keys
-
-      (* TODO: need better math here...! *)
-      val tolerance = 100 * Real.ceil (1.0 / (1.0 - maxload))
 
       fun claimSlotAt i = bcas (keys, i, emptykey, x)
 
@@ -149,7 +145,11 @@ struct
     end
 
 
-  fun forceInsertUnique (T {keys, packedWeights, emptykey, maxload}) (x, v) =
+  fun insertAddWeights table (x, v) =
+    insertAddWeightsLimitProbes {probes = capacity table} table (x, v)
+
+
+  fun forceInsertUnique (T {keys, packedWeights, emptykey}) (x, v) =
     let
       val n = Array.length keys
       val start = (BasisIdx.hash x) mod n
@@ -222,6 +222,17 @@ struct
     end
 
 
+  fun zeroSize state =
+    let
+      val currentElems = unsafeViewContents state
+    in
+      SeqBasis.reduce 1000 op+ 0 (0, DelayedSeq.length currentElems) (fn i =>
+        case DelayedSeq.nth currentElems i of
+          NONE => 0
+        | SOME (bidx, weight) => if Complex.isNonZero weight then 0 else 1)
+    end
+
+
   fun compact (T {keys, emptykey, packedWeights, ...}) =
     let
       fun makeWeight i =
@@ -238,7 +249,7 @@ struct
         not (BasisIdx.equal (Array.sub (keys, i), emptykey))
         andalso Complex.isNonZero (makeWeight i)
 
-      val data = SeqBasis.filter 10000 (0, Array.length keys) makeElem keepElem
+      val data = SeqBasis.filter 5000 (0, Array.length keys) makeElem keepElem
     in
       DelayedSeq.tabulate
         (fn i => let val (b, re, im) = Array.sub (data, i)
@@ -247,16 +258,26 @@ struct
     end
 
 
-  fun increaseCapacityByFactor alpha (table as T {maxload, emptykey, ...}) =
+  fun increaseCapacityByFactor alpha
+    (table as T {keys, packedWeights, emptykey}) =
     let
       val newCap = Real.ceil (alpha * Real.fromInt (capacity table))
-      val newTable =
-        make {capacity = newCap, maxload = maxload, emptykey = emptykey}
+      val newTable = make {capacity = newCap, emptykey = emptykey}
 
-      val elems = compact table
+    (* val elems = compact table *)
     in
-      ForkJoin.parfor 1000 (0, DelayedSeq.length elems) (fn i =>
-        forceInsertUnique newTable (DelayedSeq.nth elems i));
+      ForkJoin.parfor 1000 (0, capacity table) (fn i =>
+        (* forceInsertUnique newTable (DelayedSeq.nth elems i)); *)
+        let
+          val key = Array.sub (keys, i)
+          val weight = Complex.make (Array.sub (packedWeights, 2 * i), Array.sub
+            (packedWeights, 2 * i + 1))
+        in
+          if Complex.isNonZero weight then
+            forceInsertUnique newTable (key, weight)
+          else
+            ()
+        end);
 
       newTable
     end

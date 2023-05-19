@@ -11,17 +11,7 @@ struct
 
   structure SST = SparseStateTable
   structure DS = DelayedSeq
-
   type state = (BasisIdx.t * Complex.t) DelayedSeq.t
-
-  fun tryPut table widx =
-    (SST.insertAddWeights table widx; true)
-    handle SST.Full => false
-
-
-  datatype successors_result =
-    AllSucceeded
-  | SomeFailed of {widx: BasisIdx.t * Complex.t, gatenum: int} list
 
 
   val blockSize = CommandLineArgs.parseInt "expand-block-size" 10000
@@ -30,6 +20,27 @@ struct
 
   val maxload = CommandLineArgs.parseReal "expand-max-load" 0.9
   val _ = print ("expand-max-load " ^ Real.toString maxload ^ "\n")
+
+
+  fun log2 x = Math.log10 x / Math.log10 2.0
+
+  fun tryPut table widx =
+    let
+      val n = SST.capacity table
+      val probablyLongestProbe = Int.max (10, Real.ceil
+        (log2 (Real.fromInt n) / (maxload - 1.0 - log2 maxload)))
+      val tolerance = 2 * probablyLongestProbe
+      val tolerance = Int.min (tolerance, n)
+    in
+      SST.insertAddWeightsLimitProbes {probes = tolerance} table widx;
+      true
+    end
+    handle SST.Full => false
+
+
+  datatype successors_result =
+    AllSucceeded
+  | SomeFailed of {widx: BasisIdx.t * Complex.t, gatenum: int} list
 
 
   fun expand {gates, state, expected} =
@@ -58,6 +69,9 @@ struct
 
       fun blockHasPending b =
         not (List.null (Array.sub (blockPending, b)))
+
+      (* fun blockNumPending b =
+        List.length (Array.sub (blockPending, b)) *)
 
       fun blockPopPending b =
         case Array.sub (blockPending, b) of
@@ -161,11 +175,7 @@ struct
 
       val impossibleBasisIdx = BasisIdx.flip BasisIdx.zeros 63
       val initialTable =
-        SST.make
-          { capacity = expected
-          , maxload = maxload
-          , emptykey = impossibleBasisIdx
-          }
+        SST.make {capacity = expected, emptykey = impossibleBasisIdx}
       val initialBlocks = Seq.tabulate (fn b => b) numBlocks
     in
       ( print ("expand state; guess = " ^ Int.toString expected ^ "\n")
