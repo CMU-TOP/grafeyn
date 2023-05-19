@@ -86,29 +86,29 @@ val _ =
        ^ "=========================================================\n")
 
 
-fun simulator () = QuerySimBFS.query circuit BasisIdx.zeros
+fun simulator () = FullSimBFS.run circuit
 
-val result = Benchmark.run "query-sim-bfs" (fn _ => simulator ())
+val result = Benchmark.run "full-sim-bfs" (fn _ => simulator ())
 
-val _ = print
-  ("result " ^ Complex.toString result ^ "\n")
-    (*
-    val _ =
-      if output = "" then
-        ()
-      else
+val _ =
+  if output = "" then
+    print ("use -output FILE to see output state vector\n")
+  else
+    let
+      val numQubits = Circuit.numQubits circuit
+      val _ = print ("writing to " ^ output ^ "\n")
+      val outstream = TextIO.openOut output
+    in
+      Util.for (0, DelayedSeq.length result) (fn i =>
         let
-          val _ = print ("generating output...\n")
-    
-          val contents =
-            SparseState.toString {numQubits = Circuit.numQubits circuit} result
-            ^ "\n"
-    
-          val _ = print ("writing to " ^ output ^ "\n")
-          val outstream = TextIO.openOut output
+          val (bidx, weight) = DelayedSeq.nth result i
         in
-          TextIO.output (outstream, contents);
-          TextIO.closeOut outstream;
-          print ("output written to " ^ output ^ "\n")
-        end
-    *)
+          TextIO.output
+            ( outstream
+            , BasisIdx.toString {numQubits = numQubits} bidx ^ " "
+              ^ Complex.toString weight ^ "\n"
+            )
+        end);
+      TextIO.closeOut outstream;
+      print ("output written to " ^ output ^ "\n")
+    end

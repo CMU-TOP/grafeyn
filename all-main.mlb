@@ -4,6 +4,7 @@ local
   lib/lib/github.com/mpllang/mpllib/sources.$(COMPILER).mlb
 in
   structure Seq
+  structure DelayedSeq
   structure CommandLineArgs
   structure Util
   structure Benchmark
@@ -11,4 +12,4 @@ end
 
 lib/sources.mlb
 
-main.sml
+all-main.sml

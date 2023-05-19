@@ -94,6 +94,14 @@ fun wrapFullSim runner () =
       ("num non-zero states " ^ Int.toString (SparseState.size result) ^ "\n")
   end
 
+fun wrapFullSim' runner () =
+  let
+    val result = runner circuit
+  in
+    print
+      ("num non-zero states " ^ Int.toString (DelayedSeq.length result) ^ "\n")
+  end
+
 fun wrapQuerySim runner () =
   let val result = runner circuit BasisIdx.zeros
   in print ("result " ^ Complex.toString result ^ "\n")
@@ -113,7 +121,7 @@ val simulator =
   case simName of
     "full-seq" => wrapFullSim FullSimSequential.run
   | "full-naive-par" => wrapFullSim FullSimNaivePar.run
-  | "full-bfs" => wrapFullSim FullSimBFS.run
+  | "full-bfs" => wrapFullSim' FullSimBFS.run
   | "full-strided-bfs" => wrapFullSim FullSimStridedBFS.run
 
   | "query-seq" => wrapQuerySim QuerySimSequential.query

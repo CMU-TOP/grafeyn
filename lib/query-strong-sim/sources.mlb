@@ -2,6 +2,7 @@ local
   $(SML_LIB)/basis/basis.mlb
   ../lib/github.com/mpllang/mpllib/sources.$(COMPILER).mlb
   ../common/sources.mlb
+  ../full-strong-sim/sources.mlb
   QuerySimSequential.sml
   QuerySimNaivePar.sml
   QuerySimBFS.sml
