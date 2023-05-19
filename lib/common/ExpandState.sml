@@ -3,7 +3,8 @@ sig
 
   type state = (BasisIdx.t * Complex.t) DelayedSeq.t
 
-  val expand: {gates: Gate.t Seq.t, state: state, expected: int} -> state
+  val expand: {gates: Gate.t Seq.t, state: state, expected: int}
+              -> SparseStateTable.table
 
 end =
 struct
@@ -23,6 +24,14 @@ struct
   | SomeFailed of {widx: BasisIdx.t * Complex.t, gatenum: int} list
 
 
+  val blockSize = CommandLineArgs.parseInt "expand-block-size" 10000
+  val _ = print ("expand-block-size " ^ Int.toString blockSize ^ "\n")
+
+
+  val maxload = CommandLineArgs.parseReal "expand-max-load" 0.9
+  val _ = print ("expand-max-load " ^ Real.toString maxload ^ "\n")
+
+
   fun expand {gates, state, expected} =
     let
       val numGates = Seq.length gates
@@ -32,7 +41,6 @@ struct
       val n = DelayedSeq.length state
 
       (* block size configuration *)
-      val blockSize = 1000
       val numBlocks = Util.ceilDiv n blockSize
       fun blockStart b = blockSize * b
       fun blockStop b =
@@ -70,6 +78,8 @@ struct
           val full = ref (0w0 : Word8.word)
           fun notFull () =
             (!full = 0w0)
+          fun isFull () =
+            (!full = 0w1)
           fun markFull () = (full := 0w1)
 
 
@@ -77,9 +87,15 @@ struct
           fun doGates (widx, gatenum) : successors_result =
             if Complex.isZero (#2 widx) then
               AllSucceeded
+            else if isFull () then
+              SomeFailed [{widx = widx, gatenum = gatenum}]
             else if gatenum >= numGates then
-              if notFull () andalso tryPut table widx then AllSucceeded
-              else SomeFailed [{widx = widx, gatenum = gatenum}]
+              if notFull () andalso tryPut table widx then
+                AllSucceeded
+              else
+                ( if notFull () then markFull () else ()
+                ; SomeFailed [{widx = widx, gatenum = gatenum}]
+                )
             else
               case Gate.apply (gate gatenum) widx of
                 Gate.OutputOne widx' => doGates (widx', gatenum + 1)
@@ -130,7 +146,7 @@ struct
             Seq.filter (fn b => blockHasPending b orelse blockHasRemaining b)
               remainingBlocks
         in
-          if Seq.length remainingBlocks' = 0 then SST.compact table
+          if Seq.length remainingBlocks' = 0 then table
           else loop remainingBlocks' (SST.increaseCapacityByFactor 2.0 table)
         end
 
@@ -138,7 +154,10 @@ struct
       val impossibleBasisIdx = BasisIdx.flip BasisIdx.zeros 63
       val initialTable =
         SST.make
-          {capacity = expected, maxload = 0.9, emptykey = impossibleBasisIdx}
+          { capacity = expected
+          , maxload = maxload
+          , emptykey = impossibleBasisIdx
+          }
       val initialBlocks = Seq.tabulate (fn b => b) numBlocks
     in
       loop initialBlocks initialTable

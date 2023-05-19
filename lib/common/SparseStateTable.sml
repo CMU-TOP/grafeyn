@@ -4,6 +4,7 @@ sig
   type table = t
 
   exception Full
+  exception DuplicateKey (* only raised by forceInsertUnique *)
 
   val make: {capacity: int, maxload: real, emptykey: BasisIdx.t} -> table
 
@@ -14,6 +15,7 @@ sig
   (* val insertIfNotPresent: table -> BasisIdx.t * Complex.t -> bool *)
 
   val insertAddWeights: table -> BasisIdx.t * Complex.t -> unit
+  val forceInsertUnique: table -> BasisIdx.t * Complex.t -> unit
 
   (* not safe for concurrency with insertions *)
   val lookup: table -> BasisIdx.t -> Complex.t option
@@ -42,6 +44,7 @@ struct
       }
 
   exception Full
+  exception DuplicateKey
 
   type table = t
 
@@ -63,6 +66,9 @@ struct
 
 
   fun capacity (T {keys, ...}) = Array.length keys
+
+
+  fun maxload (T {maxload = m, ...}) = m
 
 
   fun size (T {keys, emptykey, ...}) =
@@ -98,6 +104,10 @@ struct
     end
 
 
+  fun nonAtomicAdd (arr: real array) i x =
+    Array.update (arr, i, x + Array.sub (arr, i))
+
+
   fun insertAddWeights (input as T {keys, packedWeights, emptykey, maxload})
     (x, v) =
     let
@@ -122,9 +132,6 @@ struct
         else
           let
             val k = Array.sub (keys, i)
-            val goodSlot =
-              (BasisIdx.equal (k, emptykey) andalso claimSlotAt i)
-              orelse BasisIdx.equal (k, x)
           in
             if BasisIdx.equal (k, emptykey) then
               if claimSlotAt i then putValueAt i else loop i probes
@@ -140,14 +147,41 @@ struct
     end
 
 
-  fun forceInsertUnique (input as T {keys, packedWeights, emptykey, maxload})
-    (x, v) =
-    raise Fail "SparseStateTable.forceInsertUnique: NYI"
+  fun forceInsertUnique (T {keys, packedWeights, emptykey, maxload}) (x, v) =
+    let
+      val n = Array.length keys
+      val start = (BasisIdx.hash x) mod n
 
+      fun claimSlotAt i = bcas (keys, i, emptykey, x)
 
-  fun increaseCapacityByFactor alpha
-    (input as T {keys, packedWeights, emptykey, maxload}) =
-    raise Fail "SparseStateTable.increaseCapacityByFactor: NYI"
+      fun putValueAt i =
+        let
+          val (re, im) = Complex.view v
+        in
+          nonAtomicAdd packedWeights (2 * i) re;
+          nonAtomicAdd packedWeights (2 * i + 1) im
+        end
+
+      fun loop i =
+        if i >= n then
+          loop 0
+        else
+          let
+            val k = Array.sub (keys, i)
+          in
+            if BasisIdx.equal (k, emptykey) then
+              if claimSlotAt i then putValueAt i else loop i
+            else if BasisIdx.equal (k, x) then
+              raise DuplicateKey
+            else
+              loopNext (i + 1)
+          end
+
+      and loopNext i =
+        if i = start then raise Full else loop i
+    in
+      loop start
+    end
 
 
   fun lookup (T {keys, packedWeights, emptykey, ...}) x =
@@ -208,6 +242,21 @@ struct
         (fn i => let val (b, re, im) = Array.sub (data, i)
                  in (b, Complex.make (re, im))
                  end) (Array.length data)
+    end
+
+
+  fun increaseCapacityByFactor alpha (table as T {maxload, emptykey, ...}) =
+    let
+      val newCap = Real.ceil (alpha * Real.fromInt (capacity table))
+      val newTable =
+        make {capacity = newCap, maxload = maxload, emptykey = emptykey}
+
+      val elems = compact table
+    in
+      ForkJoin.parfor 1000 (0, DelayedSeq.length elems) (fn i =>
+        forceInsertUnique newTable (DelayedSeq.nth elems i));
+
+      newTable
     end
 
 end

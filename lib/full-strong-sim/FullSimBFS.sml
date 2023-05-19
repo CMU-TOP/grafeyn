@@ -62,15 +62,16 @@ struct
       fun makeNewState cap =
         SST.make {capacity = cap, maxload = 0.9, emptykey = impossibleBasisIdx}
 
+      (*
       fun tryCapacity capacity (gatenum, goal) state =
         let
           val _ = print
             ("trying " ^ Int.toString gatenum ^ " -> " ^ Int.toString goal
              ^ " with capacity " ^ Int.toString capacity ^ "\n")
-
+      
           (* val currentElems = SST.unsafeViewContents state *)
           val newState = makeNewState capacity
-
+      
           fun doGates numGateApps i widx =
             if Complex.isZero (#2 widx) then
               numGateApps
@@ -83,7 +84,7 @@ struct
                   let val numGateApps = doGates (numGateApps + 1) (i + 1) widx1
                   in doGates numGateApps (i + 1) widx2
                   end
-
+      
           val numGateApps =
             SeqBasis.reduce 10000 op+ 0 (0, DelayedSeq.length state) (fn i =>
               let val (bidx, weight) = DelayedSeq.nth state i
@@ -93,8 +94,8 @@ struct
           SOME (numGateApps, newState)
         end
         handle SST.Full => NONE
-
-
+      
+      
       fun advanceTryCapacity capacity (i, goal) countGateApp state =
         case tryCapacity capacity (i, goal) state of
           NONE =>
@@ -102,8 +103,8 @@ struct
               (i, goal) countGateApp state
         | SOME (gateApps, newState) =>
             loopGuessCapacity goal (countGateApp + gateApps) newState
-
-
+      
+      
       and loopGuessCapacity next countGateApp state =
         let
           val capacityHere = SST.capacity state
@@ -124,13 +125,37 @@ struct
               advanceTryCapacity guess (next, goal) countGateApp nonZeros
             end
         end
+      *)
+
+      fun loop next state =
+        let
+          val capacityHere = SST.capacity state
+          val nonZeros = SST.compact state
+          val nonZeroSize = DelayedSeq.length nonZeros
+          val _ = dumpDensity (next, nonZeroSize, SOME capacityHere)
+        in
+          if next >= depth then
+            nonZeros
+          else
+            let
+              val (goal, numBranchingUntilGoal) = findNextGoal gates next
+              val theseGates = Seq.subseq gates (next, goal - next)
+              val state =
+                ExpandState.expand
+                  {gates = theseGates, state = nonZeros, expected = 1000}
+            in
+              loop goal state
+            end
+        end
 
       val initialState = makeNewState 1
       val _ =
         SST.insertAddWeights initialState (BasisIdx.zeros, Complex.real 1.0)
 
-      val (totalGateApps, finalState) = loopGuessCapacity 0 0 initialState
-      val _ = print ("gate app count " ^ Int.toString totalGateApps ^ "\n")
+      (* val (totalGateApps, finalState) = loopGuessCapacity 0 0 initialState 
+      val _ = print ("gate app count " ^ Int.toString totalGateApps ^ "\n") *)
+
+      val finalState = loop 0 initialState
     in
       finalState
     end
