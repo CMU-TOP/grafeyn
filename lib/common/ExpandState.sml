@@ -4,14 +4,14 @@ sig
   type state = (BasisIdx.t * Complex.t) DelayedSeq.t
 
   val expand: {gates: Gate.t Seq.t, state: state, expected: int}
-              -> SparseStateTable.table
+              -> SparseStateTable.t
 
 end =
 struct
 
   structure SST = SparseStateTable
   structure DS = DelayedSeq
-  type state = (BasisIdx.t * Complex.t) DelayedSeq.t
+  type state = (BasisIdx.t * Complex.t) DS.t
 
 
   val blockSize = CommandLineArgs.parseInt "expand-block-size" 10000
@@ -24,12 +24,35 @@ struct
 
   fun log2 x = Math.log10 x / Math.log10 2.0
 
+
+  (* tryPut will fail (and return false) if the table is full, or almost full.
+   *
+   * We use here a trick to avoid needing to scan the whole table to figure out
+   * the load factor. The idea is: if a single insertion takes a long time,
+   * then we can assume the load factor is high.
+   *
+   * At load factor `alpha`, the longest probe sequence is probably going to
+   * be approximately 
+   *   log(n)/(alpha - 1 - log(alpha))
+   * Analysis in this paper:
+   *   Linear Probing: The Probable Largest Search Time Grows Logarithmically
+   *   with the Number of Records
+   *   Author: B. Pittel
+   *
+   * So, if number of probes witnessed by a single insertion is nearby this
+   * amount, then the table is probably nearby `alpha` load factor, so it's
+   * time to back off and resize the table.
+   *
+   * (This seems to work decently, but it's possible we could do better. Need
+   * to analyze the probability of the load factor being high, given the
+   * observation of a single long probe sequence.)
+   *)
   fun tryPut table widx =
     let
       val n = SST.capacity table
-      val probablyLongestProbe = Int.max (10, Real.ceil
-        (log2 (Real.fromInt n) / (maxload - 1.0 - log2 maxload)))
-      val tolerance = 2 * probablyLongestProbe
+      val probablyLongestProbe = Real.ceil
+        (log2 (Real.fromInt n) / (maxload - 1.0 - log2 maxload))
+      val tolerance = 2 * Int.max (10, probablyLongestProbe)
       val tolerance = Int.min (tolerance, n)
     in
       SST.insertAddWeightsLimitProbes {probes = tolerance} table widx;
