@@ -6,6 +6,7 @@ struct
 
   structure SST = SparseStateTable
   structure DS = DelayedSeq
+  structure BFS = FullSimBFS(SparseStateTable)
 
 
   val queryBfsMaxBranchingStride =
@@ -32,7 +33,7 @@ struct
 
   fun query circuit desired =
     let
-      val finalState = FullSimBFS.run circuit
+      val finalState = BFS.run circuit
 
       val output =
         SeqBasis.reduce 10000 Complex.+ Complex.zero

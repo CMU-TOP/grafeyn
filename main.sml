@@ -1,9 +1,23 @@
 structure CLA = CommandLineArgs
 
+structure BFSLocked = FullSimBFS(SparseStateTableLockedSlots)
+structure BFSLockfree = FullSimBFS(SparseStateTable)
+
+val impl = CLA.parseString "impl" "lockfree"
 val inputName = CLA.parseString "input" "random"
 val output = CLA.parseString "output" ""
 
+val _ = print ("impl " ^ impl ^ "\n")
 val _ = print ("input " ^ inputName ^ "\n")
+
+val sim =
+  case impl of
+    "lockfree" => BFSLockfree.run
+  | "locked" => BFSLocked.run
+  | _ =>
+      Util.die
+        ("unknown impl " ^ impl ^ "; valid options are: lockfree, locked\n")
+
 
 val _ = print
   ("-------------------------------\n\
@@ -85,10 +99,7 @@ val _ =
        ^ Circuit.toString circuit
        ^ "=========================================================\n")
 
-
-fun simulator () = FullSimBFS.run circuit
-
-val result = Benchmark.run "full-sim-bfs" (fn _ => simulator ())
+val result = Benchmark.run "full-sim-bfs" (fn _ => sim circuit)
 
 val _ =
   if output = "" then

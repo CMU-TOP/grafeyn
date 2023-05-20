@@ -1,15 +1,14 @@
-structure ExpandState :>
+functor ExpandState(SST: SPARSE_STATE_TABLE) :>
 sig
 
   type state = (BasisIdx.t * Complex.t) DelayedSeq.t
 
   val expand: {gates: Gate.t Seq.t, numQubits: int, state: state, expected: int}
-              -> SparseStateTable.t
+              -> SST.t
 
 end =
 struct
 
-  structure SST = SparseStateTable
   structure DS = DelayedSeq
   type state = (BasisIdx.t * Complex.t) DS.t
 

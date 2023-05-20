@@ -1,10 +1,10 @@
-structure FullSimBFS:
+functor FullSimBFS(SST: SPARSE_STATE_TABLE):
 sig
   val run: Circuit.t -> (BasisIdx.t * Complex.t) DelayedSeq.t
 end =
 struct
 
-  structure SST = SparseStateTable
+  structure Expander = ExpandState(SST)
   structure DS = DelayedSeq
 
 
@@ -83,7 +83,7 @@ struct
                 (1.25 * Real.fromInt maxNumStates))
 
               val theseGates = Seq.subseq gates (next, goal - next)
-              val state = ExpandState.expand
+              val state = Expander.expand
                 { gates = theseGates
                 , numQubits = numQubits
                 , state = nonZeros
