@@ -57,10 +57,7 @@ struct
              ^ Real.fmt (StringCvt.FIX (SOME 8)) density ^ "\n")
         end
 
-      val impossibleBasisIdx = BasisIdx.flip BasisIdx.zeros 63
-
-      fun makeNewState cap =
-        SST.make {capacity = cap, emptykey = impossibleBasisIdx}
+      fun makeNewState cap = SST.make {capacity = cap, numQubits = numQubits}
 
       fun loop next prevNonZeroSize state =
         let
@@ -86,17 +83,19 @@ struct
                 (1.25 * Real.fromInt maxNumStates))
 
               val theseGates = Seq.subseq gates (next, goal - next)
-              val state =
-                ExpandState.expand
-                  {gates = theseGates, state = nonZeros, expected = guess}
+              val state = ExpandState.expand
+                { gates = theseGates
+                , numQubits = numQubits
+                , state = nonZeros
+                , expected = guess
+                }
             in
               loop goal nonZeroSize state
             end
         end
 
-      val initialState = makeNewState 1
-      val _ =
-        SST.insertAddWeights initialState (BasisIdx.zeros, Complex.real 1.0)
+      val initialState =
+        SST.singleton {numQubits = numQubits} (BasisIdx.zeros, Complex.real 1.0)
 
       (* val (totalGateApps, finalState) = loopGuessCapacity 0 0 initialState 
       val _ = print ("gate app count " ^ Int.toString totalGateApps ^ "\n") *)

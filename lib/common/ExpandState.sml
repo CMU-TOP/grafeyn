@@ -3,7 +3,7 @@ sig
 
   type state = (BasisIdx.t * Complex.t) DelayedSeq.t
 
-  val expand: {gates: Gate.t Seq.t, state: state, expected: int}
+  val expand: {gates: Gate.t Seq.t, numQubits: int, state: state, expected: int}
               -> SparseStateTable.t
 
 end =
@@ -66,7 +66,7 @@ struct
   | SomeFailed of {widx: BasisIdx.t * Complex.t, gatenum: int} list
 
 
-  fun expand {gates, state, expected} =
+  fun expand {gates, numQubits, state, expected} =
     let
       val numGates = Seq.length gates
       fun gate i = Seq.nth gates i
@@ -196,9 +196,7 @@ struct
         end
 
 
-      val impossibleBasisIdx = BasisIdx.flip BasisIdx.zeros 63
-      val initialTable =
-        SST.make {capacity = expected, emptykey = impossibleBasisIdx}
+      val initialTable = SST.make {capacity = expected, numQubits = numQubits}
       val initialBlocks = Seq.tabulate (fn b => b) numBlocks
     in
       ( print ("expand state; guess = " ^ Int.toString expected ^ "\n")

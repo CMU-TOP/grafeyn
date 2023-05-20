@@ -6,7 +6,8 @@ sig
   exception Full
   exception DuplicateKey (* only raised by forceInsertUnique *)
 
-  val make: {capacity: int, emptykey: BasisIdx.t} -> table
+  val make: {capacity: int, numQubits: int} -> table
+  val singleton: {numQubits: int} -> BasisIdx.t * Complex.t -> table
 
   val size: table -> int
   val nonZeroSize: table -> int
@@ -54,17 +55,23 @@ struct
 
   type table = t
 
-  fun make {capacity, emptykey} =
+
+  fun make' {capacity, emptykey} =
+    let
+      val keys = SeqBasis.tabulate 5000 (0, capacity) (fn _ => emptykey)
+      val packedWeights = SeqBasis.tabulate 5000 (0, 2 * capacity) (fn _ => 0.0)
+    in
+      T {keys = keys, emptykey = emptykey, packedWeights = packedWeights}
+    end
+
+
+  fun make {capacity, numQubits} =
     if capacity = 0 then
       raise Fail "SparseStateTable.make: capacity 0"
+    else if numQubits < 0 orelse numQubits > 63 then
+      raise Fail "SparseStateTable.make: bad number of qubits"
     else
-      let
-        val keys = SeqBasis.tabulate 5000 (0, capacity) (fn _ => emptykey)
-        val packedWeights =
-          SeqBasis.tabulate 5000 (0, 2 * capacity) (fn _ => 0.0)
-      in
-        T {keys = keys, emptykey = emptykey, packedWeights = packedWeights}
-      end
+      make' {capacity = capacity, emptykey = BasisIdx.flip BasisIdx.zeros 63}
 
 
   fun capacity (T {keys, ...}) = Array.length keys
@@ -262,7 +269,7 @@ struct
     (table as T {keys, packedWeights, emptykey}) =
     let
       val newCap = Real.ceil (alpha * Real.fromInt (capacity table))
-      val newTable = make {capacity = newCap, emptykey = emptykey}
+      val newTable = make' {capacity = newCap, emptykey = emptykey}
 
     (* val elems = compact table *)
     in
@@ -280,6 +287,12 @@ struct
         end);
 
       newTable
+    end
+
+
+  fun singleton {numQubits} widx =
+    let val table = make {capacity = 1, numQubits = numQubits}
+    in forceInsertUnique table widx; table
     end
 
 end
