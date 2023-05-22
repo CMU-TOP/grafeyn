@@ -69,8 +69,10 @@ struct
       | (GateName "cswap", 3) =>
           Gate.CSwap
             {control = getArg 0, target1 = getArg 1, target2 = getArg 2}
-      | (GateName name, _) => err name
-      | (GateNameAndArg (name, _), _) => err name
+      | (GateName name, _) =>
+          Gate.Other {name=name, params=NONE, args = args}
+      | (GateNameAndArg (name, param), _) =>
+          Gate.Other {name=name, params = SOME (Seq.singleton (RealExp.eval param)), args = args}
     end
 
   fun charSeqToString s =

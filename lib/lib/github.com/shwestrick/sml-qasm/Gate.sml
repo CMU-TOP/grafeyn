@@ -30,6 +30,8 @@ sig
   | RY of {rot: real, target: qubit_idx}
   | CSwap of {control: qubit_idx, target1: qubit_idx, target2: qubit_idx}
 
+  | Other of {name: string, params: real Seq.t option, args: qubit_idx Seq.t}
+
   type t = gate
 
 end =
@@ -57,6 +59,8 @@ struct
   | RZ of {rot: real, target: qubit_idx}
   | RY of {rot: real, target: qubit_idx}
   | CSwap of {control: qubit_idx, target1: qubit_idx, target2: qubit_idx}
+
+  | Other of {name: string, params: real Seq.t option, args: qubit_idx Seq.t}
 
   type t = gate
 
