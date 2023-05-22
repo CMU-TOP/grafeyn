@@ -27,7 +27,10 @@ local
   SparseState.sml
   Gate.sml
 
+  SPARSE_STATE_TABLE.sml
   SparseStateTable.sml
+  SparseStateTableLockedSlots.sml
+  ExpandState.sml
 in
   structure HashTable
   structure ApplyUntilFailure
@@ -39,7 +42,11 @@ in
   structure Circuit
   structure ParseQASM
 
+  signature SPARSE_STATE_TABLE
   structure SparseStateTable
+  structure SparseStateTableLockedSlots
+
+  functor ExpandState
 
   functor RedBlackMapFn
 end

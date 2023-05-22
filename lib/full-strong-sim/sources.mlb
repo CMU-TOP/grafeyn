@@ -9,6 +9,7 @@ local
 in
   structure FullSimSequential
   structure FullSimNaivePar
-  structure FullSimBFS
   structure FullSimStridedBFS
+  
+  functor FullSimBFS
 end

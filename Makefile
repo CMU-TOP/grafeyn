@@ -13,6 +13,12 @@ main.mpl: phony
 main.mlton: phony
 	mlton $(FLAGS) -mlb-path-var 'COMPILER mlton' -output main.mlton main.mlb
 
+all-main.mpl: phony
+	$(MPL) $(FLAGS) -mlb-path-var 'COMPILER mpl' -output all-main.mpl all-main.mlb
+
+all-main.mlton: phony
+	mlton $(FLAGS) -mlb-path-var 'COMPILER mlton' -output all-main.mlton all-main.mlb
+
 test: phony
 	mlton $(FLAGS) -output test test.mlton.mlb
 
