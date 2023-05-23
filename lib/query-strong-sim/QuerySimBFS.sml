@@ -39,9 +39,10 @@ struct
         SeqBasis.reduce 10000 Complex.+ Complex.zero
           (0, DelayedSeq.length finalState)
           (fn i =>
-             let val (bidx, weight) = DelayedSeq.nth finalState i
-             in if BasisIdx.equal (bidx, desired) then weight else Complex.zero
-             end)
+             case DelayedSeq.nth finalState i of
+               NONE => Complex.zero
+             | SOME (bidx, weight) =>
+                 if BasisIdx.equal (bidx, desired) then weight else Complex.zero)
     in
       output
     end

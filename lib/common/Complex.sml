@@ -20,6 +20,8 @@ sig
   val ~ : t -> t
   val + : t * t -> t
   val * : t * t -> t
+
+  val scale: real * t -> t
 end =
 struct
   datatype t = C of {re: real, im: real}
@@ -33,11 +35,9 @@ struct
 
   fun view (C {re, im}) = (re, im)
 
-  fun closeEnough (x, y) =
-    Real.abs (x - y) <= 0.000000001
+  fun realIsZero x = x > ~0.000000001 andalso x < 0.000000001
 
-  fun isZero (C {re, im}) =
-    closeEnough (re, 0.0) andalso closeEnough (im, 0.0)
+  fun isZero (C {re, im}) = realIsZero re andalso realIsZero im
 
   fun isNonZero c =
     not (isZero c)
@@ -59,6 +59,9 @@ struct
 
   fun mul (C {re = a, im = b}, C {re = c, im = d}) =
     C {re = a * c + b * d, im = a * d + b * c}
+
+  fun scale (r, C {re, im}) =
+    C {re = r * re, im = r * im}
 
   val ~ = neg
   val op+ = add

@@ -1,7 +1,7 @@
 functor ExpandState(SST: SPARSE_STATE_TABLE) :>
 sig
 
-  type state = (BasisIdx.t * Complex.t) DelayedSeq.t
+  type state = (BasisIdx.t * Complex.t) option DelayedSeq.t
 
   val expand: {gates: Gate.t Seq.t, numQubits: int, state: state, expected: int}
               -> SST.t
@@ -10,7 +10,7 @@ end =
 struct
 
   structure DS = DelayedSeq
-  type state = (BasisIdx.t * Complex.t) DS.t
+  type state = (BasisIdx.t * Complex.t) option DS.t
 
 
   val blockSize = CommandLineArgs.parseInt "expand-block-size" 10000
@@ -88,23 +88,31 @@ struct
         Array.sub (blockRemainingStarts, b) < blockStop b
 
       val blockPending = SeqBasis.tabulate 5000 (0, numBlocks) (fn _ => [])
-
       fun blockHasPending b =
         not (List.null (Array.sub (blockPending, b)))
-
-      (* fun blockNumPending b =
-        List.length (Array.sub (blockPending, b)) *)
-
       fun blockPopPending b =
         case Array.sub (blockPending, b) of
-          x :: rest => (Array.update (blockPending, b, rest); SOME x)
-        | _ => NONE
-
+          [] => NONE
+        | x :: rest => (Array.update (blockPending, b, rest); SOME x)
       fun blockPushPending b pending =
         case Array.sub (blockPending, b) of
           [] => Array.update (blockPending, b, pending)
         | xx => Array.update (blockPending, b, pending @ xx)
 
+      (* fun blockHasPending b = false
+      fun blockPopPending b = NONE
+      fun blockPushPending b _ = () *)
+
+
+      (* val apply =
+        if numGates = 1 then
+          let val f = Gate.apply (gate 0)
+          in fn (_, widx) => f widx
+          end
+        else
+          (fn (gatenum, widx) => Gate.apply (gate gatenum) widx) *)
+
+      val apply = (fn (gatenum, widx) => Gate.apply (gate gatenum) widx)
 
       (* remainingBlocks: list of block ids that aren't finished yet
        * table: place to put results; this will fill up and need resizing
@@ -114,17 +122,26 @@ struct
           val full = ref (0w0 : Word8.word)
           fun notFull () =
             (!full = 0w0)
-          fun isFull () =
-            (!full = 0w1)
           fun markFull () = (full := 0w1)
 
+          (* fun notFull () = true
+          fun markFull () = () *)
+
+          (* fun doGates (widx, gatenum) =
+            if Complex.isZero (#2 widx) then
+              AllSucceeded
+            else if gatenum >= numGates then
+              if tryPut table widx then AllSucceeded else Util.die ("uh oh!")
+            else
+              case apply (gatenum, widx) of
+                Gate.OutputOne widx' => doGates (widx', gatenum + 1)
+              | Gate.OutputTwo (widx1, widx2) =>
+                  (doGates (widx1, gatenum + 1); doGates (widx2, gatenum + 1)) *)
 
           (* try insert all successors of `(widx, gatenum)` into `table` *)
           fun doGates (widx, gatenum) : successors_result =
             if Complex.isZero (#2 widx) then
               AllSucceeded
-            else if isFull () then
-              SomeFailed [{widx = widx, gatenum = gatenum}]
             else if gatenum >= numGates then
               if notFull () andalso tryPut table widx then
                 AllSucceeded
@@ -133,7 +150,7 @@ struct
                 ; SomeFailed [{widx = widx, gatenum = gatenum}]
                 )
             else
-              case Gate.apply (gate gatenum) widx of
+              case apply (gatenum, widx) of
                 Gate.OutputOne widx' => doGates (widx', gatenum + 1)
               | Gate.OutputTwo (widx1, widx2) =>
                   case doGates (widx1, gatenum + 1) of
@@ -161,12 +178,15 @@ struct
                 if i >= stop then
                   Array.update (blockRemainingStarts, b, stop)
                 else
-                  case doGates (DelayedSeq.nth state i, 0) of
-                    AllSucceeded => loop (i + 1)
-                  | SomeFailed failures =>
-                      ( Array.update (blockRemainingStarts, b, i + 1)
-                      ; blockPushPending b failures
-                      )
+                  case DelayedSeq.nth state i of
+                    NONE => loop (i + 1)
+                  | SOME elem =>
+                      case doGates (elem, 0) of
+                        AllSucceeded => loop (i + 1)
+                      | SomeFailed failures =>
+                          ( Array.update (blockRemainingStarts, b, i + 1)
+                          ; blockPushPending b failures
+                          )
             in
               if clearPending () then loop start else ()
             end

@@ -210,16 +210,30 @@ struct
         , Array.sub (packedWeights, 2 * i + 1)
         )
 
+      fun isNonZero x = x < ~0.000000001 orelse x > 0.000000001
+
       fun keepElem i =
         not (BasisIdx.equal (Array.sub (keys, i), emptykey))
-        andalso Complex.isNonZero (makeWeight i)
+        andalso
+        (isNonZero (Array.sub (packedWeights, 2 * i))
+         orelse isNonZero (Array.sub (packedWeights, 2 * i + 1)))
 
-      val data = SeqBasis.filter 5000 (0, Array.length keys) makeElem keepElem
+      (* val data = SeqBasis.filter 5000 (0, Array.length keys) makeElem keepElem *)
+      val keepers =
+        SeqBasis.filter 5000 (0, Array.length keys) (fn i => i) keepElem
+
+    (* val keepers = SeqBasis.tabFilter 5000 (0, Array.length keys) (fn i =>
+      if keepElem i then SOME i else NONE) *)
     in
-      DelayedSeq.tabulate
+      (* DelayedSeq.tabulate
         (fn i => let val (b, re, im) = Array.sub (data, i)
                  in (b, Complex.make (re, im))
-                 end) (Array.length data)
+                 end) (Array.length data) *)
+
+      DelayedSeq.tabulate
+        (fn i => let val j = Array.sub (keepers, i)
+                 in (Array.sub (keys, j), makeWeight j)
+                 end) (Array.length keepers)
     end
 
 

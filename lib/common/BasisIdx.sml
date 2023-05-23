@@ -51,5 +51,5 @@ struct
   fun equal (b1, b2) = b1 = b2
 
   fun hash bidx =
-    Word64.toIntX (Util.hash64 bidx)
+    Word64.toIntX (Util.hash64_2 bidx)
 end

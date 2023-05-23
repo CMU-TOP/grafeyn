@@ -111,15 +111,16 @@ val _ =
       val outstream = TextIO.openOut output
     in
       Util.for (0, DelayedSeq.length result) (fn i =>
-        let
-          val (bidx, weight) = DelayedSeq.nth result i
-        in
-          TextIO.output
-            ( outstream
-            , BasisIdx.toString {numQubits = numQubits} bidx ^ " "
-              ^ Complex.toString weight ^ "\n"
-            )
-        end);
+        case DelayedSeq.nth result i of
+          NONE => ()
+        | SOME (bidx, weight) =>
+            let in
+              TextIO.output
+                ( outstream
+                , BasisIdx.toString {numQubits = numQubits} bidx ^ " "
+                  ^ Complex.toString weight ^ "\n"
+                )
+            end);
       TextIO.closeOut outstream;
       print ("output written to " ^ output ^ "\n")
     end

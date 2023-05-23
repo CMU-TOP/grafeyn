@@ -1,6 +1,6 @@
 functor FullSimBFS(SST: SPARSE_STATE_TABLE):
 sig
-  val run: Circuit.t -> (BasisIdx.t * Complex.t) DelayedSeq.t
+  val run: Circuit.t -> (BasisIdx.t * Complex.t) option DelayedSeq.t
 end =
 struct
 
@@ -11,6 +11,10 @@ struct
   val maxBranchingStride = CommandLineArgs.parseInt "bfs-max-branching-stride" 1
   val _ = print
     ("bfs-max-branching-stride " ^ Int.toString maxBranchingStride ^ "\n")
+
+
+  val doMeasureZeros = CommandLineArgs.parseFlag "measure-zeros"
+  val dontCompact = CommandLineArgs.parseFlag "dont-compact"
 
 
   fun findNextGoal gates gatenum =
@@ -40,21 +44,25 @@ struct
 
       fun dumpDensity (i, nonZeroSize, zeroSize, capacity) =
         let
-          val density = Real.fromInt nonZeroSize / Real.fromInt maxNumStates
-          val usedSlots = nonZeroSize + zeroSize
+          val densityStr = Real.fmt (StringCvt.FIX (SOME 8))
+            (Real.fromInt nonZeroSize / Real.fromInt maxNumStates)
+          val zerosStr =
+            case zeroSize of
+              NONE => "??"
+            | SOME x => Int.toString x
           val slackPct =
-            case capacity of
-              NONE => "(none)"
-            | SOME cap =>
+            case (zeroSize, capacity) of
+              (SOME zs, SOME cap) =>
                 Int.toString (Real.ceil
-                  (100.0 * (1.0 - Real.fromInt usedSlots / Real.fromInt cap)))
+                  (100.0
+                   * (1.0 - Real.fromInt (nonZeroSize + zs) / Real.fromInt cap)))
                 ^ "%"
+            | _ => "??"
         in
           print
             ("gate " ^ Int.toString i ^ ": non-zeros: "
-             ^ Int.toString nonZeroSize ^ "; zeros: " ^ Int.toString zeroSize
-             ^ "; slack: " ^ slackPct ^ "; density: "
-             ^ Real.fmt (StringCvt.FIX (SOME 8)) density ^ "\n")
+             ^ Int.toString nonZeroSize ^ "; zeros: " ^ zerosStr ^ "; slack: "
+             ^ slackPct ^ "; density: " ^ densityStr ^ "\n")
         end
 
       fun makeNewState cap = SST.make {capacity = cap, numQubits = numQubits}
@@ -62,9 +70,26 @@ struct
       fun loop next prevNonZeroSize state =
         let
           val capacityHere = SST.capacity state
-          val numZeros = SST.zeroSize state
-          val nonZeros = SST.compact state
-          val nonZeroSize = DelayedSeq.length nonZeros
+
+          val numZeros =
+            if doMeasureZeros then SOME (SST.zeroSize state) else NONE
+
+          val (nonZeros, nonZeroSize) =
+            (* if dontCompact then
+              let
+                val elems = SST.unsafeViewContents state
+                val nonZeroSize = SST.nonZeroSize state
+              in
+                (elems, nonZeroSize)
+              end
+            else *)
+            let
+              val nonZeros = SST.compact state
+              val nonZeroSize = DelayedSeq.length nonZeros
+            in
+              (DelayedSeq.map SOME nonZeros, nonZeroSize)
+            end
+
           val _ = dumpDensity (next, nonZeroSize, numZeros, SOME capacityHere)
         in
           if next >= depth then

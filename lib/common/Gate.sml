@@ -142,15 +142,13 @@ struct
       val bidx2 = BasisIdx.flip bidx qi
 
       val multiplier1 =
-        if BasisIdx.get bidx qi then
-          Complex.~ (Complex.real Constants.RECP_SQRT_2)
-        else
-          Complex.real Constants.RECP_SQRT_2
+        if BasisIdx.get bidx qi then Constants.NEG_RECP_SQRT_2
+        else Constants.RECP_SQRT_2
 
-      val multiplier2 = Complex.real Constants.RECP_SQRT_2
+      val multiplier2 = Constants.RECP_SQRT_2
 
-      val weight1 = Complex.* (weight, multiplier1)
-      val weight2 = Complex.* (weight, multiplier2)
+      val weight1 = Complex.scale (multiplier1, weight)
+      val weight2 = Complex.scale (multiplier2, weight)
     in
       OutputTwo ((bidx1, weight1), (bidx2, weight2))
     end
@@ -244,15 +242,14 @@ struct
     let
       val bidx0 = BasisIdx.set bidx target false
       val bidx1 = BasisIdx.set bidx target true
-
       val s = Math.sin (rot / 2.0)
       val c = Math.cos (rot / 2.0)
-
       val (mult0, mult1) = if BasisIdx.get bidx target then (~s, c) else (c, s)
-      val (mult0, mult1) = (Complex.real mult0, Complex.real mult1)
     in
       OutputTwo
-        ((bidx0, Complex.* (mult0, weight)), (bidx1, Complex.* (mult1, weight)))
+        ( (bidx0, Complex.scale (mult0, weight))
+        , (bidx1, Complex.scale (mult1, weight))
+        )
     end
 
 
@@ -284,23 +281,24 @@ struct
     | _ => false
 
 
-  fun apply gate widx =
+  fun apply gate =
     case gate of
-      PauliY xx => pauliy xx widx
-    | PauliZ xx => pauliz xx widx
-    | Hadamard xx => hadamard xx widx
-    | T xx => t xx widx
-    | SqrtY xx => sqrty xx widx
-    | SqrtX xx => sqrtx xx widx
-    | SqrtW xx => sqrtw xx widx
-    | X xx => x xx widx
-    | CX xx => cx xx widx
-    | CCX xx => ccx xx widx
-    | CPhase xx => cphase xx widx
-    | FSim xx => fsim xx widx
-    | RZ xx => rz xx widx
-    | RY xx => ry xx widx
-    | CSwap xx => cswap xx widx
+      PauliY xx => pauliy xx
+    | PauliZ xx => pauliz xx
+    | Hadamard xx => hadamard xx
+    | T xx => t xx
+    | SqrtY xx => sqrty xx
+    | SqrtX xx => sqrtx xx
+    | SqrtW xx => sqrtw xx
+    | X xx => x xx
+    | CX xx => cx xx
+    | CCX xx => ccx xx
+    | CPhase xx => cphase xx
+    | FSim xx => fsim xx
+    | RZ xx => rz xx
+    | RY xx => ry xx
+    | CSwap xx => cswap xx
+    | Other xx => Util.die ("uh oh")
 
 
   fun gateOutputToSeq go =
