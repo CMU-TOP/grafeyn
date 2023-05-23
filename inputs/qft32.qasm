@@ -1,3 +1,5 @@
+OPENQASM 2.0;
+include "qelib1.inc";
 qreg q[32];
 h q[31];
 cphase(pi / 2) q[30], q[31];

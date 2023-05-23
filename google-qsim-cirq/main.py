@@ -35,7 +35,7 @@ print('elapsed {}s'.format(round(t1-t0, 4)))
 def basisidx(i):
   maxlen = len(bin(len(result)-1)) - 2
   bidx = bin(i)[2:]
-  return bidx.rjust(maxlen, '0')
+  return "".join(reversed(bidx.rjust(maxlen, '0')))
 
 if doOutput:
   print('computing non-zeros...')
