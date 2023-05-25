@@ -208,7 +208,7 @@ struct
             table
           else
             ( print
-                ("growing to "
+                ("growing from " ^ Int.toString (SST.capacity table) ^ " to "
                  ^
                  Int.toString (Real.ceil
                    (1.5 * Real.fromInt (SST.capacity table))) ^ "\n")

@@ -28,18 +28,21 @@ struct
 
 
   fun findNextGoal gates gatenum =
-    let
-      fun loop (i, branching) =
-        if i >= Seq.length gates then
-          (i, branching)
-        else if G.expectBranching (Seq.nth gates i) then
-          if branching >= maxBranchingStride then (i, branching)
-          else loop (i + 1, branching + 1)
-        else
-          loop (i + 1, branching)
-    in
-      loop (gatenum, 0)
-    end
+    if maxBranchingStride = ~1 then
+      (gatenum + 1, if G.expectBranching (Seq.nth gates gatenum) then 1 else 0)
+    else
+      let
+        fun loop (i, branching) =
+          if i >= Seq.length gates then
+            (i, branching)
+          else if G.expectBranching (Seq.nth gates i) then
+            if branching >= maxBranchingStride then (i, branching)
+            else loop (i + 1, branching + 1)
+          else
+            loop (i + 1, branching)
+      in
+        loop (gatenum, 0)
+      end
 
 
   fun run {numQubits, gates} =
