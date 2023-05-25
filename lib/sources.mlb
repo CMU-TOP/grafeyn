@@ -1,9 +1,4 @@
 common/sources.mlb
 full-strong-sim/sources.mlb
 query-strong-sim/sources.mlb
-local
-  lib/github.com/mpllang/mpllib/sources.$(COMPILER).mlb
-  GenerateGoogleCircuit.sml
-in
-  structure GenerateGoogleCircuit
-end
+gen-google-circuit/sources.mlb

@@ -1,0 +1,8 @@
+local
+  $(SML_LIB)/basis/basis.mlb
+  ../lib/github.com/mpllang/mpllib/sources.$(COMPILER).mlb
+  ../common/sources.mlb
+  FullSimBFS.sml
+in
+  functor FullSimBFS
+end

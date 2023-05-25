@@ -104,7 +104,7 @@ struct
 
   val empty = Seq.empty ()
 
-  val initial = Seq.singleton (BasisIdx.zeros, Complex.real 1.0)
+  val initial = Seq.singleton (BasisIdx.zeros, Complex.defaultReal 1.0)
 
   fun toString {numQubits} state =
     let

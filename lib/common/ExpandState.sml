@@ -1,16 +1,20 @@
-functor ExpandState(SST: SPARSE_STATE_TABLE) :>
+functor ExpandState
+  (structure C: COMPLEX
+   structure SST: SPARSE_STATE_TABLE
+   structure G: GATE
+   sharing C = SST.C = G.C) :>
 sig
 
-  type state = (BasisIdx.t * Complex.t) option DelayedSeq.t
+  type state = (BasisIdx.t * C.t) option DelayedSeq.t
 
-  val expand: {gates: Gate.t Seq.t, numQubits: int, state: state, expected: int}
+  val expand: {gates: G.t Seq.t, numQubits: int, state: state, expected: int}
               -> SST.t
 
 end =
 struct
 
   structure DS = DelayedSeq
-  type state = (BasisIdx.t * Complex.t) option DS.t
+  type state = (BasisIdx.t * C.t) option DS.t
 
 
   val blockSize = CommandLineArgs.parseInt "expand-block-size" 10000
@@ -51,7 +55,7 @@ struct
       val n = SST.capacity table
       val probablyLongestProbe = Real.ceil
         (log2 (Real.fromInt n) / (maxload - 1.0 - log2 maxload))
-      val tolerance = 2 * Int.max (10, probablyLongestProbe)
+      val tolerance = 4 * Int.max (10, probablyLongestProbe)
       val tolerance = Int.min (tolerance, n)
     in
       SST.insertAddWeightsLimitProbes {probes = tolerance} table widx;
@@ -62,7 +66,7 @@ struct
 
   datatype successors_result =
     AllSucceeded
-  | SomeFailed of {widx: BasisIdx.t * Complex.t, gatenum: int} list
+  | SomeFailed of {widx: BasisIdx.t * C.t, gatenum: int} list
 
 
   fun expand {gates, numQubits, state, expected} =
@@ -106,13 +110,13 @@ struct
 
       (* val apply =
         if numGates = 1 then
-          let val f = Gate.apply (gate 0)
+          let val f = G.apply (gate 0)
           in fn (_, widx) => f widx
           end
         else
-          (fn (gatenum, widx) => Gate.apply (gate gatenum) widx) *)
+          (fn (gatenum, widx) => G.apply (gate gatenum) widx) *)
 
-      val apply = (fn (gatenum, widx) => Gate.apply (gate gatenum) widx)
+      val apply = (fn (gatenum, widx) => G.apply (gate gatenum) widx)
 
       (* remainingBlocks: list of block ids that aren't finished yet
        * table: place to put results; this will fill up and need resizing
@@ -128,19 +132,19 @@ struct
           fun markFull () = () *)
 
           (* fun doGates (widx, gatenum) =
-            if Complex.isZero (#2 widx) then
+            if C.isZero (#2 widx) then
               AllSucceeded
             else if gatenum >= numGates then
               if tryPut table widx then AllSucceeded else Util.die ("uh oh!")
             else
               case apply (gatenum, widx) of
-                Gate.OutputOne widx' => doGates (widx', gatenum + 1)
-              | Gate.OutputTwo (widx1, widx2) =>
+                G.OutputOne widx' => doGates (widx', gatenum + 1)
+              | G.OutputTwo (widx1, widx2) =>
                   (doGates (widx1, gatenum + 1); doGates (widx2, gatenum + 1)) *)
 
           (* try insert all successors of `(widx, gatenum)` into `table` *)
           fun doGates (widx, gatenum) : successors_result =
-            if Complex.isZero (#2 widx) then
+            if C.isZero (#2 widx) then
               AllSucceeded
             else if gatenum >= numGates then
               if notFull () andalso tryPut table widx then
@@ -151,8 +155,8 @@ struct
                 )
             else
               case apply (gatenum, widx) of
-                Gate.OutputOne widx' => doGates (widx', gatenum + 1)
-              | Gate.OutputTwo (widx1, widx2) =>
+                G.OutputOne widx' => doGates (widx', gatenum + 1)
+              | G.OutputTwo (widx1, widx2) =>
                   case doGates (widx1, gatenum + 1) of
                     AllSucceeded => doGates (widx2, gatenum + 1)
                   | SomeFailed failures =>
@@ -214,13 +218,13 @@ struct
             )
         end
 
-
-      val initialTable = SST.make {capacity = expected, numQubits = numQubits}
+      val initialCapacity = Real.ceil
+        (1.1 * (1.0 / maxload) * Real.fromInt expected)
+      val initialTable =
+        SST.make {capacity = initialCapacity, numQubits = numQubits}
       val initialBlocks = Seq.tabulate (fn b => b) numBlocks
     in
-      ( print ("expand state; guess = " ^ Int.toString expected ^ "\n")
-      ; loop initialBlocks initialTable
-      )
+      loop initialBlocks initialTable
     end
 
 end

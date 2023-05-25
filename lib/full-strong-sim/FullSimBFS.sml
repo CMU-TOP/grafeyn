@@ -1,10 +1,15 @@
-functor FullSimBFS(SST: SPARSE_STATE_TABLE):
+functor FullSimBFS
+  (structure C: COMPLEX
+   structure SST: SPARSE_STATE_TABLE
+   structure G: GATE
+   sharing C = SST.C = G.C):
 sig
-  val run: Circuit.t -> (BasisIdx.t * Complex.t) option DelayedSeq.t
+  val run: Circuit.t -> (BasisIdx.t * C.t) option DelayedSeq.t
 end =
 struct
 
-  structure Expander = ExpandState(SST)
+  structure Expander =
+    ExpandState (structure C = C structure SST = SST structure G = G)
   structure DS = DelayedSeq
 
 
@@ -22,7 +27,7 @@ struct
       fun loop (i, branching) =
         if i >= Seq.length gates then
           (i, branching)
-        else if Gate.expectBranching (Seq.nth gates i) then
+        else if G.expectBranching (Seq.nth gates i) then
           if branching >= maxBranchingStride then (i, branching)
           else loop (i + 1, branching + 1)
         else
@@ -100,27 +105,31 @@ struct
 
               val rate = Real.max
                 (1.0, Real.fromInt nonZeroSize / Real.fromInt prevNonZeroSize)
-              val guess = Real.ceil (1.25 * rate * Real.fromInt nonZeroSize)
-
-              (* val multiplier = if numBranchingUntilGoal = 0 then 1.25 else 2.5
-              val guess = Real.ceil (multiplier * Real.fromInt nonZeroSize) *)
-              val guess = Int.min (guess, Real.ceil
-                (1.25 * Real.fromInt maxNumStates))
+              val guess = Real.ceil (rate * Real.fromInt nonZeroSize)
+              val guess = Int.min (guess, maxNumStates)
 
               val theseGates = Seq.subseq gates (next, goal - next)
-              val state = Expander.expand
-                { gates = theseGates
-                , numQubits = numQubits
-                , state = nonZeros
-                , expected = guess
-                }
+              val (state, tm) = Util.getTime (fn () =>
+                Expander.expand
+                  { gates = theseGates
+                  , numQubits = numQubits
+                  , state = nonZeros
+                  , expected = guess
+                  })
+
+              val seconds = Time.toReal tm
+              val millionsOfElements = Real.fromInt nonZeroSize / 1e6
+              val throughput = millionsOfElements / seconds
+              val throughputStr = Real.fmt (StringCvt.FIX (SOME 3)) throughput
+              val _ = print ("throughput " ^ throughputStr ^ "\n")
             in
               loop goal nonZeroSize state
             end
         end
 
       val initialState =
-        SST.singleton {numQubits = numQubits} (BasisIdx.zeros, Complex.real 1.0)
+        SST.singleton {numQubits = numQubits}
+          (BasisIdx.zeros, C.defaultReal 1.0)
 
       (* val (totalGateApps, finalState) = loopGuessCapacity 0 0 initialState 
       val _ = print ("gate app count " ^ Int.toString totalGateApps ^ "\n") *)

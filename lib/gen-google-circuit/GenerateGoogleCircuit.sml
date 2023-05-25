@@ -198,7 +198,7 @@ struct
       fun colInBounds c = 0 <= c andalso c < numCols
 
       fun fsim (qi1, qi2) =
-        Gate.FSim
+        SMLQasmGate.FSim
           {left = qi1, right = qi2, theta = Math.pi / 2.0, phi = Math.pi / 6.0}
 
       (* qi1 is guaranteed okay. but there might not be a qubit at (row2, col2) *)
@@ -294,9 +294,9 @@ struct
 
       fun pickGate cycle qubitIdx =
         case desiredGateType (qubitIdx, cycle) of
-          SqrtX => Gate.SqrtX qubitIdx
-        | SqrtY => Gate.SqrtY qubitIdx
-        | SqrtW => Gate.SqrtW qubitIdx
+          SqrtX => SMLQasmGate.SqrtX qubitIdx
+        | SqrtY => SMLQasmGate.SqrtY qubitIdx
+        | SqrtW => SMLQasmGate.SqrtW qubitIdx
 
       fun genCycle cycle =
         let

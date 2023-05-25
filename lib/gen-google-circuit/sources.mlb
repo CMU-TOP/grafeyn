@@ -1,0 +1,7 @@
+local
+  ../common/sources.mlb
+  ../lib/github.com/mpllang/mpllib/sources.$(COMPILER).mlb
+  GenerateGoogleCircuit.sml
+in
+  structure GenerateGoogleCircuit
+end

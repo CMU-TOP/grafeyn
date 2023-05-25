@@ -11,7 +11,7 @@ local
     ../lib/github.com/shwestrick/sml-qasm/sources.$(COMPILER).mlb
   in
     (* base Gate structure, which is extended by Gate.sml here. *)
-    structure Gate
+    structure SMLQasmGate = Gate
     structure Circuit
     structure ParseQASM
   end
@@ -20,6 +20,9 @@ local
   ApplyUntilFailure.sml
 
   Constants.sml
+  MkComplex.sml
+  Complex32.sml
+  Complex64.sml
   Complex.sml
   ann "allowExtendedTextConsts true" in
     BasisIdx.sml
@@ -28,23 +31,32 @@ local
   Gate.sml
 
   SPARSE_STATE_TABLE.sml
-  SparseStateTable.sml
+  (* SparseStateTable.sml *)
   SparseStateTableLockedSlots.sml
   ExpandState.sml
 in
   structure HashTable
   structure ApplyUntilFailure
 
+  signature COMPLEX
+  functor MkComplex
+  structure Complex32
+  structure Complex64
   structure Complex
   structure BasisIdx
   structure SparseState
-  structure Gate
+
+  structure SMLQasmGate
+
+  signature GATE
+  functor Gate
+
   structure Circuit
   structure ParseQASM
 
   signature SPARSE_STATE_TABLE
-  structure SparseStateTable
-  structure SparseStateTableLockedSlots
+  (* functor SparseStateTable *)
+  functor SparseStateTableLockedSlots
 
   functor ExpandState
 
