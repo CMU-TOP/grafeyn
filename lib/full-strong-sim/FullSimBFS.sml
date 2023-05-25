@@ -2,25 +2,26 @@ functor FullSimBFS
   (structure C: COMPLEX
    structure SST: SPARSE_STATE_TABLE
    structure G: GATE
-   sharing C = SST.C = G.C):
+   sharing C = SST.C = G.C
+
+   val blockSize: int
+   val maxload: real
+   val maxBranchingStride: int
+   val doMeasureZeros: bool):
 sig
   val run: Circuit.t -> (BasisIdx.t * C.t) option DelayedSeq.t
 end =
 struct
 
   structure Expander =
-    ExpandState (structure C = C structure SST = SST structure G = G)
+    ExpandState
+      (structure C = C
+       structure SST = SST
+       structure G = G
+       val blockSize = blockSize
+       val maxload = maxload)
+
   structure DS = DelayedSeq
-
-
-  val maxBranchingStride = CommandLineArgs.parseInt "bfs-max-branching-stride" 1
-  val _ = print
-    ("bfs-max-branching-stride " ^ Int.toString maxBranchingStride ^ "\n")
-
-
-  val doMeasureZeros = CommandLineArgs.parseFlag "measure-zeros"
-  val dontCompact = CommandLineArgs.parseFlag "dont-compact"
-
 
   fun findNextGoal gates gatenum =
     let

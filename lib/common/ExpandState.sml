@@ -2,6 +2,8 @@ functor ExpandState
   (structure C: COMPLEX
    structure SST: SPARSE_STATE_TABLE
    structure G: GATE
+   val blockSize: int
+   val maxload: real
    sharing C = SST.C = G.C) :>
 sig
 
@@ -16,17 +18,7 @@ struct
   structure DS = DelayedSeq
   type state = (BasisIdx.t * C.t) option DS.t
 
-
-  val blockSize = CommandLineArgs.parseInt "expand-block-size" 10000
-  val _ = print ("expand-block-size " ^ Int.toString blockSize ^ "\n")
-
-
-  val maxload = CommandLineArgs.parseReal "expand-max-load" 0.9
-  val _ = print ("expand-max-load " ^ Real.toString maxload ^ "\n")
-
-
   fun log2 x = Math.log10 x / Math.log10 2.0
-
 
   (* tryPut will fail (and return false) if the table is full, or almost full.
    *

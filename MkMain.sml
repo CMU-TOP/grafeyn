@@ -1,16 +1,32 @@
-functor MkMain(C: COMPLEX) =
+functor MkMain
+  (structure C: COMPLEX
+   val blockSize: int
+   val maxload: real
+   val maxBranchingStride: int
+   val doMeasureZeros: bool) =
 struct
 
   structure CLA = CommandLineArgs
+
   structure G = Gate(C)
   structure BFSLocked =
     FullSimBFS
       (structure C = C
        structure SST = SparseStateTableLockedSlots(C)
-       structure G = G)
+       structure G = G
+       val blockSize = blockSize
+       val maxload = maxload
+       val maxBranchingStride = maxBranchingStride
+       val doMeasureZeros = doMeasureZeros)
   structure BFSLockfree =
     FullSimBFS
-      (structure C = C structure SST = SparseStateTable(C) structure G = G)
+      (structure C = C
+       structure SST = SparseStateTable(C)
+       structure G = G
+       val blockSize = blockSize
+       val maxload = maxload
+       val maxBranchingStride = maxBranchingStride
+       val doMeasureZeros = doMeasureZeros)
 
   fun main () =
     let
