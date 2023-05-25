@@ -18,11 +18,20 @@ sig
   val compare: t * t -> order
   val equal: t * t -> bool
   val hash: t -> int
+
+  val fromDenseIndex: int -> t
+  val toDenseIndex: t -> int
 end =
 struct
   type qubit_idx = int
 
-  type t = Word64.word (* allows up to 64 qubits *)
+  (* allows up to 63 qubits; we reserve one bit to allow for a bogus value, and
+   * also to enable casting to/from dense indices.
+   *)
+  type t = Word64.word 
+
+  fun fromDenseIndex i = Word64.fromInt i
+  fun toDenseIndex t = Word64.toInt t
 
   val zeros: t = 0w0
 

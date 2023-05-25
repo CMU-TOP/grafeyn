@@ -7,21 +7,25 @@ functor FullSimBFS
    val blockSize: int
    val maxload: real
    val maxBranchingStride: int
-   val doMeasureZeros: bool):
+   val doMeasureZeros: bool
+   val denseThreshold: real):
 sig
   val run: Circuit.t -> (BasisIdx.t * C.t) option DelayedSeq.t
 end =
 struct
 
+  structure DS = DenseState(C)
+
   structure Expander =
     ExpandState
       (structure C = C
        structure SST = SST
+       structure DS = DS
        structure G = G
+       val denseThreshold = denseThreshold
        val blockSize = blockSize
        val maxload = maxload)
 
-  structure DS = DelayedSeq
 
   fun findNextGoal gates gatenum =
     let
@@ -75,26 +79,33 @@ struct
 
       fun loop next prevNonZeroSize state =
         let
-          val capacityHere = SST.capacity state
+          val (capacityHere, numZeros, nonZeros, nonZeroSize) =
+            case state of
+              Expander.Sparse state =>
+                let
+                  val numZeros =
+                    if doMeasureZeros then SOME (SST.zeroSize state) else NONE
+                  val nonZeros = SST.compact state
+                  val nonZeroSize = DelayedSeq.length nonZeros
+                in
+                  ( SST.capacity state
+                  , numZeros
+                  , DelayedSeq.map SOME nonZeros
+                  , nonZeroSize
+                  )
+                end
 
-          val numZeros =
-            if doMeasureZeros then SOME (SST.zeroSize state) else NONE
-
-          val (nonZeros, nonZeroSize) =
-            (* if dontCompact then
-              let
-                val elems = SST.unsafeViewContents state
-                val nonZeroSize = SST.nonZeroSize state
-              in
-                (elems, nonZeroSize)
-              end
-            else *)
-            let
-              val nonZeros = SST.compact state
-              val nonZeroSize = DelayedSeq.length nonZeros
-            in
-              (DelayedSeq.map SOME nonZeros, nonZeroSize)
-            end
+            | Expander.Dense state =>
+                let
+                  val numZeros =
+                    if doMeasureZeros then SOME (DS.zeroSize state) else NONE
+                in
+                  ( DS.capacity state
+                  , numZeros
+                  , DS.unsafeViewContents state
+                  , DS.nonZeroSize state
+                  )
+                end
 
           val _ = dumpDensity (next, nonZeroSize, numZeros, SOME capacityHere)
         in
@@ -128,9 +139,9 @@ struct
             end
         end
 
-      val initialState =
-        SST.singleton {numQubits = numQubits}
-          (BasisIdx.zeros, C.defaultReal 1.0)
+      val initialState = Expander.Sparse
+        (SST.singleton {numQubits = numQubits}
+           (BasisIdx.zeros, C.defaultReal 1.0))
 
       (* val (totalGateApps, finalState) = loopGuessCapacity 0 0 initialState 
       val _ = print ("gate app count " ^ Int.toString totalGateApps ^ "\n") *)

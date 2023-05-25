@@ -1,22 +1,25 @@
 functor ExpandState
   (structure C: COMPLEX
    structure SST: SPARSE_STATE_TABLE
+   structure DS: DENSE_STATE
    structure G: GATE
+   sharing C = SST.C = DS.C = G.C
    val blockSize: int
    val maxload: real
-   sharing C = SST.C = G.C) :>
+   val denseThreshold: real) :>
 sig
 
   type state = (BasisIdx.t * C.t) option DelayedSeq.t
 
+  datatype expand_result = Sparse of SST.t | Dense of DS.t
+
   val expand: {gates: G.t Seq.t, numQubits: int, state: state, expected: int}
-              -> SST.t
+              -> expand_result
 
 end =
 struct
 
-  structure DS = DelayedSeq
-  type state = (BasisIdx.t * C.t) option DS.t
+  type state = (BasisIdx.t * C.t) option DelayedSeq.t
 
   fun log2 x = Math.log10 x / Math.log10 2.0
 
@@ -61,7 +64,10 @@ struct
   | SomeFailed of {widx: BasisIdx.t * C.t, gatenum: int} list
 
 
-  fun expand {gates, numQubits, state, expected} =
+  datatype expand_result = Sparse of SST.t | Dense of DS.t
+
+
+  fun expandSparse {gates, numQubits, state, expected} =
     let
       val numGates = Seq.length gates
       fun gate i = Seq.nth gates i
@@ -217,6 +223,58 @@ struct
       val initialBlocks = Seq.tabulate (fn b => b) numBlocks
     in
       loop initialBlocks initialTable
+    end
+
+
+  fun expandDense {gates, numQubits, state, expected} =
+    let
+      val numGates = Seq.length gates
+      fun gate i = Seq.nth gates i
+
+      (* number of initial elements *)
+      val n = DelayedSeq.length state
+
+      val output = DS.make {numQubits = numQubits}
+      fun put widx = DS.insertAddWeights output widx
+
+      (* val apply =
+        if numGates = 1 then
+          let val f = G.apply (gate 0)
+          in fn (_, widx) => f widx
+          end
+        else
+          (fn (gatenum, widx) => G.apply (gate gatenum) widx) *)
+
+      val apply = (fn (gatenum, widx) => G.apply (gate gatenum) widx)
+
+      fun doGates (widx, gatenum) =
+        if C.isZero (#2 widx) then
+          ()
+        else if gatenum >= numGates then
+          put widx
+        else
+          case apply (gatenum, widx) of
+            G.OutputOne widx' => doGates (widx', gatenum + 1)
+          | G.OutputTwo (widx1, widx2) =>
+              (doGates (widx1, gatenum + 1); doGates (widx2, gatenum + 1))
+    in
+      ForkJoin.parfor blockSize (0, n) (fn i =>
+        case DelayedSeq.nth state i of
+          SOME widx => doGates (widx, 0)
+        | NONE => ());
+
+      output
+    end
+
+
+  fun expand (xxx as {gates, numQubits, state, expected}) =
+    let
+      val maxNumStates = Real.fromInt (Word64.toInt
+        (Word64.<< (0w1, Word64.fromInt numQubits)))
+      val expectedDensity = Real.fromInt expected / maxNumStates
+    in
+      if expectedDensity >= denseThreshold then Dense (expandDense xxx)
+      else Sparse (expandSparse xxx)
     end
 
 end

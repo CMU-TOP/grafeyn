@@ -1,16 +1,19 @@
 structure CLA = CommandLineArgs
 
-val precision = CommandLineArgs.parseInt "precision" 32
+val precision = CLA.parseInt "precision" 32
+val blockSize = CLA.parseInt "expand-block-size" 10000
+val maxload = CLA.parseReal "expand-max-load" 0.9
+val maxBranchingStride = CLA.parseInt "max-branching-stride" 1
+val doMeasureZeros = CLA.parseFlag "measure-zeros"
+val denseThreshold = CLA.parseReal "dense-thresh" 0.3
+
 val _ = print ("precision " ^ Int.toString precision ^ "\n")
-val blockSize = CommandLineArgs.parseInt "expand-block-size" 10000
 val _ = print ("expand-block-size " ^ Int.toString blockSize ^ "\n")
-val maxload = CommandLineArgs.parseReal "expand-max-load" 0.9
 val _ = print ("expand-max-load " ^ Real.toString maxload ^ "\n")
-val maxBranchingStride = CommandLineArgs.parseInt "max-branching-stride" 1
 val _ = print ("max-branching-stride " ^ Int.toString maxBranchingStride ^ "\n")
-val doMeasureZeros = CommandLineArgs.parseFlag "measure-zeros"
 val _ = print
   ("measure-zeros " ^ (if doMeasureZeros then "true" else "false") ^ "\n")
+val _ = print ("dense-thresh " ^ Real.toString denseThreshold ^ "\n")
 
 structure M32 =
   MkMain
@@ -18,7 +21,8 @@ structure M32 =
      val blockSize = blockSize
      val maxload = maxload
      val maxBranchingStride = maxBranchingStride
-     val doMeasureZeros = doMeasureZeros)
+     val doMeasureZeros = doMeasureZeros
+     val denseThreshold = denseThreshold)
 
 structure M64 =
   MkMain
@@ -26,7 +30,8 @@ structure M64 =
      val blockSize = blockSize
      val maxload = maxload
      val maxBranchingStride = maxBranchingStride
-     val doMeasureZeros = doMeasureZeros)
+     val doMeasureZeros = doMeasureZeros
+     val denseThreshold = denseThreshold)
 
 val main =
   case precision of
