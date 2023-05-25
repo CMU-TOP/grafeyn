@@ -96,9 +96,9 @@ struct
               (SOME zs, SOME cap) =>
                 " slack "
                 ^
-                Int.toString (Real.ceil
+                leftPad 3 (Int.toString (Real.ceil
                   (100.0
-                   * (1.0 - Real.fromInt (nonZeroSize + zs) / Real.fromInt cap)))
+                   * (1.0 - Real.fromInt (nonZeroSize + zs) / Real.fromInt cap))))
                 ^ "%"
             | _ => ""
         in

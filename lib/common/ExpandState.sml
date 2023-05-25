@@ -217,14 +217,14 @@ struct
           if Seq.length remainingBlocks' = 0 then
             (numGateApps', table)
           else
-            ( print
+            ( (*print
                 ("growing from " ^ Int.toString (SST.capacity table) ^ " to "
                  ^
                  Int.toString (Real.ceil
                    (1.5 * Real.fromInt (SST.capacity table))) ^ "\n")
-            ; loop numGateApps' remainingBlocks'
-                (SST.increaseCapacityByFactor 1.5 table)
-            )
+              ;*)
+              loop numGateApps' remainingBlocks'
+                (SST.increaseCapacityByFactor 1.5 table))
         end
 
       val initialCapacity = Real.ceil
