@@ -80,7 +80,7 @@ struct
 
       fun makeNewState cap = SST.make {capacity = cap, numQubits = numQubits}
 
-      fun loop next prevNonZeroSize state =
+      fun loop numGateApps next prevNonZeroSize state =
         let
           val (capacityHere, numZeros, nonZeros, nonZeroSize) =
             case state of
@@ -113,7 +113,7 @@ struct
           val _ = dumpDensity (next, nonZeroSize, numZeros, SOME capacityHere)
         in
           if next >= depth then
-            nonZeros
+            (numGateApps, nonZeros)
           else
             let
               val (goal, numBranchingUntilGoal) = findNextGoal gates next
@@ -124,13 +124,14 @@ struct
               val guess = Int.min (guess, maxNumStates)
 
               val theseGates = Seq.subseq gates (next, goal - next)
-              val (state, tm) = Util.getTime (fn () =>
-                Expander.expand
-                  { gates = theseGates
-                  , numQubits = numQubits
-                  , state = nonZeros
-                  , expected = guess
-                  })
+              val ({result = state, numGateApps = apps}, tm) =
+                Util.getTime (fn () =>
+                  Expander.expand
+                    { gates = theseGates
+                    , numQubits = numQubits
+                    , state = nonZeros
+                    , expected = guess
+                    })
 
               val seconds = Time.toReal tm
               val millionsOfElements = Real.fromInt nonZeroSize / 1e6
@@ -138,7 +139,7 @@ struct
               val throughputStr = Real.fmt (StringCvt.FIX (SOME 3)) throughput
               val _ = print ("throughput " ^ throughputStr ^ "\n")
             in
-              loop goal nonZeroSize state
+              loop (numGateApps + apps) goal nonZeroSize state
             end
         end
 
@@ -146,10 +147,8 @@ struct
         (SST.singleton {numQubits = numQubits}
            (BasisIdx.zeros, C.defaultReal 1.0))
 
-      (* val (totalGateApps, finalState) = loopGuessCapacity 0 0 initialState 
-      val _ = print ("gate app count " ^ Int.toString totalGateApps ^ "\n") *)
-
-      val finalState = loop 0 1 initialState
+      val (numGateApps, finalState) = loop 0 0 1 initialState
+      val _ = print ("gate app count " ^ Int.toString numGateApps ^ "\n")
     in
       finalState
     end

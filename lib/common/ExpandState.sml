@@ -14,7 +14,7 @@ sig
   datatype expand_result = Sparse of SST.t | Dense of DS.t
 
   val expand: {gates: G.t Seq.t, numQubits: int, state: state, expected: int}
-              -> expand_result
+              -> {result: expand_result, numGateApps: int}
 
 end =
 struct
@@ -119,7 +119,7 @@ struct
       (* remainingBlocks: list of block ids that aren't finished yet
        * table: place to put results; this will fill up and need resizing
        *)
-      fun loop remainingBlocks table =
+      fun loop numGateApps remainingBlocks table =
         let
           val full = ref (0w0 : Word8.word)
           fun notFull () =
@@ -141,25 +141,27 @@ struct
                   (doGates (widx1, gatenum + 1); doGates (widx2, gatenum + 1)) *)
 
           (* try insert all successors of `(widx, gatenum)` into `table` *)
-          fun doGates (widx, gatenum) : successors_result =
+          fun doGates apps (widx, gatenum) : int * successors_result =
             if C.isZero (#2 widx) then
-              AllSucceeded
+              (apps, AllSucceeded)
             else if gatenum >= numGates then
               if notFull () andalso tryPut table widx then
-                AllSucceeded
+                (apps, AllSucceeded)
               else
                 ( if notFull () then markFull () else ()
-                ; SomeFailed [{widx = widx, gatenum = gatenum}]
+                ; (apps, SomeFailed [{widx = widx, gatenum = gatenum}])
                 )
             else
               case apply (gatenum, widx) of
-                G.OutputOne widx' => doGates (widx', gatenum + 1)
+                G.OutputOne widx' => doGates (apps + 1) (widx', gatenum + 1)
               | G.OutputTwo (widx1, widx2) =>
-                  case doGates (widx1, gatenum + 1) of
-                    AllSucceeded => doGates (widx2, gatenum + 1)
-                  | SomeFailed failures =>
-                      SomeFailed
-                        ({widx = widx2, gatenum = gatenum + 1} :: failures)
+                  case doGates (apps + 1) (widx1, gatenum + 1) of
+                    (apps, AllSucceeded) => doGates apps (widx2, gatenum + 1)
+                  | (apps, SomeFailed failures) =>
+                      ( apps
+                      , SomeFailed
+                          ({widx = widx2, gatenum = gatenum + 1} :: failures)
+                      )
 
 
           fun workOnBlock b =
@@ -167,52 +169,59 @@ struct
               val start = Array.sub (blockRemainingStarts, b)
               val stop = blockStop b
 
-              fun clearPending () =
+              fun clearPending apps =
                 case blockPopPending b of
-                  NONE => true
+                  NONE => (apps, true)
                 | SOME {widx, gatenum} =>
-                    case doGates (widx, gatenum) of
-                      AllSucceeded => clearPending ()
-                    | SomeFailed failures =>
-                        (blockPushPending b failures; false)
+                    case doGates apps (widx, gatenum) of
+                      (apps, AllSucceeded) => clearPending apps
+                    | (apps, SomeFailed failures) =>
+                        (blockPushPending b failures; (apps, false))
 
-              fun loop i =
+              fun loop apps i =
                 if i >= stop then
-                  Array.update (blockRemainingStarts, b, stop)
+                  (Array.update (blockRemainingStarts, b, stop); apps)
                 else
                   case DelayedSeq.nth state i of
-                    NONE => loop (i + 1)
+                    NONE => loop apps (i + 1)
                   | SOME elem =>
-                      case doGates (elem, 0) of
-                        AllSucceeded => loop (i + 1)
-                      | SomeFailed failures =>
+                      case doGates apps (elem, 0) of
+                        (apps, AllSucceeded) => loop apps (i + 1)
+                      | (apps, SomeFailed failures) =>
                           ( Array.update (blockRemainingStarts, b, i + 1)
                           ; blockPushPending b failures
+                          ; apps
                           )
+
+              val (apps, pendingCleared) = clearPending 0
             in
-              if clearPending () then loop start else ()
+              if pendingCleared then loop apps start else apps
             end
 
 
           (* push through blocks *)
-          val _ = ForkJoin.parfor 1 (0, Seq.length remainingBlocks) (fn bi =>
-            let val b = Seq.nth remainingBlocks bi
-            in workOnBlock b
-            end)
+          val apps =
+            SeqBasis.reduce 1 op+ 0 (0, Seq.length remainingBlocks) (fn bi =>
+              let val b = Seq.nth remainingBlocks bi
+              in workOnBlock b
+              end)
 
           val remainingBlocks' =
             Seq.filter (fn b => blockHasPending b orelse blockHasRemaining b)
               remainingBlocks
+
+          val numGateApps' = numGateApps + apps
         in
           if Seq.length remainingBlocks' = 0 then
-            table
+            (numGateApps', table)
           else
             ( print
                 ("growing from " ^ Int.toString (SST.capacity table) ^ " to "
                  ^
                  Int.toString (Real.ceil
                    (1.5 * Real.fromInt (SST.capacity table))) ^ "\n")
-            ; loop remainingBlocks' (SST.increaseCapacityByFactor 1.5 table)
+            ; loop numGateApps' remainingBlocks'
+                (SST.increaseCapacityByFactor 1.5 table)
             )
         end
 
@@ -221,8 +230,10 @@ struct
       val initialTable =
         SST.make {capacity = initialCapacity, numQubits = numQubits}
       val initialBlocks = Seq.tabulate (fn b => b) numBlocks
+
+      val (apps, output) = loop 0 initialBlocks initialTable
     in
-      loop initialBlocks initialTable
+      {result = Sparse output, numGateApps = apps}
     end
 
 
@@ -247,23 +258,25 @@ struct
 
       val apply = (fn (gatenum, widx) => G.apply (gate gatenum) widx)
 
-      fun doGates (widx, gatenum) =
+      fun doGates apps (widx, gatenum) =
         if C.isZero (#2 widx) then
-          ()
+          apps
         else if gatenum >= numGates then
-          put widx
+          (put widx; apps)
         else
           case apply (gatenum, widx) of
-            G.OutputOne widx' => doGates (widx', gatenum + 1)
+            G.OutputOne widx' => doGates (apps + 1) (widx', gatenum + 1)
           | G.OutputTwo (widx1, widx2) =>
-              (doGates (widx1, gatenum + 1); doGates (widx2, gatenum + 1))
-    in
-      ForkJoin.parfor blockSize (0, n) (fn i =>
-        case DelayedSeq.nth state i of
-          SOME widx => doGates (widx, 0)
-        | NONE => ());
+              let val apps = doGates (apps + 1) (widx1, gatenum + 1)
+              in doGates apps (widx2, gatenum + 1)
+              end
 
-      output
+      val numGateApps = SeqBasis.reduce blockSize op+ 0 (0, n) (fn i =>
+        case DelayedSeq.nth state i of
+          SOME widx => doGates 0 (widx, 0)
+        | NONE => 0)
+    in
+      {result = Dense output, numGateApps = numGateApps}
     end
 
 
@@ -273,8 +286,8 @@ struct
         (Word64.<< (0w1, Word64.fromInt numQubits)))
       val expectedDensity = Real.fromInt expected / maxNumStates
     in
-      if expectedDensity >= denseThreshold then Dense (expandDense xxx)
-      else Sparse (expandSparse xxx)
+      if expectedDensity >= denseThreshold then expandDense xxx
+      else expandSparse xxx
     end
 
 end
