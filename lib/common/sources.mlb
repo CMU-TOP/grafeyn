@@ -31,7 +31,7 @@ local
   Gate.sml
 
   SPARSE_STATE_TABLE.sml
-  (* SparseStateTable.sml *)
+  SparseStateTable.sml
   SparseStateTableLockedSlots.sml
   ExpandState.sml
 in
@@ -55,7 +55,7 @@ in
   structure ParseQASM
 
   signature SPARSE_STATE_TABLE
-  (* functor SparseStateTable *)
+  functor SparseStateTable
   functor SparseStateTableLockedSlots
 
   functor ExpandState

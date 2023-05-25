@@ -34,7 +34,7 @@ sig
 end
 
 
-functor MkComplex(R: REAL) :> COMPLEX =
+functor MkComplex(R: REAL): COMPLEX =
 struct
   structure R = R
   open R

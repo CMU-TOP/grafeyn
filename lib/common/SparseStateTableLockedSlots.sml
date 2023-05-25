@@ -113,12 +113,14 @@ struct
       val bidx = lockSlot i table
       val weight = C.make (Array.sub (packedWeights, 2 * i), Array.sub
         (packedWeights, 2 * i + 1))
-      val (bidx', weight') = f (bidx, weight)
+      val weight' = f weight
       val (re, im) = C.view weight'
     in
       Array.update (packedWeights, 2 * i, re);
       Array.update (packedWeights, 2 * i + 1, im);
-      unlockSlot i table bidx'
+      Array.update (keys, i, bidx)
+    (* if bcas (keys, i, BasisIdx.set bidx lockedIdx true, bidx) then ()
+    else Util.die ("SparseStateTableLockedSlots !!!") *)
     end
 
 
@@ -154,8 +156,7 @@ struct
               if claimSlotAt i then (putValueAt i; releaseSlotAt i)
               else loop i probes
             else if BasisIdx.equal (k, x) then
-              atomicModifyAt i input (fn (bidx, weight) =>
-                (bidx, C.+ (weight, v)))
+              atomicModifyAt i input (fn weight => C.+ (weight, v))
             else
               loop (i + 1) (probes + 1)
           end

@@ -8,13 +8,13 @@ struct
       (structure C = C
        structure SST = SparseStateTableLockedSlots(C)
        structure G = G)
-  (* structure BFSLockfree =
+  structure BFSLockfree =
     FullSimBFS
-      (structure C = C structure SST = SparseStateTable(C) structure G = G) *)
+      (structure C = C structure SST = SparseStateTable(C) structure G = G)
 
   fun main () =
     let
-      val impl = CLA.parseString "impl" "locked"
+      val impl = CLA.parseString "impl" "lockfree"
       val inputName = CLA.parseString "input" "random"
       val output = CLA.parseString "output" ""
 
@@ -23,10 +23,12 @@ struct
 
       val sim =
         case impl of
-        (* "lockfree" => BFSLockfree.run *)
-          "locked" => BFSLocked.run
+          "lockfree" => BFSLockfree.run
+        | "locked" => BFSLocked.run
         | _ =>
-            Util.die ("unknown impl " ^ impl ^ "; valid options are: locked\n")
+            Util.die
+              ("unknown impl " ^ impl
+               ^ "; valid options are: locked, lockfree\n")
 
 
       val _ = print
