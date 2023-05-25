@@ -76,6 +76,8 @@ struct
       val n = DelayedSeq.length state
 
       (* block size configuration *)
+      val blockSize = Int.min (n div 1000, blockSize)
+      val blockSize = Int.max (100, blockSize)
       val numBlocks = Util.ceilDiv n blockSize
       fun blockStart b = blockSize * b
       fun blockStop b =

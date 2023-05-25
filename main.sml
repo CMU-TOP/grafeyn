@@ -5,7 +5,7 @@ val blockSize = CLA.parseInt "expand-block-size" 10000
 val maxload = CLA.parseReal "expand-max-load" 0.9
 val maxBranchingStride = CLA.parseInt "max-branching-stride" 1
 val doMeasureZeros = CLA.parseFlag "measure-zeros"
-val denseThreshold = CLA.parseReal "dense-thresh" 0.3
+val denseThreshold = CLA.parseReal "dense-thresh" 0.25
 
 val _ = print ("precision " ^ Int.toString precision ^ "\n")
 val _ = print ("expand-block-size " ^ Int.toString blockSize ^ "\n")

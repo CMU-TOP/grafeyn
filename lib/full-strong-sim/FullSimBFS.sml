@@ -27,6 +27,27 @@ struct
        val maxload = maxload)
 
 
+  val bits = Seq.fromList [ (*"▏",*)"▎", "▍", "▌", "▊"]
+
+  fun fillBar width x =
+    let
+      val middleSize = width - 2
+      val {frac, whole} = Real.split (x * Real.fromInt middleSize)
+      val filledCount = Real.round whole
+      val lastBit = Seq.nth bits (Real.floor
+        (Real.fromInt (Seq.length bits) * frac))
+    in
+      String.concat (List.tabulate (middleSize, fn i =>
+        if i < filledCount then "█"
+        else if i = filledCount then lastBit
+        else " "))
+    end
+
+
+  fun leftPad width x =
+    CharVector.tabulate (Int.max (0, width - String.size x), fn _ => #" ") ^ x
+
+
   fun findNextGoal gates gatenum =
     if maxBranchingStride = ~1 then
       (gatenum + 1, if G.expectBranching (Seq.nth gates gatenum) then 1 else 0)
@@ -54,28 +75,37 @@ struct
         if numQubits > 63 then raise Fail "whoops, too many qubits" else ()
       val maxNumStates = Word64.toInt
         (Word64.<< (0w1, Word64.fromInt numQubits))
+      val maxCountSize = String.size (Int.toString maxNumStates)
+      val maxGateNameSize = String.size (Int.toString depth)
+
+      fun padCount x =
+        leftPad maxCountSize (Int.toString x)
+      fun padGate x =
+        leftPad maxGateNameSize (Int.toString x)
 
       fun dumpDensity (i, nonZeroSize, zeroSize, capacity) =
         let
-          val densityStr = Real.fmt (StringCvt.FIX (SOME 8))
-            (Real.fromInt nonZeroSize / Real.fromInt maxNumStates)
-          val zerosStr =
+          val density = Real.fromInt nonZeroSize / Real.fromInt maxNumStates
+          val densityStr = Real.fmt (StringCvt.FIX (SOME 8)) density
+          val zStr =
             case zeroSize of
-              NONE => "??"
-            | SOME x => Int.toString x
-          val slackPct =
+              NONE => ""
+            | SOME x => " zero " ^ padCount x
+          val slackStr =
             case (zeroSize, capacity) of
               (SOME zs, SOME cap) =>
+                " slack "
+                ^
                 Int.toString (Real.ceil
                   (100.0
                    * (1.0 - Real.fromInt (nonZeroSize + zs) / Real.fromInt cap)))
                 ^ "%"
-            | _ => "??"
+            | _ => ""
         in
           print
-            ("gate " ^ Int.toString i ^ ": non-zeros: "
-             ^ Int.toString nonZeroSize ^ "; zeros: " ^ zerosStr ^ "; slack: "
-             ^ slackPct ^ "; density: " ^ densityStr ^ "\n")
+            (fillBar 12 density ^ " " ^ "gate " ^ padGate i ^ " density "
+             ^ densityStr ^ " nonzero " ^ padCount nonZeroSize ^ zStr ^ slackStr);
+          TextIO.flushOut TextIO.stdOut
         end
 
       fun makeNewState cap = SST.make {capacity = cap, numQubits = numQubits}
@@ -113,7 +143,7 @@ struct
           val _ = dumpDensity (next, nonZeroSize, numZeros, SOME capacityHere)
         in
           if next >= depth then
-            (numGateApps, nonZeros)
+            (print "\n"; (numGateApps, nonZeros))
           else
             let
               val (goal, numBranchingUntilGoal) = findNextGoal gates next
@@ -124,22 +154,29 @@ struct
               val guess = Int.min (guess, maxNumStates)
 
               val theseGates = Seq.subseq gates (next, goal - next)
-              val ({result = state, numGateApps = apps}, tm) =
-                Util.getTime (fn () =>
-                  Expander.expand
-                    { gates = theseGates
-                    , numQubits = numQubits
-                    , state = nonZeros
-                    , expected = guess
-                    })
+              val ({result, numGateApps = apps}, tm) = Util.getTime (fn () =>
+                Expander.expand
+                  { gates = theseGates
+                  , numQubits = numQubits
+                  , state = nonZeros
+                  , expected = guess
+                  })
+
+              val expansionType =
+                case result of
+                  Expander.Sparse _ => "sparse"
+                | Expander.Dense _ => "dense "
 
               val seconds = Time.toReal tm
-              val millionsOfElements = Real.fromInt nonZeroSize / 1e6
-              val throughput = millionsOfElements / seconds
-              val throughputStr = Real.fmt (StringCvt.FIX (SOME 3)) throughput
-              val _ = print ("throughput " ^ throughputStr ^ "\n")
+              val millions = Real.fromInt apps / 1e6
+              val throughput = millions / seconds
+              val throughputStr = Real.fmt (StringCvt.FIX (SOME 2)) throughput
+              val _ = print
+                (" " ^ expansionType ^ " "
+                 ^ Real.fmt (StringCvt.FIX (SOME 4)) seconds ^ "s throughput "
+                 ^ throughputStr ^ "\n")
             in
-              loop (numGateApps + apps) goal nonZeroSize state
+              loop (numGateApps + apps) goal nonZeroSize result
             end
         end
 
