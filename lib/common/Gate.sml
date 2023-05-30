@@ -278,15 +278,13 @@ struct
 
   fun rz {rot, target} =
     let
-      fun apply (bidx, weight) =
-        let
-          val rot = R./ (R.fromLarge rot, R.fromLarge 2.0)
+      val x = R./ (R.fromLarge rot, R.fromLarge 2.0)
+      val rot0 = C.rotateBy x
+      val rot1 = C.rotateBy (R.~ x)
 
-          val mult =
-            if BasisIdx.get bidx target then C.rotateBy (R.~ rot)
-            else C.rotateBy rot
-        in
-          (bidx, C.* (mult, weight))
+      fun apply (bidx, weight) =
+        let val mult = if BasisIdx.get bidx target then rot1 else rot0
+        in (bidx, C.* (mult, weight))
         end
     in
       {touches = Seq.singleton target, action = NonBranching apply}
@@ -295,15 +293,17 @@ struct
 
   fun ry {rot, target} =
     let
+      val rot = R./ (R.fromLarge rot, R.fromLarge 2.0)
+      val s = R.Math.sin rot
+      val c = R.Math.cos rot
+      val xx = (R.~ s, c)
+      val yy = (c, s)
+
       fun apply (bidx, weight) =
         let
           val bidx0 = BasisIdx.set bidx target false
           val bidx1 = BasisIdx.set bidx target true
-          val rot = R./ (R.fromLarge rot, R.fromLarge 2.0)
-          val s = R.Math.sin rot
-          val c = R.Math.cos rot
-          val (mult0, mult1) =
-            if BasisIdx.get bidx target then (R.~ s, c) else (c, s)
+          val (mult0, mult1) = if BasisIdx.get bidx target then xx else yy
         in
           ((bidx0, C.scale (mult0, weight)), (bidx1, C.scale (mult1, weight)))
         end
