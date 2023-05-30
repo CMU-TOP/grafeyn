@@ -1,4 +1,4 @@
 require {
   github.com/mpllang/mpllib 0.4.0 #e8066d5d6fcb8cd995231c9d8f5b53f10822e4e4
-  github.com/shwestrick/sml-qasm 0.0.0-20230522100503+23ab960f880b396b49e4db3ee89d95f5b8b971f1
+  github.com/shwestrick/sml-qasm 0.0.0-20230530103922+2ca0365bcf1423143de27a221d0b67f3cfbcbfb3
 }

@@ -1,11 +1,22 @@
 local
   $(SML_LIB)/basis/basis.mlb
   ../../mpllang/mpllib/sources.mpl.mlb
-  Gate.sml
-  Circuit.sml
-  ParseQASM.sml
+  base/sources.mpl.mlb
+  lex/sources.mpl.mlb
+  ast/sources.mpl.mlb
+  parse/sources.mpl.mlb
+  syntax-highlighting/sources.mpl.mlb
+  simple-circuit/sources.mpl.mlb
 in
-  structure Gate
-  structure Circuit
-  structure ParseQASM
+  structure Error
+  structure TerminalColors
+  structure TerminalColorString
+  structure FilePath
+  structure Source
+  structure Token
+  structure Lexer
+  structure Parser
+  structure Ast
+  structure SyntaxHighlighter
+  structure SimpleCircuit
 end

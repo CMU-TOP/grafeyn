@@ -113,9 +113,28 @@ struct
             end
 
         | _ =>
-            (ParseQASM.loadFromFile inputName
-             handle ParseQASM.ParseError msg =>
-               Util.die (inputName ^ ": " ^ msg))
+            let
+              fun handleLexOrParseError exn =
+                let
+                  val e =
+                    case exn of
+                      SMLQasmError.Error e => e
+                    | other => raise other
+                in
+                  TerminalColorString.print
+                    (SMLQasmError.show
+                       {highlighter = SOME
+                          SMLQasmSyntaxHighlighter.fuzzyHighlight} e);
+                  OS.Process.exit OS.Process.failure
+                end
+
+              val ast = SMLQasmParser.parseFromFile inputName
+                        handle exn => handleLexOrParseError exn
+
+              val simpleCirc = SMLQasmSimpleCircuit.fromAst ast
+            in
+              Circuit.fromSMLQasmSimpleCircuit simpleCirc
+            end
 
       val _ = print ("-------------------------------\n")
 

@@ -3,40 +3,7 @@ sig
   structure C: COMPLEX
 
   type qubit_idx = int
-
-  (* Underlying Gate structure is taken from sml-qasm. We reuse those gate
-   * definitions but provide extended functionality here.
-   *)
-  datatype gate = datatype SMLQasmGate.gate
-  (*
-    PauliY of qubit_idx
-  | PauliZ of qubit_idx
-  | Hadamard of qubit_idx
-  | SqrtY of qubit_idx
-  | SqrtX of qubit_idx
-  | SqrtW of qubit_idx
-  | X of qubit_idx
-  | T of qubit_idx
-  | CX of {control: qubit_idx, target: qubit_idx}
-  | CCX of {control1: qubit_idx, control2: qubit_idx, target: qubit_idx}
-  | CPhase of
-      { control: qubit_idx
-      , target: qubit_idx
-      , rot: real (* rotation in [0,2pi) *)
-      }
-  
-  (** fsim(theta, phi) :=
-    *   [ [ 1,   0,              0,              0          ],
-    *     [ 0,   cos(theta),     -i sin(theta),  0          ],
-    *     [ 0,   -i sin(theta),  cos(theta),     0          ],
-    *     [ 0,   0,              0,              e^(-i phi) ] ]
-    *)
-  | FSim of {left: qubit_idx, right: qubit_idx, theta: real, phi: real}
-  | RZ of {rot: real, target: qubit_idx}
-  | RY of {rot: real, target: qubit_idx}
-  | CSwap of {control: qubit_idx, target1: qubit_idx, target2: qubit_idx}
-  *)
-
+  datatype gate = datatype GateDefn.t
   type t = gate
   type weight = C.t
   type weighted_idx = BasisIdx.t * weight
@@ -56,15 +23,12 @@ end
 functor Gate(C: COMPLEX): GATE =
 struct
 
-  open SMLQasmGate (* from sml-qasm *)
-
   structure C = C
   structure R =
   struct open C.R val fromLarge = fromLarge IEEEReal.TO_NEAREST end
 
   type qubit_idx = int
-
-  datatype gate = datatype SMLQasmGate.gate
+  datatype gate = datatype GateDefn.t
   type t = gate
   type weight = C.t
   type r = C.r
@@ -310,7 +274,9 @@ struct
     | RZ xx => rz xx
     | RY xx => ry xx
     | CSwap xx => cswap xx
-    | Other xx => Util.die ("uh oh")
+    | Other xx =>
+        Util.die
+          ("ERROR: Gate.apply: don't know how to apply gate: " ^ #name xx)
 
 
   fun gateOutputToSeq go =

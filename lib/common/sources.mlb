@@ -10,10 +10,13 @@ local
   local
     ../lib/github.com/shwestrick/sml-qasm/sources.$(COMPILER).mlb
   in
-    (* base Gate structure, which is extended by Gate.sml here. *)
-    structure SMLQasmGate = Gate
-    structure Circuit
-    structure ParseQASM
+    structure SMLQasmToken = Token
+    structure SMLQasmSimpleCircuit = SimpleCircuit
+    structure TerminalColorString
+    structure SMLQasmError = Error
+    structure SMLQasmSyntaxHighlighter = SyntaxHighlighter
+    structure SMLQasmAst = Ast
+    structure SMLQasmParser = Parser
   end
 
   HashTable.sml
@@ -28,7 +31,9 @@ local
     BasisIdx.sml
   end
   SparseState.sml
+  GateDefn.sml
   Gate.sml
+  Circuit.sml
 
   SPARSE_STATE_TABLE.sml
   SparseStateTable.sml
@@ -50,13 +55,21 @@ in
   structure BasisIdx
   structure SparseState
 
-  structure SMLQasmGate
+  structure SMLQasmError
+  structure SMLQasmParser
+  structure SMLQasmAst
+  structure SMLQasmSyntaxHighlighter
+  structure SMLQasmSimpleCircuit
+  structure TerminalColorString
+
+  (* structure SMLQasmGate *)
+  structure GateDefn
 
   signature GATE
   functor Gate
 
   structure Circuit
-  structure ParseQASM
+  (* structure ParseQASM *)
 
   signature SPARSE_STATE_TABLE
   functor SparseStateTable
