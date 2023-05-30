@@ -68,11 +68,11 @@ struct
                   val qi1 = Util.hash (seed + 1) mod numQubits
                   val qi2 = Util.hash (seed + 2) mod numQubits
                 in
-                  if p < 50 then G.Hadamard qi1
-                  else if p < 63 then G.PauliY qi1
-                  else if p < 76 then G.PauliZ qi1
-                  else if p < 89 then G.T qi1
-                  else G.CX {control = qi1, target = qi2}
+                  if p < 50 then GateDefn.Hadamard qi1
+                  else if p < 63 then GateDefn.PauliY qi1
+                  else if p < 76 then GateDefn.PauliZ qi1
+                  else if p < 89 then GateDefn.T qi1
+                  else GateDefn.CX {control = qi1, target = qi2}
                 end
 
               val gates = Seq.tabulate (fn i => genGate (3 * i)) numGates

@@ -68,6 +68,7 @@ struct
 
   fun run {numQubits, gates} =
     let
+      val gates = Seq.map G.fromGateDefn gates
       fun gate i = Seq.nth gates i
       val depth = Seq.length gates
 

@@ -30,7 +30,7 @@ local
   ann "allowExtendedTextConsts true" in
     BasisIdx.sml
   end
-  SparseState.sml
+  (* SparseState.sml *)
   GateDefn.sml
   Gate.sml
   Circuit.sml
@@ -53,7 +53,7 @@ in
   structure Complex64
   structure Complex
   structure BasisIdx
-  structure SparseState
+  (* structure SparseState *)
 
   structure SMLQasmError
   structure SMLQasmParser

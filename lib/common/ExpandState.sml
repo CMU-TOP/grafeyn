@@ -67,7 +67,7 @@ struct
   datatype expand_result = Sparse of SST.t | Dense of DS.t
 
 
-  fun expandSparse {gates, numQubits, state, expected} =
+  fun expandSparse {gates: G.t Seq.t, numQubits, state, expected} =
     let
       val numGates = Seq.length gates
       fun gate i = Seq.nth gates i
@@ -107,17 +107,6 @@ struct
       fun blockPopPending b = NONE
       fun blockPushPending b _ = () *)
 
-
-      (* val apply =
-        if numGates = 1 then
-          let val f = G.apply (gate 0)
-          in fn (_, widx) => f widx
-          end
-        else
-          (fn (gatenum, widx) => G.apply (gate gatenum) widx) *)
-
-      val apply = (fn (gatenum, widx) => G.apply (gate gatenum) widx)
-
       (* remainingBlocks: list of block ids that aren't finished yet
        * table: place to put results; this will fill up and need resizing
        *)
@@ -154,16 +143,23 @@ struct
                 ; (apps, SomeFailed [{widx = widx, gatenum = gatenum}])
                 )
             else
-              case apply (gatenum, widx) of
-                G.OutputOne widx' => doGates (apps + 1) (widx', gatenum + 1)
-              | G.OutputTwo (widx1, widx2) =>
-                  case doGates (apps + 1) (widx1, gatenum + 1) of
-                    (apps, AllSucceeded) => doGates apps (widx2, gatenum + 1)
-                  | (apps, SomeFailed failures) =>
-                      ( apps
-                      , SomeFailed
-                          ({widx = widx2, gatenum = gatenum + 1} :: failures)
-                      )
+              case #action (gate gatenum) of
+                G.NonBranching apply =>
+                  doGates (apps + 1) (apply widx, gatenum + 1)
+              | G.Branching apply => doTwo (apps + 1) (apply widx, gatenum + 1)
+              | G.MaybeBranching apply =>
+                  case apply widx of
+                    G.OutputOne widx' => doGates (apps + 1) (widx', gatenum + 1)
+                  | G.OutputTwo (widx1, widx) =>
+                      doTwo (apps + 1) ((widx1, widx), gatenum + 1)
+
+          and doTwo apps ((widx1, widx2), gatenum) =
+            case doGates apps (widx1, gatenum) of
+              (apps, AllSucceeded) => doGates apps (widx2, gatenum)
+            | (apps, SomeFailed failures) =>
+                ( apps
+                , SomeFailed ({widx = widx2, gatenum = gatenum} :: failures)
+                )
 
 
           fun workOnBlock b =
@@ -239,7 +235,7 @@ struct
     end
 
 
-  fun expandDense {gates, numQubits, state, expected} =
+  fun expandDense {gates: G.t Seq.t, numQubits, state, expected} =
     let
       val numGates = Seq.length gates
       fun gate i = Seq.nth gates i
@@ -250,28 +246,25 @@ struct
       val output = DS.make {numQubits = numQubits}
       fun put widx = DS.insertAddWeights output widx
 
-      (* val apply =
-        if numGates = 1 then
-          let val f = G.apply (gate 0)
-          in fn (_, widx) => f widx
-          end
-        else
-          (fn (gatenum, widx) => G.apply (gate gatenum) widx) *)
-
-      val apply = (fn (gatenum, widx) => G.apply (gate gatenum) widx)
-
       fun doGates apps (widx, gatenum) =
         if C.isZero (#2 widx) then
           apps
         else if gatenum >= numGates then
           (put widx; apps)
         else
-          case apply (gatenum, widx) of
-            G.OutputOne widx' => doGates (apps + 1) (widx', gatenum + 1)
-          | G.OutputTwo (widx1, widx2) =>
-              let val apps = doGates (apps + 1) (widx1, gatenum + 1)
-              in doGates apps (widx2, gatenum + 1)
-              end
+          case #action (gate gatenum) of
+            G.NonBranching apply => doGates (apps + 1) (apply widx, gatenum + 1)
+          | G.Branching apply => doTwo (apps + 1) (apply widx, gatenum + 1)
+          | G.MaybeBranching apply =>
+              case apply widx of
+                G.OutputOne widx' => doGates (apps + 1) (widx', gatenum + 1)
+              | G.OutputTwo (widx1, widx) =>
+                  doTwo (apps + 1) ((widx1, widx), gatenum + 1)
+
+      and doTwo apps ((widx1, widx2), gatenum) =
+        let val apps = doGates apps (widx1, gatenum)
+        in doGates apps (widx2, gatenum)
+        end
 
       val numGateApps = SeqBasis.reduce blockSize op+ 0 (0, n) (fn i =>
         case DelayedSeq.nth state i of
