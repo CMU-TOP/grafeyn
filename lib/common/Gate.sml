@@ -74,17 +74,34 @@ struct
   fun pauliz qi =
     let
       val xx = R.~ one
-      val yy = one
 
       fun apply (bidx, weight) =
         let
-          val multiplier = if BasisIdx.get bidx qi then xx else yy
-          val weight' = C.scale (multiplier, weight)
+          val weight' =
+            if BasisIdx.get bidx qi then C.scale (xx, weight) else weight
         in
           (bidx, weight')
         end
     in
       {touches = Seq.singleton qi, action = NonBranching apply}
+    end
+
+
+  fun cz {control, target} =
+    let
+      val xx = R.~ one
+      fun apply (bidx, weight) =
+        let
+          val weight' =
+            if BasisIdx.get bidx control andalso BasisIdx.get bidx target then
+              C.scale (xx, weight)
+            else
+              weight
+        in
+          (bidx, weight')
+        end
+    in
+      {touches = Seq.fromList [control, target], action = NonBranching apply}
     end
 
 
@@ -458,6 +475,7 @@ struct
     | GateDefn.SqrtW xx => sqrtw xx
     | GateDefn.X xx => x xx
     | GateDefn.CX xx => cx xx
+    | GateDefn.CZ xx => cz xx
     | GateDefn.CCX xx => ccx xx
     | GateDefn.CPhase xx => cphase xx
     | GateDefn.FSim xx => fsim xx

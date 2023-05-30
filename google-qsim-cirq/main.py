@@ -19,8 +19,8 @@ circuit = circuit_from_qasm(f.read())
 print(cirq.qasm(circuit))
 
 # TODO: Mike: what does this do? Do we need it?
-qubits = circuit.all_qubits()
-circuit.append(cirq.measure(*qubits))
+# qubits = circuit.all_qubits()
+# circuit.append(cirq.measure(*qubits))
 
 print('running simulator...')
 t0 = time.time()
@@ -41,7 +41,8 @@ if doOutput:
   print('computing non-zeros...')
   ind = np.arange(len(result))
   nonzeros = ind[result[ind] != 0j]
-  for i in nonzeros:
+  # print('num non-zero {}'.format(len(nonzeros)))
+  for i in reversed(nonzeros):
     print('|{}⟩ {}'.format(basisidx(i), result[i]))
 else:
   print('skipping output')

@@ -19,4 +19,4 @@ def basisidx(i):
 
 for i in range(len(result)):
   if result[i] != 0j:
-    print('|{}> {}'.format(basisidx(i), result[i]))
+    print('|{}⟩ {}'.format(basisidx(i), result[i]))

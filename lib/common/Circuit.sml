@@ -119,7 +119,11 @@ struct
 
           | ("x", 0, 1) => GateDefn.X (getArg 0)
 
+          | ("sx", 0, 1) => GateDefn.SqrtX (getArg 0)
+
           | ("cx", 0, 2) => GateDefn.CX {control = getArg 0, target = getArg 1}
+
+          | ("cz", 0, 2) => GateDefn.CZ {control = getArg 0, target = getArg 1}
 
           | ("ccx", 0, 3) =>
               GateDefn.CCX
@@ -212,11 +216,12 @@ struct
         | GateDefn.PauliZ i => "z " ^ qi i
         | GateDefn.Hadamard i => "h " ^ qi i
         | GateDefn.T i => "t " ^ qi i
-        | GateDefn.SqrtY i => "sqrt(y) " ^ qi i
-        | GateDefn.SqrtX i => "sqrt(x) " ^ qi i
-        | GateDefn.SqrtW i => "sqrt(w) " ^ qi i
+        | GateDefn.SqrtY i => "sqrty " ^ qi i
+        | GateDefn.SqrtX i => "sx " ^ qi i
+        | GateDefn.SqrtW i => "sqrtw " ^ qi i
         | GateDefn.X i => "x " ^ qi i
         | GateDefn.CX {control, target} => "cx " ^ qi control ^ ", " ^ qi target
+        | GateDefn.CZ {control, target} => "cz " ^ qi control ^ ", " ^ qi target
         | GateDefn.CCX {control1, control2, target} =>
             "ccx " ^ qi control1 ^ ", " ^ qi control2 ^ ", " ^ qi target
         | GateDefn.CPhase {control, target, rot} =>
