@@ -51,14 +51,17 @@ struct
   val one = R.fromLarge 1.0
   val half = R.fromLarge 0.5
   val recp_sqrt_2 = R.fromLarge Constants.RECP_SQRT_2
+  val neg_recp_sqrt_2 = R.~ recp_sqrt_2
 
   fun pauliy qi =
     let
+      val xx = C.imag (R.~ one)
+      val yy = C.imag one
+
       fun apply (bidx, weight) =
         let
           val bidx' = BasisIdx.flip bidx qi
-          val multiplier =
-            if BasisIdx.get bidx qi then C.imag (R.~ one) else C.imag one
+          val multiplier = if BasisIdx.get bidx qi then xx else yy
           val weight' = C.* (weight, multiplier)
         in
           (bidx', weight')
@@ -70,11 +73,13 @@ struct
 
   fun pauliz qi =
     let
+      val xx = R.~ one
+      val yy = one
+
       fun apply (bidx, weight) =
         let
-          val multiplier =
-            if BasisIdx.get bidx qi then C.real (R.~ one) else C.real one
-          val weight' = C.* (weight, multiplier)
+          val multiplier = if BasisIdx.get bidx qi then xx else yy
+          val weight' = C.scale (multiplier, weight)
         in
           (bidx, weight')
         end
@@ -155,7 +160,7 @@ struct
           val bidx2 = BasisIdx.flip bidx qi
 
           val multiplier1 =
-            if BasisIdx.get bidx qi then R.~ recp_sqrt_2 else recp_sqrt_2
+            if BasisIdx.get bidx qi then neg_recp_sqrt_2 else recp_sqrt_2
           val multiplier2 = recp_sqrt_2
 
           val weight1 = C.scale (multiplier1, weight)
