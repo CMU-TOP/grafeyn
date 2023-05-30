@@ -92,8 +92,8 @@ struct
     let
       fun apply (bidx, weight) =
         let
-          val bidx1 = BasisIdx.set bidx qi false
-          val bidx2 = BasisIdx.set bidx qi true
+          val bidx1 = BasisIdx.unset bidx qi
+          val bidx2 = BasisIdx.set bidx qi
 
           val multiplier1 = C.make (half, R.~ half)
           val multiplier2 =
@@ -114,8 +114,8 @@ struct
     let
       fun apply (bidx, weight) =
         let
-          val bidx1 = BasisIdx.set bidx qi false
-          val bidx2 = BasisIdx.set bidx qi true
+          val bidx1 = BasisIdx.unset bidx qi
+          val bidx2 = BasisIdx.set bidx qi
 
           val weightA = C.* (weight, C.make (half, half))
           val weightB = C.* (weight, C.make (half, R.~ half))
@@ -133,8 +133,8 @@ struct
     let
       fun apply (bidx, weight) =
         let
-          val bidx1 = BasisIdx.set bidx qi false
-          val bidx2 = BasisIdx.set bidx qi true
+          val bidx1 = BasisIdx.unset bidx qi
+          val bidx2 = BasisIdx.set bidx qi
 
           val (mult1, mult2) =
             if BasisIdx.get bidx qi then
@@ -206,13 +206,14 @@ struct
 
   fun t qi =
     let
+      val mult = C.make (recp_sqrt_2, recp_sqrt_2)
+
       fun apply (bidx, weight) =
         let
-          val multiplier =
-            if BasisIdx.get bidx qi then C.make (recp_sqrt_2, recp_sqrt_2)
-            else C.real one
+          val weight' =
+            if BasisIdx.get bidx qi then C.* (weight, mult) else weight
         in
-          (bidx, C.* (weight, multiplier))
+          (bidx, weight)
         end
     in
       {touches = Seq.singleton qi, action = NonBranching apply}
@@ -232,15 +233,17 @@ struct
 
   fun cphase {control, target, rot} =
     let
+      val rot = R.fromLarge rot
+      val mult = C.rotateBy rot
+
       fun apply (bidx, weight) =
         let
-          val rot = R.fromLarge rot
           val weight =
             if
               not (BasisIdx.get bidx control)
               orelse not (BasisIdx.get bidx target)
             then weight
-            else C.* (C.rotateBy rot, weight)
+            else C.* (mult, weight)
         in
           (bidx, weight)
         end
@@ -306,8 +309,8 @@ struct
 
       fun apply (bidx, weight) =
         let
-          val bidx0 = BasisIdx.set bidx target false
-          val bidx1 = BasisIdx.set bidx target true
+          val bidx0 = BasisIdx.unset bidx target
+          val bidx1 = BasisIdx.set bidx target
           val (mult0, mult1) = if BasisIdx.get bidx target then xx else yy
         in
           ((bidx0, C.scale (mult0, weight)), (bidx1, C.scale (mult1, weight)))
@@ -324,12 +327,7 @@ struct
         let
           val bidx' =
             if BasisIdx.get bidx control then
-              let
-                val t1 = BasisIdx.get bidx target1
-                val t2 = BasisIdx.get bidx target2
-              in
-                BasisIdx.set (BasisIdx.set bidx target1 t2) target2 t1
-              end
+              BasisIdx.swap bidx (target1, target2)
             else
               bidx
         in

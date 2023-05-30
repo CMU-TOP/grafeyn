@@ -8,8 +8,10 @@ sig
 
   val zeros: t
 
-  val set: t -> qubit_idx -> bool -> t
+  val set: t -> qubit_idx -> t
+  val unset: t -> qubit_idx -> t
   val flip: t -> qubit_idx -> t
+  val swap: t -> qubit_idx * qubit_idx -> t
   val get: t -> qubit_idx -> bool
 
   (* not a very meaningful comparison; this is just for storing it in
@@ -28,7 +30,7 @@ struct
   (* allows up to 63 qubits; we reserve one bit to allow for a bogus value, and
    * also to enable casting to/from dense indices.
    *)
-  type t = Word64.word 
+  type t = Word64.word
 
   fun fromDenseIndex i = Word64.fromInt i
   fun toDenseIndex t = Word64.toInt t
@@ -38,16 +40,32 @@ struct
   fun selector qi =
     Word64.<< (0w1, Word.fromInt qi)
 
-  fun set bidx qi b =
-    let val cleared = Word64.andb (bidx, Word64.notb (selector qi))
-    in if b then Word64.orb (cleared, selector qi) else cleared
-    end
+  fun set bidx qi =
+    Word64.orb (bidx, selector qi)
+
+  fun unset bidx qi =
+    Word64.andb (bidx, Word64.notb (selector qi))
 
   fun flip bidx qi =
     Word64.xorb (bidx, selector qi)
 
   fun get bidx qi =
     0w0 <> (Word64.andb (bidx, selector qi))
+
+  (* xor trick for swapping indices
+   * https://graphics.stanford.edu/~seander/bithacks.html#SwappingBitsXOR
+   *)
+  fun swap bidx (qi1, qi2) =
+    let
+      val i = Word.fromInt qi1
+      val j = Word.fromInt qi2
+      val tmp = Word64.xorb (Word64.>> (bidx, i), Word64.>> (bidx, j))
+      val tmp = Word64.andb (tmp, 0w1)
+      val tmp = Word64.orb (Word64.<< (tmp, i), Word64.<< (tmp, j))
+    in
+      Word64.xorb (bidx, tmp)
+    end
+
 
   fun toString {numQubits} bidx =
     "|"

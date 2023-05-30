@@ -96,7 +96,7 @@ struct
     in
       if BasisIdx.get current lockedIdx then
         lockSlot i table
-      else if bcas (keys, i, current, BasisIdx.set current lockedIdx true) then
+      else if bcas (keys, i, current, BasisIdx.set current lockedIdx) then
         current
       else
         lockSlot i table
@@ -130,7 +130,7 @@ struct
       val n = Array.length keys
 
       fun claimSlotAt i =
-        bcas (keys, i, emptykey, BasisIdx.set x lockedIdx true)
+        bcas (keys, i, emptykey, BasisIdx.set x lockedIdx)
 
       fun releaseSlotAt i = Array.update (keys, i, x)
 
@@ -150,7 +150,7 @@ struct
         else
           let
             val current = Array.sub (keys, i)
-            val k = BasisIdx.set current lockedIdx false
+            val k = BasisIdx.unset current lockedIdx
           in
             if BasisIdx.equal (k, emptykey) then
               if claimSlotAt i then (putValueAt i; releaseSlotAt i)
@@ -192,7 +192,7 @@ struct
         else
           let
             val current = Array.sub (keys, i)
-            val k = BasisIdx.set current lockedIdx false
+            val k = BasisIdx.unset current lockedIdx
           in
             if BasisIdx.equal (k, emptykey) then
               if claimSlotAt i then putValueAt i else loop i
