@@ -104,6 +104,7 @@ struct
             | SOME ps => ps
 
           val paramArity = Seq.length params
+          fun getParam i = Seq.nth params i
           val argArity = Seq.length args
           fun getArg i = Seq.nth args i
         in
@@ -126,21 +127,45 @@ struct
 
           | ("cphase", 1, 2) =>
               let
-                val rot = evalExp (Seq.nth params 0)
+                val rot = evalExp (getParam 0)
               in
                 GateDefn.CPhase
                   {control = getArg 0, target = getArg 1, rot = rot}
               end
 
           | ("ry", 1, 1) =>
-              GateDefn.RY {rot = evalExp (Seq.nth params 0), target = getArg 0}
+              GateDefn.RY {rot = evalExp (getParam 0), target = getArg 0}
 
           | ("rz", 1, 1) =>
-              GateDefn.RZ {rot = evalExp (Seq.nth params 0), target = getArg 0}
+              GateDefn.RZ {rot = evalExp (getParam 0), target = getArg 0}
 
           | ("cswap", 0, 3) =>
               GateDefn.CSwap
                 {control = getArg 0, target1 = getArg 1, target2 = getArg 2}
+
+          | ("u", 3, 1) =>
+              GateDefn.U
+                { target = getArg 0
+                , theta = evalExp (getParam 0)
+                , phi = evalExp (getParam 1)
+                , lambda = evalExp (getParam 2)
+                }
+
+          | ("u2", 2, 1) =>
+              GateDefn.U
+                { target = getArg 0
+                , theta = Math.pi / 2.0
+                , phi = evalExp (getParam 0)
+                , lambda = evalExp (getParam 1)
+                }
+
+          | ("u1", 1, 1) =>
+              GateDefn.U
+                { target = getArg 0
+                , theta = 0.0
+                , phi = 0.0
+                , lambda = evalExp (getParam 0)
+                }
 
           | _ =>
               GateDefn.Other
@@ -157,6 +182,29 @@ struct
 
       fun qi i =
         "q[" ^ Int.toString i ^ "]"
+
+      fun doOther {name, params, args} =
+        let
+          val pstr =
+            if Seq.length params = 0 then
+              "()"
+            else
+              "("
+              ^
+              Seq.iterate (fn (acc, e) => acc ^ ", " ^ Real.toString e)
+                (Real.toString (Seq.nth params 0)) (Seq.drop params 1) ^ ")"
+
+          val front = name ^ pstr
+
+          val args =
+            if Seq.length args = 0 then
+              ""
+            else
+              Seq.iterate (fn (acc, i) => acc ^ ", " ^ qi i)
+                (qi (Seq.nth args 0)) (Seq.drop args 1)
+        in
+          front ^ " " ^ args
+        end
 
       fun gateToString gate =
         case gate of
@@ -182,6 +230,14 @@ struct
             "ry(" ^ Real.toString rot ^ ") " ^ qi target
         | GateDefn.CSwap {control, target1, target2} =>
             "cswap " ^ qi control ^ ", " ^ qi target1 ^ ", " ^ qi target2
+
+        | GateDefn.U {target, theta, phi, lambda} =>
+            doOther
+              { name = "u"
+              , params = Seq.fromList [theta, phi, lambda]
+              , args = Seq.singleton target
+              }
+
         | GateDefn.Other {name, params, args} =>
             let
               val pstr =

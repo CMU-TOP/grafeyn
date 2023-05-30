@@ -340,6 +340,106 @@ struct
     end
 
 
+  (* condMult (x, y) b w == C.* (if b then x else y, w)
+   * we partially apply it for improved performance
+   *)
+  fun condMult (x, y) =
+    let
+      val (xre, xim) = C.view x
+      val (yre, yim) = C.view y
+    in
+      if C.realIsZero xim andalso C.realIsZero yim then
+        (fn b => fn w => C.scale (if b then xre else yre, w))
+      else
+        (fn b => fn w => C.* (if b then x else y, w))
+    end
+
+
+  (* | a b |
+   * | c d |
+   *)
+  fun singleQubitUnitary {target, mat = (a, b, c, d)} =
+    let
+      val action =
+        if C.isZero a andalso C.isZero b then
+          let
+            val fw = condMult (d, c)
+          in
+            NonBranching (fn (bidx, weight) =>
+              (BasisIdx.set bidx target, fw (BasisIdx.get bidx target) weight))
+          end
+
+        else if C.isZero a andalso C.isZero d then
+          let
+            val fw = condMult (b, c)
+          in
+            NonBranching (fn (bidx, weight) =>
+              (BasisIdx.flip bidx target, fw (BasisIdx.get bidx target) weight))
+          end
+
+        else if C.isZero c andalso C.isZero b then
+          let
+            val fw = condMult (d, a)
+          in
+            NonBranching (fn (bidx, weight) =>
+              (bidx, fw (BasisIdx.get bidx target) weight))
+          end
+
+        else if C.isZero c andalso C.isZero d then
+          let
+            val fw = condMult (b, a)
+          in
+            NonBranching (fn (bidx, weight) =>
+              (BasisIdx.unset bidx target, fw (BasisIdx.get bidx target) weight))
+          end
+
+        else
+          Branching (fn (bidx, weight) =>
+            let
+              val bidx0 = BasisIdx.unset bidx target
+              val bidx1 = BasisIdx.set bidx target
+
+              val (mult0, mult1) =
+                if BasisIdx.get bidx target then (b, d) else (a, c)
+            in
+              ((bidx0, C.* (mult0, weight)), (bidx1, C.* (mult1, weight)))
+            end)
+    in
+      {touches = Seq.singleton target, action = action}
+    end
+
+
+  (* 1/2 [1 + e^(i theta)]               [-i e^(i lambda) (1 - e^(i theta))]
+   *     [i e^(i phi) (1 - e^(i theta)]  [e^(i (phi + lambda)) (1 + e^(i theta))]
+   *)
+  fun u {target, theta, phi, lambda} =
+    let
+      val theta = R.fromLarge theta
+      val phi = R.fromLarge phi
+      val lambda = R.fromLarge lambda
+
+      val onePlusEITheta = C.+ (C.real one, C.rotateBy theta)
+      val oneMinusEITheta = C.- (C.real one, C.rotateBy theta)
+
+      val a = onePlusEITheta
+      val b = C.* (C.* (C.~ C.i, C.rotateBy lambda), oneMinusEITheta)
+      val c = C.* (C.* (C.i, C.rotateBy phi), oneMinusEITheta)
+      val d = C.* (C.rotateBy (R.+ (phi, lambda)), onePlusEITheta)
+
+      val a = C.scale (half, a)
+      val b = C.scale (half, b)
+      val c = C.scale (half, c)
+      val d = C.scale (half, d)
+    in
+      print
+        ("u(" ^ R.toString theta ^ "," ^ R.toString phi ^ ","
+         ^ R.toString lambda ^ ")\n");
+      print ("  " ^ C.toString a ^ "\t" ^ C.toString b ^ "\n");
+      print ("  " ^ C.toString c ^ "\t" ^ C.toString d ^ "\n");
+      singleQubitUnitary {target = target, mat = (a, b, c, d)}
+    end
+
+
   fun expectBranching (gate: gate) =
     case #action gate of
       Branching _ => true
@@ -364,8 +464,11 @@ struct
     | GateDefn.RZ xx => rz xx
     | GateDefn.RY xx => ry xx
     | GateDefn.CSwap xx => cswap xx
+    | GateDefn.U xx => u xx
     | GateDefn.Other xx =>
-        Util.die
-          ("ERROR: Gate.apply: don't know how to apply gate: " ^ #name xx)
+        { touches = Seq.empty ()
+        , action = Branching (fn _ =>
+            Util.die ("ERROR: Gate: don't know how to apply gate: " ^ #name xx))
+        }
 
 end

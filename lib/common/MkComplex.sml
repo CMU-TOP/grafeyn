@@ -27,6 +27,7 @@ sig
   val i: t
 
   val ~ : t -> t
+  val - : t * t -> t
   val + : t * t -> t
   val * : t * t -> t
 
@@ -83,6 +84,9 @@ struct
   fun add (C x, C y) =
     C {re = #re x + #re y, im = #im x + #im y}
 
+  fun sub (C x, C y) =
+    C {re = #re x - #re y, im = #im x - #im y}
+
   fun mul (C {re = a, im = b}, C {re = c, im = d}) =
     C {re = a * c + b * d, im = a * d + b * c}
 
@@ -90,6 +94,7 @@ struct
     C {re = r * re, im = r * im}
 
   val ~ = neg
+  val op- = sub
   val op+ = add
   val op* = mul
 end
