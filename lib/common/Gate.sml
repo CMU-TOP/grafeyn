@@ -426,8 +426,55 @@ struct
     end
 
 
-  (* 1/2 [1 + e^(i theta)]               [-i e^(i lambda) (1 - e^(i theta))]
-   *     [i e^(i phi) (1 - e^(i theta)]  [e^(i (phi + lambda)) (1 + e^(i theta))]
+  (*
+    (* 1/2 [1 + e^(i theta)]               [-i e^(i lambda) (1 - e^(i theta))]
+     *     [i e^(i phi) (1 - e^(i theta)]  [e^(i (phi + lambda)) (1 + e^(i theta))]
+     *)
+    fun u {target, theta, phi, lambda} =
+      let
+        val theta = R.fromLarge theta
+        val phi = R.fromLarge phi
+        val lambda = R.fromLarge lambda
+  
+        val onePlusEITheta = C.+ (C.real one, C.rotateBy theta)
+        val oneMinusEITheta = C.- (C.real one, C.rotateBy theta)
+  
+        val a = onePlusEITheta
+        val b = C.* (C.* (C.~ C.i, C.rotateBy lambda), oneMinusEITheta)
+        val c = C.* (C.* (C.i, C.rotateBy phi), oneMinusEITheta)
+        val d = C.* (C.rotateBy (R.+ (phi, lambda)), onePlusEITheta)
+  
+        val a = C.scale (half, a)
+        val b = C.scale (half, b)
+        val c = C.scale (half, c)
+        val d = C.scale (half, d)
+      in
+        print
+          ("u(" ^ R.toString theta ^ "," ^ R.toString phi ^ ","
+           ^ R.toString lambda ^ ")\n");
+        print ("  " ^ C.toString a ^ "\t" ^ C.toString b ^ "\n");
+        print ("  " ^ C.toString c ^ "\t" ^ C.toString d ^ "\n");
+        singleQubitUnitary {target = target, mat = (a, b, c, d)}
+      end
+    *)
+
+  (*
+  
+  theta, phi, lam = (float(param) for param in self.params)
+  cos = math.cos(theta / 2)
+  sin = math.sin(theta / 2)
+  return numpy.array(
+      [
+          [cos, -exp(1j * lam) * sin],
+          [exp(1j * phi) * sin, exp(1j * (phi + lam)) * cos],
+      ],
+      dtype=dtype,
+  )
+  
+  *)
+
+  (* cos(theta/2)              -e^(i lambda) sin(theta/2)
+   * e^(i phi) sin(theta/2)   e^(i(phi+lambda)) cos(theta/2)
    *)
   fun u {target, theta, phi, lambda} =
     let
@@ -435,18 +482,44 @@ struct
       val phi = R.fromLarge phi
       val lambda = R.fromLarge lambda
 
-      val onePlusEITheta = C.+ (C.real one, C.rotateBy theta)
-      val oneMinusEITheta = C.- (C.real one, C.rotateBy theta)
+      val cos = C.real (R.Math.cos (R./ (theta, R.fromLarge 2.0)))
+      val sin = C.real (R.Math.sin (R./ (theta, R.fromLarge 2.0)))
 
-      val a = onePlusEITheta
-      val b = C.* (C.* (C.~ C.i, C.rotateBy lambda), oneMinusEITheta)
-      val c = C.* (C.* (C.i, C.rotateBy phi), oneMinusEITheta)
-      val d = C.* (C.rotateBy (R.+ (phi, lambda)), onePlusEITheta)
+      (* val _ = print
+        ("e^(i(phi+lambda)) = " ^ C.toString (C.rotateBy (R.+ (phi, lambda)))
+         ^ "\n") *)
 
-      val a = C.scale (half, a)
-      val b = C.scale (half, b)
-      val c = C.scale (half, c)
-      val d = C.scale (half, d)
+      val a = cos
+      val b = C.~ (C.* (sin, C.rotateBy lambda))
+      val c = C.* (sin, C.rotateBy phi)
+      val d = C.* (cos, C.rotateBy (R.+ (phi, lambda)))
+    in
+      (* print
+        ("u(" ^ R.toString theta ^ "," ^ R.toString phi ^ ","
+         ^ R.toString lambda ^ ")\n");
+      print ("  " ^ C.toString a ^ "\t" ^ C.toString b ^ "\n");
+      print ("  " ^ C.toString c ^ "\t" ^ C.toString d ^ "\n"); *)
+      singleQubitUnitary {target = target, mat = (a, b, c, d)}
+    end
+
+
+  (*
+  fun u {target, theta, phi, lambda} =
+    let
+      val theta = R.fromLarge theta
+      val phi = R.fromLarge phi
+      val lambda = R.fromLarge lambda
+  
+      val s = C.real (R.Math.sin (R./ (theta, R.fromLarge 2.0)))
+      val c = C.real (R.Math.cos (R./ (theta, R.fromLarge 2.0)))
+  
+      val phiPlusLambdaBy2 = R./ (R.+ (phi, lambda), R.fromLarge 2.0)
+      val phiMinusLambdaBy2 = R./ (R.- (phi, lambda), R.fromLarge 2.0)
+  
+      val a = C.* (c, C.rotateBy (R.~ phiPlusLambdaBy2))
+      val b = C.~ (C.* (s, C.rotateBy (R.~ phiMinusLambdaBy2)))
+      val c = C.* (s, C.rotateBy phiMinusLambdaBy2)
+      val d = C.* (c, C.rotateBy phiPlusLambdaBy2)
     in
       print
         ("u(" ^ R.toString theta ^ "," ^ R.toString phi ^ ","
@@ -455,7 +528,7 @@ struct
       print ("  " ^ C.toString c ^ "\t" ^ C.toString d ^ "\n");
       singleQubitUnitary {target = target, mat = (a, b, c, d)}
     end
-
+  *)
 
   fun expectBranching (gate: gate) =
     case #action gate of

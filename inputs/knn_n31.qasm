@@ -50,4 +50,4 @@ cswap q0[0],q0[13],q0[28];
 cswap q0[0],q0[14],q0[29];
 cswap q0[0],q0[15],q0[30];
 h q0[0];
-measure q0[0] -> c0[0];
+//measure q0[0] -> c0[0];

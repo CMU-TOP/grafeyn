@@ -88,7 +88,7 @@ struct
     C {re = #re x - #re y, im = #im x - #im y}
 
   fun mul (C {re = a, im = b}, C {re = c, im = d}) =
-    C {re = a * c + b * d, im = a * d + b * c}
+    C {re = a * c - b * d, im = a * d + b * c}
 
   fun scale (r, C {re, im}) =
     C {re = r * re, im = r * im}

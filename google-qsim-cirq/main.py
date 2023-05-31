@@ -37,12 +37,16 @@ def basisidx(i):
   bidx = bin(i)[2:]
   return "".join(reversed(bidx.rjust(maxlen, '0')))
 
+def isNonzero(x):
+  return abs(x.real) > 1e-8 or abs(x.imag) > 1e-8
+
 if doOutput:
   print('computing non-zeros...')
   ind = np.arange(len(result))
   nonzeros = ind[result[ind] != 0j]
   # print('num non-zero {}'.format(len(nonzeros)))
   for i in reversed(nonzeros):
-    print('|{}⟩ {}'.format(basisidx(i), result[i]))
+    if isNonzero(result[i]):
+      print('|{}⟩ {}'.format(basisidx(i), result[i]))
 else:
   print('skipping output')
