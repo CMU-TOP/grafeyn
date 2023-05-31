@@ -60,4 +60,4 @@ ccx rout[1], ram[1], qout[0];
 ccx rout[0], ram[0], qout[0];
 
 // measure queried data
-measure qout[0] -> cout[0];
+//measure qout[0] -> cout[0];

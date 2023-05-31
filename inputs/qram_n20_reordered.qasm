@@ -36,4 +36,4 @@ ccx q[15],q[7],q[3];
 ccx q[14],q[6],q[3];
 ccx q[13],q[5],q[3];
 ccx q[12],q[4],q[3];
-measure q[3] -> m_cout_0[0];
+//measure q[3] -> m_cout_0[0];
