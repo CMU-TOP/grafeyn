@@ -1,0 +1,1 @@
+python google-qsim-cirq/main.py $1 $2 | tee $TIMER_OUTFILE

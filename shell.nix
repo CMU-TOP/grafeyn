@@ -14,10 +14,23 @@
   gmp ? pkgs.gmp
   }:
 
+let
+  customPython = pkgs.python310.buildEnv.override {
+    extraLibs = [ pkgs.python310Packages.jsonschema
+                  pkgs.python310Packages.simplejson
+                  pkgs.python310Packages.psutil
+                  pkgs.python310Packages.py-cpuinfo
+                  pkgs.python310Packages.sqlalchemy
+                  pkgs.python310Packages.python-sql
+                  (with import <nixpkgs> {}; pkgs.python310Packages.callPackage ../../flexibench {})
+                ];
+  };
+in
+
 stdenv.mkDerivation rec {
   name = "feynsum";
 
-  buildInputs = [ mpl gmp ];
+  buildInputs = [ mpl gmp customPython pkgs.jq ];
 
   MPL_COMPILER="${mpl}/bin/mpl";
 

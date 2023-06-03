@@ -29,7 +29,7 @@ qsim_simulator = qsimcirq.QSimSimulator(opt)
 result = qsim_simulator.simulate(circuit).final_state_vector
 t1 = time.time()
 print('simulation completed')
-print('elapsed {}s'.format(round(t1-t0, 4)))
+print('time {}s'.format(round(t1-t0, 4)))
 # result = np.around(result.final_state_vector, 3)
 
 def basisidx(i):
