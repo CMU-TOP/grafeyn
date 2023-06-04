@@ -30,7 +30,7 @@ in
 stdenv.mkDerivation rec {
   name = "feynsum";
 
-  buildInputs = [ mpl gmp customPython pkgs.jq ];
+  buildInputs = [ mpl gmp customPython pkgs.jq pkgs.dsq ];
 
   MPL_COMPILER="${mpl}/bin/mpl";
 
