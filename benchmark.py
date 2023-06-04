@@ -6,17 +6,16 @@ sys.setrecursionlimit(150000)
 from flexibench import table as T, benchmark as B, query as Q
 
 
-def extract_key_value_pairs(filename, keys):
+def extract_key_value_pairs(file, keys):
     result = {}
-    with open(filename, 'r') as file:
-        for line in file:
-            line = line.strip()
-            if line:
-                parts = line.split()
-                if len(parts) == 2:
-                    key, value = parts
-                    if key in keys:
-                        result[key] = value
+    for line in file:
+        line = line.strip()
+        if line:
+            parts = line.split()
+            if len(parts) == 2:
+                key, value = parts
+                if key in keys:
+                    result[key] = value
     return result
 
 #print(extract_key_value_pairs('/home/rainey/Downloads/mpl_outfile.txt',['time','input']))
@@ -29,18 +28,26 @@ def get_files_with_extension(folder_path, extension):
                 file_list.append(os.path.join(root, file))
     return file_list
 
-infiles = get_files_with_extension('inputs', 'qasm')
-print(infiles)
+#infiles = get_files_with_extension('inputs', 'qasm')
+infiles = [
+    "adder_n28.qasm",
+    "bv_n30_reordered.qasm",
+    "ghz_state_n23.qasm",
+    "ising_n26.qasm",
+    "ising_n26_reordered.qasm",
+    "knn_n31.qasm",
+    "qram_n20.qasm",
+    "qram_n20_reordered.qasm"
+]
 
 # Key types
 # --------- 
 
 benchmark_key = 'benchmark'
 procs_key = 'procs'
-procs_vals = [1, 32, 64, 112, 224]
+procs = [1, 32, 64, 96, 112, 224]
 
-ranked_command_line_arg_keys = {'procs': 1,
-                                'input': 0}
+ranked_command_line_arg_keys = {'procs': 1, 'input': 0}
 
 # keys whose associated values are to be passed as environment
 # variables
@@ -84,13 +91,10 @@ def virtual_run_benchmarks_of_rows(rows):
 
 rows = T.rows_of(
     T.mk_cross2(
-        T.mk_append2(T.mk_table1(benchmark_key, 'mpl'),
+        T.mk_append2(T.mk_table1(benchmark_key, 'feynsum'),
                      T.mk_table1(benchmark_key, 'cirq')),
-        T.mk_cross([T.mk_table1('input', 'foo.qasm'),
-                    T.mk_table1('procs', 144)])))
-
-virtual_run_benchmarks_of_rows(rows)
-
+        T.mk_cross([T.mk_append([T.mk_table1('input', f) for f in infiles]),
+                    T.mk_append([T.mk_table1('procs', p) for p in procs])])))
 stats_info = {
     'TIMER_OUTFILE': {'results': [], 'tmpfile': 'timer.txt', 'jsonfile': 'timer.json'}
 }
@@ -123,3 +127,49 @@ def run_benchmark(br, stats0 = stats_info,
         os.unlink(stats_path)
     return {'stats': stats, 'trace': br_o}
 
+def merge_dictionaries(dict1, dict2):
+    merged_dict = dict1.copy()
+    merged_dict.update(dict2)
+    return merged_dict
+
+traces_tmp_file = 'traces.txt'
+
+def json_of_tmp_file(results_txt, results_json):
+    with open(results_txt, 'r') as results:
+        lines = results.readlines()
+        ds = []
+        for line in lines:
+            ds.append(json.loads(line))
+        with open(results_json, 'w') as results:
+            results.write(json.dumps(ds, indent=2))
+            print('Emitted ' + results_json)
+
+def run_benchmarks():
+    if os.path.exists(traces_tmp_file):
+        os.remove(traces_tmp_file)
+    for k,v in stats_info.items():
+        if os.path.exists(v['tmpfile']):
+            os.remove(v['tmpfile'])
+    virtual_run_benchmarks_of_rows(rows)
+    for row in rows:
+        br_i = B.run_of_row(row,
+                            program_of_row = program_of_row,
+                            is_command_line_arg_key = is_command_line_arg_key,
+                            is_env_arg_key = is_env_arg_key,
+                            rank_of_command_line_arg_key =
+                            lambda k: None if not(is_ranked_command_line_arg_key(k)) else ranked_command_line_arg_keys[k])
+        b = run_benchmark(br_i)
+        timestamp = b['trace']['benchmark_run']['timestamp']
+        with open(traces_tmp_file, 'a') as traces:
+            traces.write(json.dumps(b['trace']) + '\n')
+        for k,v in stats_info.items():
+            with open(v['tmpfile'], 'a') as results:
+                for r in b['stats'][k]['results']:
+                    q = extract_key_value_pairs(r, ['time'])
+                    q['timestamp'] = timestamp
+                    results.write(json.dumps(merge_dictionaries(row, q)) + '\n')
+    for k,v in stats_info.items():
+        json_of_tmp_file(v['tmpfile'], v['jsonfile'])
+    json_of_tmp_file(traces_tmp_file, 'traces.json')
+
+run_benchmarks()

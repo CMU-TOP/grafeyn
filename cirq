@@ -1,1 +1,1 @@
-python google-qsim-cirq/main.py $1 $2 | tee $TIMER_OUTFILE
+python google-qsim-cirq/main.py inputs/$1 $2 | tee $TIMER_OUTFILE
