@@ -351,6 +351,8 @@ struct
       val expected = Int.min (expected, maxNumStates)
 
       val expectedDensity = Real.fromInt expected / Real.fromInt maxNumStates
+      val currentDensity = Real.fromInt nonZeroSize / Real.fromInt maxNumStates
+      val expectedCost = Real.max (expectedDensity, currentDensity)
 
       fun allGatesPullable () =
         Util.all (0, Seq.length gates) (G.pullable o Seq.nth gates)
@@ -363,9 +365,9 @@ struct
         }
 
       val (method, {result, numGateApps}) =
-        if expectedDensity < denseThreshold then
+        if expectedCost < denseThreshold then
           ("push sparse", expandSparse args)
-        else if expectedDensity >= pullThreshold andalso allGatesPullable () then
+        else if expectedCost >= pullThreshold andalso allGatesPullable () then
           ("pull dense", expandPullDense args)
         else
           ("push dense", expandPushDense args)
