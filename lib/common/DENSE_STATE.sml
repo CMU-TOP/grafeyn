@@ -9,7 +9,7 @@ sig
 
   val pull: {numQubits: int}
             -> (BasisIdx.t -> {weight: C.t, count: int})
-            -> {result: state, totalCount: int}
+            -> {result: state, nonZeroSize: int, totalCount: int}
 
   val size: state -> int
   val nonZeroSize: state -> int

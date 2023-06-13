@@ -15,6 +15,7 @@ sig
   datatype state =
     Sparse of SST.t
   | Dense of DS.t
+  | DenseKnownNonZeroSize of DS.t * int
 
   val expand:
     {gates: G.t Seq.t, numQubits: int, state: state, prevNonZeroSize: int}
@@ -22,12 +23,6 @@ sig
 
 end =
 struct
-
-  (* type state = (BasisIdx.t * C.t) option DelayedSeq.t *)
-
-  datatype state =
-    Sparse of SST.t
-  | Dense of DS.t
 
   fun log2 x = Math.log10 x / Math.log10 2.0
 
@@ -72,7 +67,10 @@ struct
   | SomeFailed of {widx: BasisIdx.t * C.t, gatenum: int} list
 
 
-  datatype state = Sparse of SST.t | Dense of DS.t
+  datatype state =
+    Sparse of SST.t
+  | Dense of DS.t
+  | DenseKnownNonZeroSize of DS.t * int
 
 
   fun expandSparse {gates: G.t Seq.t, numQubits, state, expected} =
@@ -84,6 +82,7 @@ struct
         case state of
           Sparse sst => DelayedSeq.map SOME (SST.compact sst)
         | Dense state => DS.unsafeViewContents state
+        | DenseKnownNonZeroSize (state, _) => DS.unsafeViewContents state
 
       (* number of initial elements *)
       val n = DelayedSeq.length stateSeq
@@ -257,6 +256,7 @@ struct
         case state of
           Sparse sst => DelayedSeq.map SOME (SST.compact sst)
         | Dense state => DS.unsafeViewContents state
+        | DenseKnownNonZeroSize (state, _) => DS.unsafeViewContents state
 
       (* number of initial elements *)
       val n = DelayedSeq.length stateSeq
@@ -303,6 +303,7 @@ struct
         case state of
           Sparse sst => (fn bidx => Option.getOpt (SST.lookup sst bidx, C.zero))
         | Dense ds => DS.lookupDirect ds
+        | DenseKnownNonZeroSize (ds, _) => DS.lookupDirect ds
 
       fun doGates (bidx, gatenum) =
         if gatenum < 0 then
@@ -328,10 +329,13 @@ struct
                 {weight = C.+ (w1, w2), count = 1 + c1 + c2}
               end
 
-      val {result, totalCount} = DS.pull {numQubits = numQubits} (fn bidx =>
-        doGates (bidx, numGates - 1))
+      val {result, totalCount, nonZeroSize} =
+        DS.pull {numQubits = numQubits} (fn bidx =>
+          doGates (bidx, numGates - 1))
     in
-      {result = Dense result, numGateApps = totalCount}
+      { result = DenseKnownNonZeroSize (result, nonZeroSize)
+      , numGateApps = totalCount
+      }
     end
 
 
@@ -344,6 +348,7 @@ struct
         case state of
           Sparse sst => SST.nonZeroSize sst
         | Dense ds => DS.nonZeroSize ds
+        | DenseKnownNonZeroSize (_, nz) => nz
 
       val rate = Real.max
         (1.0, Real.fromInt nonZeroSize / Real.fromInt prevNonZeroSize)

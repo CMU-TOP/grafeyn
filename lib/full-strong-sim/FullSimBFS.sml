@@ -123,6 +123,8 @@ struct
                   (SST.unsafeViewContents sst, SST.nonZeroSize sst)
               | Expander.Dense ds =>
                   (DS.unsafeViewContents ds, DS.nonZeroSize ds)
+              | Expander.DenseKnownNonZeroSize (ds, nz) =>
+                  (DS.unsafeViewContents ds, nz)
           in
             dumpDensity (next, numNonZeros, NONE, NONE);
             print "\n";

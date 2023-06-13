@@ -26,17 +26,23 @@ struct
     let
       val capacity = Word64.toInt (Word64.<< (0w1, Word64.fromInt numQubits))
       val packedWeights = ForkJoin.alloc (2 * capacity)
-      val totalCount = SeqBasis.reduce 2000 op+ 0 (0, capacity) (fn i =>
-        let
-          val {weight, count} = f (BasisIdx.fromDenseIndex i)
-          val (re, im) = C.view weight
-        in
-          Array.update (packedWeights, 2 * i, re);
-          Array.update (packedWeights, 2 * i + 1, im);
-          count
-        end)
+      val (totalCount, nonZeroSize) =
+        SeqBasis.reduce 5000 (fn ((a, b), (c, d)) => (a + c, b + d)) (0, 0)
+          (0, capacity)
+          (fn i =>
+             let
+               val {weight, count} = f (BasisIdx.fromDenseIndex i)
+               val (re, im) = C.view weight
+             in
+               Array.update (packedWeights, 2 * i, re);
+               Array.update (packedWeights, 2 * i + 1, im);
+               (count, if C.isNonZero weight then 1 else 0)
+             end)
     in
-      {result = T {packedWeights = packedWeights}, totalCount = totalCount}
+      { result = T {packedWeights = packedWeights}
+      , totalCount = totalCount
+      , nonZeroSize = nonZeroSize
+      }
     end
 
 
@@ -66,7 +72,7 @@ struct
     let
       val elems = unsafeViewContents' x
     in
-      SeqBasis.reduce 1000 op+ 0 (0, DelayedSeq.length elems) (fn i =>
+      SeqBasis.reduce 5000 op+ 0 (0, DelayedSeq.length elems) (fn i =>
         let val (_, weight) = DelayedSeq.nth elems i
         in if C.isNonZero weight then 1 else 0
         end)
@@ -77,7 +83,7 @@ struct
     let
       val elems = unsafeViewContents' x
     in
-      SeqBasis.reduce 1000 op+ 0 (0, DelayedSeq.length elems) (fn i =>
+      SeqBasis.reduce 5000 op+ 0 (0, DelayedSeq.length elems) (fn i =>
         let val (_, weight) = DelayedSeq.nth elems i
         in if C.isZero weight then 1 else 0
         end)
