@@ -22,6 +22,24 @@ struct
     end
 
 
+  fun pull {numQubits} f =
+    let
+      val capacity = Word64.toInt (Word64.<< (0w1, Word64.fromInt numQubits))
+      val packedWeights = ForkJoin.alloc (2 * capacity)
+      val totalCount = SeqBasis.reduce 2000 op+ 0 (0, capacity) (fn i =>
+        let
+          val {weight, count} = f (BasisIdx.fromDenseIndex i)
+          val (re, im) = C.view weight
+        in
+          Array.update (packedWeights, 2 * i, re);
+          Array.update (packedWeights, 2 * i + 1, im);
+          count
+        end)
+    in
+      {result = T {packedWeights = packedWeights}, totalCount = totalCount}
+    end
+
+
   fun size (T {packedWeights} : state) = Array.length packedWeights div 2
   fun capacity (T {packedWeights} : state) = Array.length packedWeights div 2
 
@@ -66,13 +84,19 @@ struct
     end
 
 
-  fun lookup (T {packedWeights}) bidx =
+  fun lookupDirect (T {packedWeights}) bidx =
     let
       val i = BasisIdx.toDenseIndex bidx
       val weight = C.make (Array.sub (packedWeights, 2 * i), Array.sub
         (packedWeights, 2 * i + 1))
     in
-      if C.isNonZero weight then SOME weight else NONE
+      weight
+    end
+
+
+  fun lookup ds bidx =
+    let val weight = lookupDirect ds bidx
+    in if C.isNonZero weight then SOME weight else NONE
     end
 
 

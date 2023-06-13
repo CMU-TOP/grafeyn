@@ -17,7 +17,7 @@ sig
 
   val expand:
     {gates: G.t Seq.t, numQubits: int, state: state, prevNonZeroSize: int}
-    -> {result: state, numNonZeros: int, numGateApps: int}
+    -> {result: state, method: string, numNonZeros: int, numGateApps: int}
 
 end =
 struct
@@ -292,15 +292,52 @@ struct
     end
 
 
-  (* fun expandPullDense {gates: G.t Seq.t, numQubits, state, expected} *)
+  fun expandPullDense {gates: G.t Seq.t, numQubits, state, expected} =
+    let
+      val actions = Seq.map (valOf o G.pushPull) gates
+      fun action i = Seq.nth actions i
+      val numGates = Seq.length gates
+
+      val lookup =
+        case state of
+          Sparse sst => (fn bidx => Option.getOpt (SST.lookup sst bidx, C.zero))
+        | Dense ds => DS.lookupDirect ds
+
+      fun doGates (bidx, gatenum) =
+        if gatenum < 0 then
+          {weight = lookup bidx, count = 0}
+        else
+          case action gatenum of
+            G.PullNonBranching apply =>
+              let
+                val (neighbor, mult) = apply bidx
+                val {weight, count} = doGates (neighbor, gatenum - 1)
+              in
+                {weight = C.* (mult, weight), count = 1 + count}
+              end
+
+          | G.PullBranching apply =>
+              let
+                val ((neighbor1, mult1), (neighbor2, mult2)) = apply bidx
+                val {weight = w1, count = c1} = doGates (neighbor1, gatenum - 1)
+                val {weight = w2, count = c2} = doGates (neighbor2, gatenum - 1)
+                val w1 = C.* (mult1, w1)
+                val w2 = C.* (mult2, w2)
+              in
+                {weight = C.+ (w1, w2), count = c1 + c2}
+              end
+
+      val {result, totalCount} = DS.pull {numQubits = numQubits} (fn bidx =>
+        doGates (bidx, numGates - 1))
+    in
+      {result = Dense result, numGateApps = totalCount}
+    end
 
 
   fun expand (xxx as {gates, numQubits, state, prevNonZeroSize}) =
     let
       val maxNumStates = Word64.toInt
         (Word64.<< (0w1, Word64.fromInt numQubits))
-
-      (* val (capacityHere, numZeros, nonZeros, nonZeroSize) = *)
 
       val nonZeroSize =
         case state of
@@ -314,6 +351,9 @@ struct
 
       val expectedDensity = Real.fromInt expected / Real.fromInt maxNumStates
 
+      fun allGatesPullable () =
+        Util.all (0, Seq.length gates) (G.pullable o Seq.nth gates)
+
       val args =
         { gates = gates
         , numQubits = numQubits
@@ -321,11 +361,19 @@ struct
         , expected = expected
         }
 
-      val {result, numGateApps} =
-        if expectedDensity >= denseThreshold then expandPushDense args
-        else expandSparse args
+      val (method, {result, numGateApps}) =
+        if expectedDensity < denseThreshold then
+          ("push sparse", expandSparse args)
+        else if allGatesPullable () then
+          ("pull dense", expandPullDense args)
+        else
+          ("push dense", expandPushDense args)
     in
-      {result = result, numNonZeros = nonZeroSize, numGateApps = numGateApps}
+      { result = result
+      , method = method
+      , numNonZeros = nonZeroSize
+      , numGateApps = numGateApps
+      }
     end
 
 end

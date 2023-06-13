@@ -8,6 +8,7 @@ sig
 
   val zeros: t
 
+  val setTo: bool -> t -> qubit_idx -> t
   val set: t -> qubit_idx -> t
   val unset: t -> qubit_idx -> t
   val flip: t -> qubit_idx -> t
@@ -45,6 +46,9 @@ struct
 
   fun unset bidx qi =
     Word64.andb (bidx, Word64.notb (selector qi))
+
+  fun setTo b bidx qi =
+    if b then set bidx qi else unset bidx qi
 
   fun flip bidx qi =
     Word64.xorb (bidx, selector qi)

@@ -47,6 +47,8 @@ struct
   fun leftPad width x =
     CharVector.tabulate (Int.max (0, width - String.size x), fn _ => #" ") ^ x
 
+  fun rightPad width x =
+    x ^ CharVector.tabulate (Int.max (0, width - String.size x), fn _ => #" ")
 
   fun findNextGoal gates gatenum =
     if maxBranchingStride = ~1 then
@@ -128,9 +130,10 @@ struct
         else
           let
             val (goal, numBranchingUntilGoal) = findNextGoal gates next
+            (* val goal = next + 1 *)
 
             val theseGates = Seq.subseq gates (next, goal - next)
-            val ({result, numNonZeros, numGateApps = apps}, tm) =
+            val ({result, method, numNonZeros, numGateApps = apps}, tm) =
               Util.getTime (fn () =>
                 Expander.expand
                   { gates = theseGates
@@ -139,11 +142,6 @@ struct
                   , prevNonZeroSize = prevNonZeroSize
                   })
 
-            val expansionType =
-              case result of
-                Expander.Sparse _ => "sparse"
-              | Expander.Dense _ => "dense "
-
             val seconds = Time.toReal tm
             val millions = Real.fromInt apps / 1e6
             val throughput = millions / seconds
@@ -151,8 +149,9 @@ struct
             val _ = dumpDensity (next, numNonZeros, NONE, NONE)
             val _ = print
               (" hop " ^ leftPad 3 (Int.toString (goal - next)) ^ " "
-               ^ expansionType ^ " " ^ Real.fmt (StringCvt.FIX (SOME 4)) seconds
-               ^ "s throughput " ^ throughputStr ^ "\n")
+               ^ rightPad 11 method ^ " "
+               ^ Real.fmt (StringCvt.FIX (SOME 4)) seconds ^ "s throughput "
+               ^ throughputStr ^ "\n")
           in
             loop (numGateApps + apps) goal numNonZeros result
           end

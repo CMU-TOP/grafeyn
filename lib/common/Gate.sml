@@ -27,11 +27,10 @@ sig
    *)
 
   datatype pull_gate_action =
-    PullNonBranching of BasisIdx.t -> BasisIdx.t * (weight -> weight)
-  | PullBranching of
-      BasisIdx.t
-      -> (BasisIdx.t * (weight -> weight)) * (BasisIdx.t * (weight -> weight))
+    PullNonBranching of BasisIdx.t -> BasisIdx.t * weight
+  | PullBranching of BasisIdx.t -> (BasisIdx.t * weight) * (BasisIdx.t * weight)
 
+  val pullable: gate -> bool
   val pushPull: gate -> pull_gate_action option
 
 end
@@ -581,12 +580,16 @@ struct
    *)
 
   datatype pull_gate_action =
-    PullNonBranching of BasisIdx.t -> BasisIdx.t * (weight -> weight)
-  | PullBranching of
-      BasisIdx.t
-      -> (BasisIdx.t * (weight -> weight)) * (BasisIdx.t * (weight -> weight))
+    PullNonBranching of BasisIdx.t -> BasisIdx.t * weight
+  | PullBranching of BasisIdx.t -> (BasisIdx.t * weight) * (BasisIdx.t * weight)
 
   type pullgate = {touches: qubit_idx Seq.t, action: pull_gate_action}
+
+  fun pullable ({touches, action}: gate) =
+    case (Seq.length touches, action) of
+      (1, NonBranching _) => true
+    | (2, NonBranching _) => true
+    | _ => false
 
   fun pushPull ({touches, action}: gate) =
     case (Seq.length touches, action) of
@@ -600,17 +603,68 @@ struct
 
           val action =
             if notFlipped then
-              fn bidx =>
-                ( bidx
-                , fn w =>
-                    if BasisIdx.get bidx qi then C.* (m1, w) else C.* (m0, w)
-                )
+              fn bidx => (bidx, if BasisIdx.get bidx qi then m1 else m0)
             else
               fn bidx =>
-                ( BasisIdx.flip bidx qi
-                , fn w =>
-                    if BasisIdx.get bidx qi then C.* (m0, w) else C.* (m1, w)
-                )
+                (BasisIdx.flip bidx qi, if BasisIdx.get bidx qi then m0 else m1)
+        in
+          SOME (PullNonBranching action)
+        end
+
+    | (2, NonBranching apply) =>
+        let
+          val (qi, qj) = (Seq.nth touches 0, Seq.nth touches 1)
+
+          (* |00⟩  ->  m00 * |b00⟩
+           * |01⟩  ->  m01 * |b01⟩
+           * |10⟩  ->  m10 * |b10⟩
+           * |11⟩  ->  m11 * |b11⟩
+           *)
+          val (b00, m00) = apply (BasisIdx.zeros, C.real one)
+          val (b01, m01) = apply (BasisIdx.set BasisIdx.zeros qj, C.real one)
+          val (b10, m10) = apply (BasisIdx.set BasisIdx.zeros qi, C.real one)
+          val (b11, m11) = apply
+            (BasisIdx.set (BasisIdx.set BasisIdx.zeros qi) qj, C.real one)
+
+          fun match left right bb =
+            left = BasisIdx.get bb qi andalso right = BasisIdx.get bb qj
+
+          fun find left right =
+            if match left right b00 then (b00, m00)
+            else if match left right b01 then (b01, m01)
+            else if match left right b10 then (b10, m10)
+            else (b11, m11)
+
+
+          (* Invert the lookup.
+           *
+           * |b00'⟩  ->  m00' * |00⟩
+           * |b01'⟩  ->  m01' * |01⟩
+           * |b10'⟩  ->  m10' * |10⟩
+           * |b11'⟩  ->  m11' * |11⟩
+           *)
+          val (b00', m00') = find false false
+          val (b01', m01') = find false true
+          val (b10', m10') = find true false
+          val (b11', m11') = find true true
+
+
+          fun alignWith bb bidx =
+            let
+              val bidx = BasisIdx.setTo (BasisIdx.get bb qi) bidx qi
+              val bidx = BasisIdx.setTo (BasisIdx.get bb qj) bidx qj
+            in
+              bidx
+            end
+
+
+          fun action bidx =
+            if BasisIdx.get bidx qi then
+              (if BasisIdx.get bidx qj then (alignWith b11' bidx, m11')
+               else (alignWith b10' bidx, m10'))
+            else
+              (if BasisIdx.get bidx qj then (alignWith b01' bidx, m01')
+               else (alignWith b00' bidx, m00'))
         in
           SOME (PullNonBranching action)
         end
