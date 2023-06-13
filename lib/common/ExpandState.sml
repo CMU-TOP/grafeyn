@@ -295,7 +295,7 @@ struct
 
   fun expandPullDense {gates: G.t Seq.t, numQubits, state, expected} =
     let
-      val actions = Seq.map (valOf o G.pushPull) gates
+      val actions = Seq.map (valOf o G.pullAction) gates
       fun action i = Seq.nth actions i
       val numGates = Seq.length gates
 
