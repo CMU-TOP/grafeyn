@@ -27,13 +27,14 @@ local
   Complex32.sml
   Complex64.sml
   Complex.sml
+  
   ann "allowExtendedTextConsts true" in
     BasisIdx.sml
+    (* SparseState.sml *)
+    GateDefn.sml
+    Gate.sml
+    Circuit.sml
   end
-  (* SparseState.sml *)
-  GateDefn.sml
-  Gate.sml
-  Circuit.sml
 
   SPARSE_STATE_TABLE.sml
   SparseStateTable.sml

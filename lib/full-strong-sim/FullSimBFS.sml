@@ -8,7 +8,8 @@ functor FullSimBFS
    val maxload: real
    val maxBranchingStride: int
    val doMeasureZeros: bool
-   val denseThreshold: real):
+   val denseThreshold: real
+   val pullThreshold: real):
 sig
   val run: Circuit.t -> (BasisIdx.t * C.t) option DelayedSeq.t
 end =
@@ -24,7 +25,8 @@ struct
        structure G = G
        val denseThreshold = denseThreshold
        val blockSize = blockSize
-       val maxload = maxload)
+       val maxload = maxload
+       val pullThreshold = pullThreshold)
 
 
   val bits = Seq.fromList [ (*"▏",*)"▎", "▍", "▌", "▊"]

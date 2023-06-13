@@ -4,7 +4,8 @@ functor MkMain
    val maxload: real
    val maxBranchingStride: int
    val doMeasureZeros: bool
-   val denseThreshold: real) =
+   val denseThreshold: real
+   val pullThreshold: real) =
 struct
 
   structure CLA = CommandLineArgs
@@ -19,7 +20,8 @@ struct
        val maxload = maxload
        val maxBranchingStride = maxBranchingStride
        val doMeasureZeros = doMeasureZeros
-       val denseThreshold = denseThreshold)
+       val denseThreshold = denseThreshold
+       val pullThreshold = pullThreshold)
   structure BFSLockfree =
     FullSimBFS
       (structure C = C
@@ -29,7 +31,8 @@ struct
        val maxload = maxload
        val maxBranchingStride = maxBranchingStride
        val doMeasureZeros = doMeasureZeros
-       val denseThreshold = denseThreshold)
+       val denseThreshold = denseThreshold
+       val pullThreshold = pullThreshold)
 
   fun main () =
     let

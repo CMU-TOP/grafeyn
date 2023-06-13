@@ -589,6 +589,7 @@ struct
     case (Seq.length touches, action) of
       (1, NonBranching _) => true
     | (2, NonBranching _) => true
+    | (1, Branching _) => true
     | _ => false
 
   fun pushPull ({touches, action}: gate) =
@@ -667,6 +668,45 @@ struct
                else (alignWith b00' bidx, m00'))
         in
           SOME (PullNonBranching action)
+        end
+
+    | (1, Branching apply) =>
+        let
+          val qi = Seq.nth touches 0
+
+          (* |0⟩  ->  m00 * |b00⟩ + m01 * |b01⟩
+           * |1⟩  ->  m10 * |b10⟩ + m11 * |b11⟩
+           *)
+          val ((b00, m00), (b01, m01)) = apply (BasisIdx.zeros, C.real one)
+          val ((b10, m10), (b11, m11)) = apply
+            (BasisIdx.set BasisIdx.zeros qi, C.real one)
+
+          val ((b00, m00), (b01, m01)) =
+            if BasisIdx.get b00 qi then ((b01, m01), (b00, m00))
+            else ((b00, m00), (b01, m01))
+
+          val ((b10, m10), (b11, m11)) =
+            if BasisIdx.get b10 qi then ((b11, m11), (b10, m10))
+            else ((b10, m10), (b11, m11))
+
+          (* sanity check *)
+          val _ =
+            if
+              not (BasisIdx.get b00 qi) andalso not (BasisIdx.get b10 qi)
+              andalso BasisIdx.get b01 qi andalso BasisIdx.get b11 qi
+            then
+              ()
+            else
+              raise Fail
+                "Gate.pushPull: branching gate doesn't output in order |0⟩, |1⟩"
+
+          fun action bidx =
+            if BasisIdx.get bidx qi then
+              ((BasisIdx.unset bidx qi, m01), (bidx, m11))
+            else
+              ((bidx, m00), (BasisIdx.set bidx qi, m10))
+        in
+          SOME (PullBranching action)
         end
 
     | _ => NONE

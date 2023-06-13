@@ -6,7 +6,8 @@ functor ExpandState
    sharing C = SST.C = DS.C = G.C
    val blockSize: int
    val maxload: real
-   val denseThreshold: real) :>
+   val denseThreshold: real
+   val pullThreshold: real) :>
 sig
 
   (* type state = (BasisIdx.t * C.t) option DelayedSeq.t *)
@@ -324,7 +325,7 @@ struct
                 val w1 = C.* (mult1, w1)
                 val w2 = C.* (mult2, w2)
               in
-                {weight = C.+ (w1, w2), count = c1 + c2}
+                {weight = C.+ (w1, w2), count = 1 + c1 + c2}
               end
 
       val {result, totalCount} = DS.pull {numQubits = numQubits} (fn bidx =>
@@ -364,7 +365,7 @@ struct
       val (method, {result, numGateApps}) =
         if expectedDensity < denseThreshold then
           ("push sparse", expandSparse args)
-        else if allGatesPullable () then
+        else if expectedDensity >= pullThreshold andalso allGatesPullable () then
           ("pull dense", expandPullDense args)
         else
           ("push dense", expandPushDense args)
