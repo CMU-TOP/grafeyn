@@ -74,10 +74,15 @@ struct
   datatype state = Sparse of SST.t | Dense of DS.t
 
 
-  fun expandSparse {gates: G.t Seq.t, numQubits, stateSeq, expected} =
+  fun expandSparse {gates: G.t Seq.t, numQubits, state, expected} =
     let
       val numGates = Seq.length gates
       fun gate i = Seq.nth gates i
+
+      val stateSeq =
+        case state of
+          Sparse sst => DelayedSeq.map SOME (SST.compact sst)
+        | Dense state => DS.unsafeViewContents state
 
       (* number of initial elements *)
       val n = DelayedSeq.length stateSeq
@@ -242,10 +247,15 @@ struct
     end
 
 
-  fun expandPushDense {gates: G.t Seq.t, numQubits, stateSeq, expected} =
+  fun expandPushDense {gates: G.t Seq.t, numQubits, state, expected} =
     let
       val numGates = Seq.length gates
       fun gate i = Seq.nth gates i
+
+      val stateSeq =
+        case state of
+          Sparse sst => DelayedSeq.map SOME (SST.compact sst)
+        | Dense state => DS.unsafeViewContents state
 
       (* number of initial elements *)
       val n = DelayedSeq.length stateSeq
@@ -291,22 +301,11 @@ struct
         (Word64.<< (0w1, Word64.fromInt numQubits))
 
       (* val (capacityHere, numZeros, nonZeros, nonZeroSize) = *)
-      val (stateSeq, nonZeroSize) =
-        case state of
-          Sparse sst =>
-            let
-              val nonZeros = SST.compact sst
-              val nonZeroSize = DelayedSeq.length nonZeros
-            in
-              (DelayedSeq.map SOME nonZeros, nonZeroSize)
-            end
 
-        | Dense state =>
-            let
-            (* val numZeros =
-              if doMeasureZeros then SOME (DS.zeroSize state) else NONE *)
-            in (DS.unsafeViewContents state, DS.nonZeroSize state)
-            end
+      val nonZeroSize =
+        case state of
+          Sparse sst => SST.nonZeroSize sst
+        | Dense ds => DS.nonZeroSize ds
 
       val rate = Real.max
         (1.0, Real.fromInt nonZeroSize / Real.fromInt prevNonZeroSize)
@@ -318,7 +317,7 @@ struct
       val args =
         { gates = gates
         , numQubits = numQubits
-        , stateSeq = stateSeq
+        , state = state
         , expected = expected
         }
 

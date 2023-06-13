@@ -150,9 +150,9 @@ struct
             val throughputStr = Real.fmt (StringCvt.FIX (SOME 2)) throughput
             val _ = dumpDensity (next, numNonZeros, NONE, NONE)
             val _ = print
-              (" " ^ expansionType ^ " "
-               ^ Real.fmt (StringCvt.FIX (SOME 4)) seconds ^ "s throughput "
-               ^ throughputStr ^ "\n")
+              (" hop " ^ leftPad 3 (Int.toString (goal - next)) ^ " "
+               ^ expansionType ^ " " ^ Real.fmt (StringCvt.FIX (SOME 4)) seconds
+               ^ "s throughput " ^ throughputStr ^ "\n")
           in
             loop (numGateApps + apps) goal numNonZeros result
           end
