@@ -9,17 +9,24 @@ functor ExpandState
    val denseThreshold: real) :>
 sig
 
-  type state = (BasisIdx.t * C.t) option DelayedSeq.t
+  (* type state = (BasisIdx.t * C.t) option DelayedSeq.t *)
 
-  datatype expand_result = Sparse of SST.t | Dense of DS.t
+  datatype state =
+    Sparse of SST.t
+  | Dense of DS.t
 
-  val expand: {gates: G.t Seq.t, numQubits: int, state: state, expected: int}
-              -> {result: expand_result, numGateApps: int}
+  val expand:
+    {gates: G.t Seq.t, numQubits: int, state: state, prevNonZeroSize: int}
+    -> {result: state, numNonZeros: int, numGateApps: int}
 
 end =
 struct
 
-  type state = (BasisIdx.t * C.t) option DelayedSeq.t
+  (* type state = (BasisIdx.t * C.t) option DelayedSeq.t *)
+
+  datatype state =
+    Sparse of SST.t
+  | Dense of DS.t
 
   fun log2 x = Math.log10 x / Math.log10 2.0
 
@@ -64,16 +71,16 @@ struct
   | SomeFailed of {widx: BasisIdx.t * C.t, gatenum: int} list
 
 
-  datatype expand_result = Sparse of SST.t | Dense of DS.t
+  datatype state = Sparse of SST.t | Dense of DS.t
 
 
-  fun expandSparse {gates: G.t Seq.t, numQubits, state, expected} =
+  fun expandSparse {gates: G.t Seq.t, numQubits, stateSeq, expected} =
     let
       val numGates = Seq.length gates
       fun gate i = Seq.nth gates i
 
       (* number of initial elements *)
-      val n = DelayedSeq.length state
+      val n = DelayedSeq.length stateSeq
 
       (* block size configuration *)
       val blockSize = Int.min (n div 1000, blockSize)
@@ -180,7 +187,7 @@ struct
                 if i >= stop then
                   (Array.update (blockRemainingStarts, b, stop); apps)
                 else
-                  case DelayedSeq.nth state i of
+                  case DelayedSeq.nth stateSeq i of
                     NONE => loop apps (i + 1)
                   | SOME elem =>
                       case doGates apps (elem, 0) of
@@ -235,13 +242,13 @@ struct
     end
 
 
-  fun expandDense {gates: G.t Seq.t, numQubits, state, expected} =
+  fun expandPushDense {gates: G.t Seq.t, numQubits, stateSeq, expected} =
     let
       val numGates = Seq.length gates
       fun gate i = Seq.nth gates i
 
       (* number of initial elements *)
-      val n = DelayedSeq.length state
+      val n = DelayedSeq.length stateSeq
 
       val output = DS.make {numQubits = numQubits}
       fun put widx = DS.insertAddWeights output widx
@@ -267,7 +274,7 @@ struct
         end
 
       val numGateApps = SeqBasis.reduce blockSize op+ 0 (0, n) (fn i =>
-        case DelayedSeq.nth state i of
+        case DelayedSeq.nth stateSeq i of
           SOME widx => doGates 0 (widx, 0)
         | NONE => 0)
     in
@@ -275,14 +282,51 @@ struct
     end
 
 
-  fun expand (xxx as {gates, numQubits, state, expected}) =
+  (* fun expandPullDense {gates: G.t Seq.t, numQubits, state, expected} *)
+
+
+  fun expand (xxx as {gates, numQubits, state, prevNonZeroSize}) =
     let
-      val maxNumStates = Real.fromInt (Word64.toInt
-        (Word64.<< (0w1, Word64.fromInt numQubits)))
-      val expectedDensity = Real.fromInt expected / maxNumStates
+      val maxNumStates = Word64.toInt
+        (Word64.<< (0w1, Word64.fromInt numQubits))
+
+      (* val (capacityHere, numZeros, nonZeros, nonZeroSize) = *)
+      val (stateSeq, nonZeroSize) =
+        case state of
+          Sparse sst =>
+            let
+              val nonZeros = SST.compact sst
+              val nonZeroSize = DelayedSeq.length nonZeros
+            in
+              (DelayedSeq.map SOME nonZeros, nonZeroSize)
+            end
+
+        | Dense state =>
+            let
+            (* val numZeros =
+              if doMeasureZeros then SOME (DS.zeroSize state) else NONE *)
+            in (DS.unsafeViewContents state, DS.nonZeroSize state)
+            end
+
+      val rate = Real.max
+        (1.0, Real.fromInt nonZeroSize / Real.fromInt prevNonZeroSize)
+      val expected = Real.ceil (rate * Real.fromInt nonZeroSize)
+      val expected = Int.min (expected, maxNumStates)
+
+      val expectedDensity = Real.fromInt expected / Real.fromInt maxNumStates
+
+      val args =
+        { gates = gates
+        , numQubits = numQubits
+        , stateSeq = stateSeq
+        , expected = expected
+        }
+
+      val {result, numGateApps} =
+        if expectedDensity >= denseThreshold then expandPushDense args
+        else expandSparse args
     in
-      if expectedDensity >= denseThreshold then expandDense xxx
-      else expandSparse xxx
+      {result = result, numNonZeros = nonZeroSize, numGateApps = numGateApps}
     end
 
 end

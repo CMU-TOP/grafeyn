@@ -21,6 +21,19 @@ sig
   val fromGateDefn: GateDefn.t -> gate
 
   val expectBranching: gate -> bool
+
+  (* =========================================================================
+   * pull-gates
+   *)
+
+  datatype pull_gate_action =
+    PullNonBranching of BasisIdx.t -> BasisIdx.t * (weight -> weight)
+  | PullBranching of
+      BasisIdx.t
+      -> (BasisIdx.t * (weight -> weight)) * (BasisIdx.t * (weight -> weight))
+
+  val pushPull: gate -> pull_gate_action option
+
 end
 
 
@@ -561,5 +574,47 @@ struct
         , action = Branching (fn _ =>
             Util.die ("ERROR: Gate: don't know how to apply gate: " ^ #name xx))
         }
+
+
+  (* ========================================================================
+   * pull-gates
+   *)
+
+  datatype pull_gate_action =
+    PullNonBranching of BasisIdx.t -> BasisIdx.t * (weight -> weight)
+  | PullBranching of
+      BasisIdx.t
+      -> (BasisIdx.t * (weight -> weight)) * (BasisIdx.t * (weight -> weight))
+
+  type pullgate = {touches: qubit_idx Seq.t, action: pull_gate_action}
+
+  fun pushPull ({touches, action}: gate) =
+    case (Seq.length touches, action) of
+      (1, NonBranching apply) =>
+        let
+          val qi = Seq.nth touches 0
+          val (b0, m0) = apply (BasisIdx.zeros, C.real one)
+          val (b1, m1) = apply (BasisIdx.set BasisIdx.zeros qi, C.real one)
+
+          val notFlipped = BasisIdx.equal (b0, BasisIdx.zeros)
+
+          val action =
+            if notFlipped then
+              fn bidx =>
+                ( bidx
+                , fn w =>
+                    if BasisIdx.get bidx qi then C.* (m1, w) else C.* (m0, w)
+                )
+            else
+              fn bidx =>
+                ( BasisIdx.flip bidx qi
+                , fn w =>
+                    if BasisIdx.get bidx qi then C.* (m0, w) else C.* (m1, w)
+                )
+        in
+          SOME (PullNonBranching action)
+        end
+
+    | _ => NONE
 
 end

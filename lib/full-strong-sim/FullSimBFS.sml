@@ -109,77 +109,54 @@ struct
           TextIO.flushOut TextIO.stdOut
         end
 
-      fun makeNewState cap = SST.make {capacity = cap, numQubits = numQubits}
 
       fun loop numGateApps next prevNonZeroSize state =
-        let
-          val (capacityHere, numZeros, nonZeros, nonZeroSize) =
-            case state of
-              Expander.Sparse state =>
-                let
-                  val numZeros =
-                    if doMeasureZeros then SOME (SST.zeroSize state) else NONE
-                  val nonZeros = SST.compact state
-                  val nonZeroSize = DelayedSeq.length nonZeros
-                in
-                  ( SST.capacity state
-                  , numZeros
-                  , DelayedSeq.map SOME nonZeros
-                  , nonZeroSize
-                  )
-                end
+        if next >= depth then
+          let
+            val (nonZeros, numNonZeros) =
+              case state of
+                Expander.Sparse sst =>
+                  (SST.unsafeViewContents sst, SST.nonZeroSize sst)
+              | Expander.Dense ds =>
+                  (DS.unsafeViewContents ds, DS.nonZeroSize ds)
+          in
+            dumpDensity (next, numNonZeros, NONE, NONE);
+            print "\n";
+            (numGateApps, nonZeros)
+          end
 
-            | Expander.Dense state =>
-                let
-                  val numZeros =
-                    if doMeasureZeros then SOME (DS.zeroSize state) else NONE
-                in
-                  ( DS.capacity state
-                  , numZeros
-                  , DS.unsafeViewContents state
-                  , DS.nonZeroSize state
-                  )
-                end
+        else
+          let
+            val (goal, numBranchingUntilGoal) = findNextGoal gates next
 
-          val _ = dumpDensity (next, nonZeroSize, numZeros, SOME capacityHere)
-        in
-          if next >= depth then
-            (print "\n"; (numGateApps, nonZeros))
-          else
-            let
-              val (goal, numBranchingUntilGoal) = findNextGoal gates next
-
-              val rate = Real.max
-                (1.0, Real.fromInt nonZeroSize / Real.fromInt prevNonZeroSize)
-              val guess = Real.ceil (rate * Real.fromInt nonZeroSize)
-              val guess = Int.min (guess, maxNumStates)
-
-              val theseGates = Seq.subseq gates (next, goal - next)
-              val ({result, numGateApps = apps}, tm) = Util.getTime (fn () =>
+            val theseGates = Seq.subseq gates (next, goal - next)
+            val ({result, numNonZeros, numGateApps = apps}, tm) =
+              Util.getTime (fn () =>
                 Expander.expand
                   { gates = theseGates
                   , numQubits = numQubits
-                  , state = nonZeros
-                  , expected = guess
+                  , state = state
+                  , prevNonZeroSize = prevNonZeroSize
                   })
 
-              val expansionType =
-                case result of
-                  Expander.Sparse _ => "sparse"
-                | Expander.Dense _ => "dense "
+            val expansionType =
+              case result of
+                Expander.Sparse _ => "sparse"
+              | Expander.Dense _ => "dense "
 
-              val seconds = Time.toReal tm
-              val millions = Real.fromInt apps / 1e6
-              val throughput = millions / seconds
-              val throughputStr = Real.fmt (StringCvt.FIX (SOME 2)) throughput
-              val _ = print
-                (" " ^ expansionType ^ " "
-                 ^ Real.fmt (StringCvt.FIX (SOME 4)) seconds ^ "s throughput "
-                 ^ throughputStr ^ "\n")
-            in
-              loop (numGateApps + apps) goal nonZeroSize result
-            end
-        end
+            val seconds = Time.toReal tm
+            val millions = Real.fromInt apps / 1e6
+            val throughput = millions / seconds
+            val throughputStr = Real.fmt (StringCvt.FIX (SOME 2)) throughput
+            val _ = dumpDensity (next, numNonZeros, NONE, NONE)
+            val _ = print
+              (" " ^ expansionType ^ " "
+               ^ Real.fmt (StringCvt.FIX (SOME 4)) seconds ^ "s throughput "
+               ^ throughputStr ^ "\n")
+          in
+            loop (numGateApps + apps) goal numNonZeros result
+          end
+
 
       val initialState = Expander.Sparse
         (SST.singleton {numQubits = numQubits}
