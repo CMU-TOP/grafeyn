@@ -70,11 +70,42 @@ struct
       end
 
 
+  fun scheduleNextGates sched =
+    let
+      fun loop acc numBranchingSoFar =
+        if numBranchingSoFar >= maxBranchingStride then
+          acc
+        else
+          let
+            val nb = GateScheduler.visitMaximalNonBranchingRun sched
+          in
+            case GateScheduler.visitBranching sched of
+              NONE => nb :: acc
+            | SOME gidx =>
+                loop (Seq.singleton gidx :: nb :: acc) (numBranchingSoFar + 1)
+          end
+
+      val acc = loop [] 0
+    in
+      Seq.flatten (Seq.fromRevList acc)
+    end
+
+
   fun run {numQubits, gates} =
     let
       val gates = Seq.map G.fromGateDefn gates
       fun gate i = Seq.nth gates i
       val depth = Seq.length gates
+
+      val sched = GateScheduler.new
+        { numQubits = numQubits
+        , numGates = depth
+        , gateTouches = #touches o gate
+        , gateIsBranching = (fn i =>
+            case #action (gate i) of
+              G.NonBranching _ => false
+            | _ => true)
+        }
 
       val _ =
         if numQubits > 63 then raise Fail "whoops, too many qubits" else ()
@@ -114,8 +145,8 @@ struct
         end
 
 
-      fun loop numGateApps next prevNonZeroSize state =
-        if next >= depth then
+      fun loop numGateApps gatesVisitedSoFar prevNonZeroSize state =
+        if gatesVisitedSoFar >= depth then
           let
             val (nonZeros, numNonZeros) =
               case state of
@@ -126,17 +157,22 @@ struct
               | Expander.DenseKnownNonZeroSize (ds, nz) =>
                   (DS.unsafeViewContents ds, nz)
           in
-            dumpDensity (next, numNonZeros, NONE, NONE);
+            dumpDensity (gatesVisitedSoFar, numNonZeros, NONE, NONE);
             print "\n";
             (numGateApps, nonZeros)
           end
 
         else
           let
-            val (goal, numBranchingUntilGoal) = findNextGoal gates next
+            (* val (goal, numBranchingUntilGoal) = findNextGoal gates next *)
             (* val goal = next + 1 *)
+            (* val theseGates = Seq.subseq gates (next, goal - next) *)
 
-            val theseGates = Seq.subseq gates (next, goal - next)
+            val theseGates = scheduleNextGates sched
+            (* val _ = print
+              ("visiting: " ^ Seq.toString Int.toString theseGates ^ "\n") *)
+            val theseGates = Seq.map (Seq.nth gates) theseGates
+            val numGatesVisitedHere = Seq.length theseGates
             val ({result, method, numNonZeros, numGateApps = apps}, tm) =
               Util.getTime (fn () =>
                 Expander.expand
@@ -150,14 +186,15 @@ struct
             val millions = Real.fromInt apps / 1e6
             val throughput = millions / seconds
             val throughputStr = Real.fmt (StringCvt.FIX (SOME 2)) throughput
-            val _ = dumpDensity (next, numNonZeros, NONE, NONE)
+            val _ = dumpDensity (gatesVisitedSoFar, numNonZeros, NONE, NONE)
             val _ = print
-              (" hop " ^ leftPad 3 (Int.toString (goal - next)) ^ " "
+              (" hop " ^ leftPad 3 (Int.toString numGatesVisitedHere) ^ " "
                ^ rightPad 11 method ^ " "
                ^ Real.fmt (StringCvt.FIX (SOME 4)) seconds ^ "s throughput "
                ^ throughputStr ^ "\n")
           in
-            loop (numGateApps + apps) goal numNonZeros result
+            loop (numGateApps + apps) (gatesVisitedSoFar + numGatesVisitedHere)
+              numNonZeros result
           end
 
 

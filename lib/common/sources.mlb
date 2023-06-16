@@ -44,6 +44,8 @@ local
   DenseState.sml
   
   ExpandState.sml
+
+  GateScheduler.sml
 in
   structure HashTable
   structure ApplyUntilFailure
@@ -80,6 +82,8 @@ in
   functor DenseState
 
   functor ExpandState
+
+  structure GateScheduler
 
   functor RedBlackMapFn
 end

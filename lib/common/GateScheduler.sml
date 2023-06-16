@@ -16,6 +16,7 @@ sig
 
   val tryVisit: sched -> gate_idx -> bool
   val visitMaximalNonBranchingRun: sched -> gate_idx Seq.t
+  val visitBranching: sched -> gate_idx option
 end =
 struct
 
@@ -62,27 +63,34 @@ struct
    *)
   fun tryVisit (S {numQubits, numGates, gateTouches, gateIsBranching, frontier})
     gidx =
-    let
-      val touches = gateTouches gidx
-      val okayToVisit = Util.all (0, Seq.length touches) (fn i =>
-        Array.sub (frontier, Seq.nth touches i) = gidx)
-    in
-      if not okayToVisit then
-        false
-      else
-        ( Util.for (0, Seq.length touches) (fn i =>
-            let
-              val qi = Seq.nth touches i
-              val next =
-                nextTouch {numGates = numGates, gateTouches = gateTouches} qi
-                  (gidx + 1)
-            in
-              Array.update (frontier, qi, next)
-            end)
+    if gidx >= numGates then
+      false
+    else
+      let
+        (* val _ = print
+          ("GateScheduler.tryVisit " ^ Int.toString gidx ^ " numGates "
+           ^ Int.toString numGates ^ " frontier "
+           ^ Seq.toString Int.toString (ArraySlice.full frontier) ^ "\n") *)
+        val touches = gateTouches gidx
+        val okayToVisit = Util.all (0, Seq.length touches) (fn i =>
+          Array.sub (frontier, Seq.nth touches i) = gidx)
+      in
+        if not okayToVisit then
+          false
+        else
+          ( Util.for (0, Seq.length touches) (fn i =>
+              let
+                val qi = Seq.nth touches i
+                val next =
+                  nextTouch {numGates = numGates, gateTouches = gateTouches} qi
+                    (gidx + 1)
+              in
+                Array.update (frontier, qi, next)
+              end)
 
-        ; true
-        )
-    end
+          ; true
+          )
+      end
 
 
   fun visitMaximalNonBranchingRun
@@ -111,6 +119,27 @@ struct
         end
     in
       Seq.fromRevList (loop [])
+    end
+
+
+  fun visitBranching
+    (sched as S {numQubits, numGates, gateTouches, gateIsBranching, frontier}) =
+    let
+      val possibles =
+        Seq.filter (fn i => i < numGates andalso gateIsBranching i)
+          (ArraySlice.full frontier)
+    in
+      if Seq.length possibles = 0 then
+        NONE
+      else
+        let
+          val gidx = Seq.nth possibles 0
+        in
+          if tryVisit sched gidx then ()
+          else raise Fail "GateScheduler.visitBranching: error";
+
+          SOME gidx
+        end
     end
 
 end
