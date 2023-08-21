@@ -41,6 +41,7 @@ struct
       val impl = CLA.parseString "impl" "lockfree"
       val inputName = CLA.parseString "input" "random"
       val output = CLA.parseString "output" ""
+      val outputDensities = CLA.parseString "output-densities" ""
 
       val _ = print ("impl " ^ impl ^ "\n")
       val _ = print ("input " ^ inputName ^ "\n")
@@ -159,7 +160,8 @@ struct
              ^ Circuit.toString circuit
              ^ "=========================================================\n")
 
-      val result = Benchmark.run "full-sim-bfs" (fn _ => sim circuit)
+      val {result, densities} = Benchmark.run "full-sim-bfs" (fn _ =>
+        sim circuit)
 
       val _ =
         if output = "" then
@@ -183,6 +185,24 @@ struct
                   end);
             TextIO.closeOut outstream;
             print ("output written to " ^ output ^ "\n")
+          end
+
+      val _ =
+        if outputDensities = "" then
+          print ("use -output-densities FILE to see densities\n")
+        else
+          let
+            val outstream = TextIO.openOut outputDensities
+          in
+            Util.for (0, Seq.length densities) (fn i =>
+              let
+                val dstr = Real.fmt (StringCvt.FIX (SOME 8))
+                  (Seq.nth densities i)
+              in
+                TextIO.output (outstream, dstr ^ "\n")
+              end);
+            TextIO.closeOut outstream;
+            print ("output densities written to " ^ outputDensities ^ "\n")
           end
     in
       ()

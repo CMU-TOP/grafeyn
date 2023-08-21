@@ -1,4 +1,4 @@
-functor GateSchedulerEagerNonBranching
+functor GateSchedulerGreedyNonBranching
   (val maxBranchingStride: int val disableFusion: bool):
 sig
   type sched
@@ -145,8 +145,10 @@ struct
         let
           val gidx = Seq.nth possibles 0
         in
-          if tryVisit sched gidx then ()
-          else raise Fail "GateScheduler.visitBranching: error";
+          if tryVisit sched gidx then
+            ()
+          else
+            raise Fail "GateSchedulerGreedyNonBranching.visitBranching: error";
 
           SOME gidx
         end
@@ -174,8 +176,11 @@ struct
           (* print
             ("visitNonBranching trying to visit " ^ Int.toString gidx ^ "\n"); *)
 
-          if tryVisit sched gidx then ()
-          else raise Fail "GateScheduler.visitNonBranching: error";
+          if tryVisit sched gidx then
+            ()
+          else
+            raise Fail
+              "GateSchedulerGreedyNonBranching.visitNonBranching: error";
 
           SOME gidx
         end

@@ -1,41 +1,80 @@
 structure CLA = CommandLineArgs
 
+(* 32-bit or 64-bit precision for floating point arithmetic *)
 val precision = CLA.parseInt "precision" 32
+val _ = print ("precision " ^ Int.toString precision ^ "\n")
+
+(* some parameters for the expand subroutine *)
 val blockSize = CLA.parseInt "expand-block-size" 10000
 val maxload = CLA.parseReal "expand-max-load" 0.9
-val maxBranchingStride = CLA.parseInt "max-branching-stride" 2
-val disableFusion = CLA.parseFlag "disable-fusion"
-val naiveSchedule = CLA.parseFlag "naive-schedule"
-val doMeasureZeros = CLA.parseFlag "measure-zeros"
 val denseThreshold = CLA.parseReal "dense-thresh" 0.25
 val pullThreshold = CLA.parseReal "pull-thresh" 0.8
-
-val _ = print ("precision " ^ Int.toString precision ^ "\n")
 val _ = print ("expand-block-size " ^ Int.toString blockSize ^ "\n")
 val _ = print ("expand-max-load " ^ Real.toString maxload ^ "\n")
-val _ = print ("max-branching-stride " ^ Int.toString maxBranchingStride ^ "\n")
-val _ = print
-  ("measure-zeros? " ^ (if doMeasureZeros then "yes" else "no") ^ "\n")
-val _ = print
-  ("disable-fusion? " ^ (if disableFusion then "yes" else "no") ^ "\n")
-val _ = print
-  ("naive-schedule? " ^ (if naiveSchedule then "yes" else "no") ^ "\n")
 val _ = print ("dense-thresh " ^ Real.toString denseThreshold ^ "\n")
 val _ = print ("pull-thresh " ^ Real.toString pullThreshold ^ "\n")
+
+(* should the simulator print out info about how many zeros were eliminated
+ * on each frontier? (default: no)
+ *)
+val doMeasureZeros = CLA.parseFlag "measure-zeros"
+val _ = print
+  ("measure-zeros? " ^ (if doMeasureZeros then "yes" else "no") ^ "\n")
+
+(* gate scheduler name *)
+val schedulerName = CLA.parseString "scheduler" "greedy-nonbranching"
+val _ = print ("scheduler " ^ schedulerName ^ "\n")
 
 
 (* ========================================================================
  * gate scheduling
  *)
 
-structure GSN = GateSchedulerNaive
 
-structure GSENB =
-  GateSchedulerEagerNonBranching
-    (val maxBranchingStride = maxBranchingStride
-     val disableFusion = disableFusion)
+local
+  val gnbDisableFusion = CLA.parseFlag "scheduler-gnb-disable-fusion"
+  val gnbMaxBranchingStride =
+    CLA.parseInt "scheduler-gnb-max-branching-stride" 2
+in
+  structure GNB =
+    GateSchedulerGreedyNonBranching
+      (val maxBranchingStride = gnbMaxBranchingStride
+       val disableFusion = gnbDisableFusion)
 
-val gateScheduler = if naiveSchedule then GSN.scheduler else GSENB.scheduler
+  fun print_gnb_info () =
+    let
+      val _ = print
+        ("-------------------------------------\n\
+         \--- scheduler-specific args\n\
+         \-------------------------------------\n")
+      val _ = print
+        ("scheduler-gnb-max-branching-stride "
+         ^ Int.toString gnbMaxBranchingStride ^ "\n")
+      val _ = print
+        ("scheduler-gnb-disable-fusion? "
+         ^ (if gnbDisableFusion then "yes" else "no") ^ "\n")
+      val _ = print ("-------------------------------------\n")
+    in
+      ()
+    end
+end
+
+
+val gateScheduler =
+  case schedulerName of
+    "naive" => GateSchedulerNaive.scheduler
+
+  | "greedy-branching" => GateSchedulerGreedyBranching.scheduler
+  | "gb" => GateSchedulerGreedyBranching.scheduler
+
+  | "greedy-nonbranching" => (print_gnb_info (); GNB.scheduler)
+  | "gnb" => (print_gnb_info (); GNB.scheduler)
+
+  | _ =>
+      Util.die
+        ("unknown scheduler: " ^ schedulerName
+         ^
+         "; valid options are: naive, greedy-branching (gb), greedy-nonbranching (gnb)")
 
 (* ========================================================================
  * mains: 32-bit and 64-bit

@@ -11,7 +11,9 @@ functor FullSimBFS
    val denseThreshold: real
    val pullThreshold: real):
 sig
-  val run: Circuit.t -> (BasisIdx.t * C.t) option DelayedSeq.t
+  val run:
+    Circuit.t
+    -> {result: (BasisIdx.t * C.t) option DelayedSeq.t, densities: real Seq.t}
 end =
 struct
 
@@ -103,11 +105,12 @@ struct
           print
             (fillBar 12 density ^ " " ^ "gate " ^ padGate i ^ " density "
              ^ densityStr ^ " nonzero " ^ padCount nonZeroSize ^ zStr ^ slackStr);
-          TextIO.flushOut TextIO.stdOut
+          TextIO.flushOut TextIO.stdOut;
+          density
         end
 
 
-      fun loop numGateApps gatesVisitedSoFar prevNonZeroSize state =
+      fun loop numGateApps gatesVisitedSoFar densities prevNonZeroSize state =
         if gatesVisitedSoFar >= depth then
           let
             val (nonZeros, numNonZeros) =
@@ -118,10 +121,12 @@ struct
                   (DS.unsafeViewContents ds, DS.nonZeroSize ds)
               | Expander.DenseKnownNonZeroSize (ds, nz) =>
                   (DS.unsafeViewContents ds, nz)
+
+            val density =
+              dumpDensity (gatesVisitedSoFar, numNonZeros, NONE, NONE)
           in
-            dumpDensity (gatesVisitedSoFar, numNonZeros, NONE, NONE);
             print "\n";
-            (numGateApps, nonZeros)
+            (numGateApps, nonZeros, Seq.fromRevList (density :: densities))
           end
 
         else
@@ -131,8 +136,10 @@ struct
             (* val theseGates = Seq.subseq gates (next, goal - next) *)
 
             val theseGates = gateSchedulerPickNextGates ()
+
             (* val _ = print
               ("visiting: " ^ Seq.toString Int.toString theseGates ^ "\n") *)
+
             val theseGates = Seq.map (Seq.nth gates) theseGates
             val numGatesVisitedHere = Seq.length theseGates
             val ({result, method, numNonZeros, numGateApps = apps}, tm) =
@@ -148,7 +155,8 @@ struct
             val millions = Real.fromInt apps / 1e6
             val throughput = millions / seconds
             val throughputStr = Real.fmt (StringCvt.FIX (SOME 2)) throughput
-            val _ = dumpDensity (gatesVisitedSoFar, numNonZeros, NONE, NONE)
+            val density =
+              dumpDensity (gatesVisitedSoFar, numNonZeros, NONE, NONE)
             val _ = print
               (" hop " ^ leftPad 3 (Int.toString numGatesVisitedHere) ^ " "
                ^ rightPad 11 method ^ " "
@@ -156,7 +164,7 @@ struct
                ^ throughputStr ^ "\n")
           in
             loop (numGateApps + apps) (gatesVisitedSoFar + numGatesVisitedHere)
-              numNonZeros result
+              (density :: densities) numNonZeros result
           end
 
 
@@ -164,9 +172,9 @@ struct
         (SST.singleton {numQubits = numQubits}
            (BasisIdx.zeros, C.defaultReal 1.0))
 
-      val (numGateApps, finalState) = loop 0 0 1 initialState
+      val (numGateApps, finalState, densities) = loop 0 0 [] 1 initialState
       val _ = print ("gate app count " ^ Int.toString numGateApps ^ "\n")
     in
-      finalState
+      {result = finalState, densities = densities}
     end
 end
