@@ -2,7 +2,7 @@ functor MkMain
   (structure C: COMPLEX
    val blockSize: int
    val maxload: real
-   val maxBranchingStride: int
+   val gateScheduler: GateScheduler.t
    val doMeasureZeros: bool
    val denseThreshold: real
    val pullThreshold: real) =
@@ -10,29 +10,28 @@ struct
 
   structure CLA = CommandLineArgs
 
-  structure GS =
-    GateSchedulerFuseNonBranching(val maxBranchingStride = maxBranchingStride)
-
   structure G = Gate(C)
+
   structure BFSLocked =
     FullSimBFS
       (structure C = C
        structure SST = SparseStateTableLockedSlots(C)
        structure G = G
-       structure GateScheduler = GS
        val blockSize = blockSize
        val maxload = maxload
+       val gateScheduler = gateScheduler
        val doMeasureZeros = doMeasureZeros
        val denseThreshold = denseThreshold
        val pullThreshold = pullThreshold)
+
   structure BFSLockfree =
     FullSimBFS
       (structure C = C
        structure SST = SparseStateTable(C)
        structure G = G
-       structure GateScheduler = GS
        val blockSize = blockSize
        val maxload = maxload
+       val gateScheduler = gateScheduler
        val doMeasureZeros = doMeasureZeros
        val denseThreshold = denseThreshold
        val pullThreshold = pullThreshold)

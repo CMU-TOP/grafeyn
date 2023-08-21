@@ -2,11 +2,11 @@ functor FullSimBFS
   (structure C: COMPLEX
    structure SST: SPARSE_STATE_TABLE
    structure G: GATE
-   structure GateScheduler: GATE_SCHEDULER
    sharing C = SST.C = G.C
 
    val blockSize: int
    val maxload: real
+   val gateScheduler: GateScheduler.t
    val doMeasureZeros: bool
    val denseThreshold: real
    val pullThreshold: real):
@@ -59,7 +59,7 @@ struct
       fun gate i = Seq.nth gates i
       val depth = Seq.length gates
 
-      val sched = GateScheduler.new
+      val gateSchedulerPickNextGates = gateScheduler
         { numQubits = numQubits
         , numGates = depth
         , gateTouches = #touches o gate
@@ -130,7 +130,7 @@ struct
             (* val goal = next + 1 *)
             (* val theseGates = Seq.subseq gates (next, goal - next) *)
 
-            val theseGates = GateScheduler.pickNext sched
+            val theseGates = gateSchedulerPickNextGates ()
             (* val _ = print
               ("visiting: " ^ Seq.toString Int.toString theseGates ^ "\n") *)
             val theseGates = Seq.map (Seq.nth gates) theseGates
