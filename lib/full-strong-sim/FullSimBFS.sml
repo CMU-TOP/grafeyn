@@ -2,11 +2,11 @@ functor FullSimBFS
   (structure C: COMPLEX
    structure SST: SPARSE_STATE_TABLE
    structure G: GATE
+   structure GateScheduler: GATE_SCHEDULER
    sharing C = SST.C = G.C
 
    val blockSize: int
    val maxload: real
-   val maxBranchingStride: int
    val doMeasureZeros: bool
    val denseThreshold: real
    val pullThreshold: real):
@@ -51,44 +51,6 @@ struct
 
   fun rightPad width x =
     x ^ CharVector.tabulate (Int.max (0, width - String.size x), fn _ => #" ")
-
-  fun findNextGoal gates gatenum =
-    if maxBranchingStride = ~1 then
-      (gatenum + 1, if G.expectBranching (Seq.nth gates gatenum) then 1 else 0)
-    else
-      let
-        fun loop (i, branching) =
-          if i >= Seq.length gates then
-            (i, branching)
-          else if G.expectBranching (Seq.nth gates i) then
-            if branching >= maxBranchingStride then (i, branching)
-            else loop (i + 1, branching + 1)
-          else
-            loop (i + 1, branching)
-      in
-        loop (gatenum, 0)
-      end
-
-
-  fun scheduleNextGates sched =
-    let
-      fun loop acc numBranchingSoFar =
-        if numBranchingSoFar >= maxBranchingStride then
-          acc
-        else
-          let
-            val nb = GateScheduler.visitMaximalNonBranchingRun sched
-          in
-            case GateScheduler.visitBranching sched of
-              NONE => nb :: acc
-            | SOME gidx =>
-                loop (Seq.singleton gidx :: nb :: acc) (numBranchingSoFar + 1)
-          end
-
-      val acc = loop [] 0
-    in
-      Seq.flatten (Seq.fromRevList acc)
-    end
 
 
   fun run {numQubits, gates} =
@@ -168,7 +130,7 @@ struct
             (* val goal = next + 1 *)
             (* val theseGates = Seq.subseq gates (next, goal - next) *)
 
-            val theseGates = scheduleNextGates sched
+            val theseGates = GateScheduler.pickNext sched
             (* val _ = print
               ("visiting: " ^ Seq.toString Int.toString theseGates ^ "\n") *)
             val theseGates = Seq.map (Seq.nth gates) theseGates

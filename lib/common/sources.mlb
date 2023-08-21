@@ -45,7 +45,8 @@ local
   
   ExpandState.sml
 
-  GateScheduler.sml
+  GATE_SCHEDULER.sml
+  GateSchedulerFuseNonBranching.sml
 in
   structure HashTable
   structure ApplyUntilFailure
@@ -83,7 +84,8 @@ in
 
   functor ExpandState
 
-  structure GateScheduler
+  signature GATE_SCHEDULER
+  functor GateSchedulerFuseNonBranching
 
   functor RedBlackMapFn
 end

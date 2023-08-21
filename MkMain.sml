@@ -10,15 +10,18 @@ struct
 
   structure CLA = CommandLineArgs
 
+  structure GS =
+    GateSchedulerFuseNonBranching(val maxBranchingStride = maxBranchingStride)
+
   structure G = Gate(C)
   structure BFSLocked =
     FullSimBFS
       (structure C = C
        structure SST = SparseStateTableLockedSlots(C)
        structure G = G
+       structure GateScheduler = GS
        val blockSize = blockSize
        val maxload = maxload
-       val maxBranchingStride = maxBranchingStride
        val doMeasureZeros = doMeasureZeros
        val denseThreshold = denseThreshold
        val pullThreshold = pullThreshold)
@@ -27,9 +30,9 @@ struct
       (structure C = C
        structure SST = SparseStateTable(C)
        structure G = G
+       structure GateScheduler = GS
        val blockSize = blockSize
        val maxload = maxload
-       val maxBranchingStride = maxBranchingStride
        val doMeasureZeros = doMeasureZeros
        val denseThreshold = denseThreshold
        val pullThreshold = pullThreshold)

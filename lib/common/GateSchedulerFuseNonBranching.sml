@@ -1,4 +1,4 @@
-structure GateScheduler:
+functor GateSchedulerFuseNonBranching (val maxBranchingStride: int):
 sig
   type sched
   type t = sched
@@ -17,6 +17,8 @@ sig
   val tryVisit: sched -> gate_idx -> bool
   val visitMaximalNonBranchingRun: sched -> gate_idx Seq.t
   val visitBranching: sched -> gate_idx option
+
+  val pickNext: sched -> gate_idx Seq.t
 end =
 struct
 
@@ -140,6 +142,27 @@ struct
 
           SOME gidx
         end
+    end
+
+
+  fun pickNext sched =
+    let
+      fun loop acc numBranchingSoFar =
+        if numBranchingSoFar >= maxBranchingStride then
+          acc
+        else
+          let
+            val nb = visitMaximalNonBranchingRun sched
+          in
+            case visitBranching sched of
+              NONE => nb :: acc
+            | SOME gidx =>
+                loop (Seq.singleton gidx :: nb :: acc) (numBranchingSoFar + 1)
+          end
+
+      val acc = loop [] 0
+    in
+      Seq.flatten (Seq.fromRevList acc)
     end
 
 end
