@@ -70,11 +70,14 @@ val gateScheduler =
   | "greedy-nonbranching" => (print_gnb_info (); GNB.scheduler)
   | "gnb" => (print_gnb_info (); GNB.scheduler)
 
+  | "greedy-finish-qubit" => GateSchedulerGreedyFinishQubit.scheduler
+  | "gfq" => GateSchedulerGreedyFinishQubit.scheduler
+
   | _ =>
       Util.die
         ("unknown scheduler: " ^ schedulerName
          ^
-         "; valid options are: naive, greedy-branching (gb), greedy-nonbranching (gnb)")
+         "; valid options are: naive, greedy-branching (gb), greedy-nonbranching (gnb), greedy-finish-qubit (gfq)")
 
 (* ========================================================================
  * mains: 32-bit and 64-bit
