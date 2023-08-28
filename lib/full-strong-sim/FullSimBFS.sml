@@ -55,6 +55,26 @@ struct
     x ^ CharVector.tabulate (Int.max (0, width - String.size x), fn _ => #" ")
 
 
+  fun dumpState numQubits s =
+    let
+      val ss =
+        case s of
+          Expander.Sparse sst => SST.unsafeViewContents sst
+        | Expander.Dense ds => DS.unsafeViewContents ds
+        | Expander.DenseKnownNonZeroSize (ds, _) => DS.unsafeViewContents ds
+    in
+      Util.for (0, DelayedSeq.length ss) (fn i =>
+        case DelayedSeq.nth ss i of
+          NONE => ()
+        | SOME (bidx, weight) =>
+            let in
+              print
+                (BasisIdx.toString {numQubits = numQubits} bidx ^ " "
+                 ^ C.toString weight ^ "\n")
+            end)
+    end
+
+
   fun run {numQubits, gates} =
     let
       val gates = Seq.map G.fromGateDefn gates
@@ -122,6 +142,8 @@ struct
               | Expander.DenseKnownNonZeroSize (ds, nz) =>
                   (DS.unsafeViewContents ds, nz)
 
+            (* val _ = dumpState numQubits state *)
+
             val density =
               dumpDensity (gatesVisitedSoFar, numNonZeros, NONE, NONE)
           in
@@ -131,9 +153,7 @@ struct
 
         else
           let
-            (* val (goal, numBranchingUntilGoal) = findNextGoal gates next *)
-            (* val goal = next + 1 *)
-            (* val theseGates = Seq.subseq gates (next, goal - next) *)
+            (* val _ = dumpState numQubits state *)
 
             val theseGates = gateSchedulerPickNextGates ()
 
