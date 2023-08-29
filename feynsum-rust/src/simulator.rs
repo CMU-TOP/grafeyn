@@ -1,3 +1,3 @@
-fn run(_: ()) -> () {
+pub fn run(_: ()) -> () {
     unimplemented!()
 }
