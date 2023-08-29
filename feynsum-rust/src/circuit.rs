@@ -10,7 +10,7 @@ pub struct Circuit {
 }
 
 impl Circuit {
-    pub fn new(program: &Program) -> Self {
+    pub fn new(program: &Program) -> Result<Self, ()> {
         unimplemented!()
     }
 }
