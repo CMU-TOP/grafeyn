@@ -56,6 +56,8 @@ impl Circuit {
                         ("t", 0, 1) => GateDefn::T(args[0]),
                         ("x", 0, 1) => GateDefn::X(args[0]),
                         ("sx", 0, 1) => GateDefn::SqrtX(args[0]),
+                        ("sy", 0, 1) => GateDefn::SqrtY(args[0]),
+                        ("sw", 0, 1) => GateDefn::SqrtW(args[0]),
                         ("cx", 0, 2) => GateDefn::CX {
                             control: args[0],
                             target: args[1],
@@ -74,6 +76,7 @@ impl Circuit {
                             target: args[1],
                             rot: params[0],
                         },
+                        ("fsim", 0, 0) => unimplemented!(),
                         ("ry", 1, 1) => GateDefn::RY {
                             rot: params[0],
                             target: args[0],
