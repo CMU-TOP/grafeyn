@@ -1,11 +1,21 @@
 mod gate;
 
-use core::panic;
+use log::error;
 use std::collections::HashMap;
 
 use crate::parser::{Argument, Expression, OpCode, QasmStatement};
 use crate::types::{QubitIndex, Real};
 pub use gate::{Gate, GateDefn};
+
+#[derive(Debug)]
+pub enum CircuitBuildError {
+    IndexOutOfBounds,
+    UnknownQReg,
+    UnsupportedExpression,
+    UnsupportedGateArg,
+    UnsupportedIdentifier,
+    UnsupportedOpcode,
+}
 
 #[derive(Debug)]
 pub struct Circuit {
@@ -14,7 +24,7 @@ pub struct Circuit {
 }
 
 impl Circuit {
-    pub fn new(statements: Vec<QasmStatement>) -> Result<Self, ()> {
+    pub fn new(statements: Vec<QasmStatement>) -> Result<Self, CircuitBuildError> {
         let mut num_qubits_so_far: usize = 0;
         let mut qregs = HashMap::<String, (QubitIndex, QubitIndex)>::new();
         let mut gates = Vec::<GateDefn>::new();
@@ -29,26 +39,44 @@ impl Circuit {
                     let param_arity = params.len();
                     let arg_arity = args.len();
 
-                    let get_index = |arg: Argument| -> QubitIndex {
+                    let get_index = |arg: Argument| -> Result<QubitIndex, CircuitBuildError> {
                         match arg {
-                            Argument::Id(_) => panic!("unsupported gate arg: missing qubit index"),
+                            Argument::Id(id) => {
+                                error!("unsupported gate arg: identifier {}", id);
+                                Err(CircuitBuildError::UnsupportedIdentifier)
+                            }
                             Argument::Item(name, index) => {
-                                let (start, stop) = qregs
-                                    .get(&name)
-                                    .expect(format!("unknown qreg {}", name.as_str()).as_str());
-                                if index >= (stop - start) {
-                                    // NOTE: index is always nonzero as it is of type usize
-                                    panic!() // TODO: Error handling
-                                } else {
-                                    start + index
+                                match qregs.get(&name) {
+                                    Some((start, stop)) => {
+                                        if index >= (stop - start) {
+                                            // NOTE: index is always nonzero as it is of type usize
+                                            error!("index out of bounds: {}", index);
+                                            Err(CircuitBuildError::IndexOutOfBounds)
+                                        } else {
+                                            Ok(start + index)
+                                        }
+                                    }
+                                    None => {
+                                        error!("unknown qreg: {}", name);
+                                        Err(CircuitBuildError::UnknownQReg)
+                                    }
                                 }
                             }
-                            _ => panic!("unsupported gate arg"),
+                            arg => {
+                                error!("unsupported gate arg: {:?}", arg);
+                                Err(CircuitBuildError::UnsupportedGateArg)
+                            }
                         }
                     };
 
-                    let args: Vec<QubitIndex> = args.into_iter().map(get_index).collect();
-                    let params: Vec<Real> = params.into_iter().map(eval).collect();
+                    let args: Vec<QubitIndex> = args
+                        .into_iter()
+                        .map(get_index)
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let params: Vec<Real> = params
+                        .into_iter()
+                        .map(eval)
+                        .collect::<Result<Vec<_>, _>>()?;
 
                     let gate = match (name.as_str(), param_arity, arg_arity) {
                         ("h", 0, 1) => GateDefn::Hadamard(args[0]),
@@ -129,25 +157,25 @@ impl Circuit {
     }
 }
 
-fn eval(exp: Expression) -> Real {
+fn eval(exp: Expression) -> Result<Real, CircuitBuildError> {
     match exp {
-        Expression::Pi => std::f64::consts::PI,
-        Expression::Real(x) => x,
-        Expression::Int(x) => x as f64,
+        Expression::Pi => Ok(std::f64::consts::PI),
+        Expression::Real(x) => Ok(x),
+        Expression::Int(x) => Ok(x as f64),
         Expression::Op(opcode, e1, e2) => {
-            let v1 = eval(*e1);
-            let v2 = eval(*e2);
+            let v1 = eval(*e1)?;
+            let v2 = eval(*e2)?;
             match opcode {
-                OpCode::Add => v1 + v2,
-                OpCode::Sub => v1 - v2,
-                OpCode::Mul => v1 * v2,
-                OpCode::Div => v1 / v2,
-                OpCode::Pow => v1.powf(v2),
-                _ => panic!("unsupported opcode"),
+                OpCode::Add => Ok(v1 + v2),
+                OpCode::Sub => Ok(v1 - v2),
+                OpCode::Mul => Ok(v1 * v2),
+                OpCode::Div => Ok(v1 / v2),
+                OpCode::Pow => Ok(v1.powf(v2)),
+                _ => Err(CircuitBuildError::UnsupportedOpcode),
             }
         }
-        Expression::Id(_) => panic!("unsupported identifier"),
-        _ => panic!("unsupported expression"),
+        Expression::Id(_) => Err(CircuitBuildError::UnsupportedIdentifier),
+        _ => Err(CircuitBuildError::UnsupportedExpression),
     }
 }
 

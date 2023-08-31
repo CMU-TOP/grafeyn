@@ -17,11 +17,17 @@ fn main() -> io::Result<()> {
     let options = Options::from_args();
     let source = fs::read_to_string(&options.input)?;
 
-    let Ok(program) = parser::parse_program(&source) else {
-        panic!("Failed to parse program")
+    let program = match parser::parse_program(&source) {
+        Ok(program) => program,
+        Err(err) => {
+            panic!("Failed to parse program: {:?}", err);
+        }
     };
-    let Ok(circuit) = Circuit::new(program) else {
-        panic!("Failed to construct circuit")
+    let circuit = match Circuit::new(program) {
+        Ok(circuit) => circuit,
+        Err(err) => {
+            panic!("Failed to construct circuit: {:?}", err);
+        }
     };
 
     let _result = simulator::simulate(&circuit);
