@@ -20,7 +20,7 @@ fn main() -> io::Result<()> {
     let Ok(program) = parser::parse_program(&source) else {
         panic!("Failed to parse program")
     };
-    let Ok(circuit) = Circuit::new(&program) else {
+    let Ok(circuit) = Circuit::new(program) else {
         panic!("Failed to construct circuit")
     };
 
