@@ -7,6 +7,7 @@ use crate::parser::{Argument, Expression, OpCode, QasmStatement};
 use crate::types::{QubitIndex, Real};
 pub use gate::{Gate, GateDefn};
 
+#[derive(Debug)]
 pub struct Circuit {
     pub num_qubits: usize,
     pub gates: Vec<GateDefn>,
@@ -142,5 +143,42 @@ fn eval(exp: Expression) -> Real {
         }
         Expression::Id(_) => panic!("unsupported identifier"),
         _ => panic!("unsupported expression"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser;
+
+    #[test]
+    fn test_circuit_from_source() {
+        let source = r#"
+        OPENQASM 2.0;
+        include "qelib1.inc";
+        qreg q[4];
+        creg c[4];
+        x q[3];
+        h q[0];
+        h q[1];
+        h q[2];
+        h q[3];
+        cx q[0],q[3];
+        cx q[1],q[3];
+        cx q[2],q[3];
+        h q[0];
+        h q[1];
+        h q[2];
+        h q[3];
+        measure q[0] -> c[0];
+        measure q[1] -> c[1];
+        measure q[2] -> c[2];
+        measure q[3] -> c[3];
+        "#;
+
+        let program = parser::parse_program(&source).unwrap();
+
+        let circuit = Circuit::new(program).unwrap();
+        println!("{:?}", circuit);
     }
 }

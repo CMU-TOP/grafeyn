@@ -1,5 +1,6 @@
 use crate::types::{QubitIndex, Real};
 
+#[derive(Debug)]
 pub enum GateDefn {
     PauliY(QubitIndex),
     PauliZ(QubitIndex),
