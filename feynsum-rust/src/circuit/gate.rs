@@ -1,30 +1,14 @@
 use crate::types::{QubitIndex, Real};
 
-enum GateDefn {
-    PauliY {
-        qubit_idx: QubitIndex,
-    },
-    PauliZ {
-        qubit_idx: QubitIndex,
-    },
-    Hadamard {
-        qubit_idx: QubitIndex,
-    },
-    T {
-        qubit_idx: QubitIndex,
-    },
-    SqrtY {
-        qubit_idx: QubitIndex,
-    },
-    SqrtX {
-        qubit_idx: QubitIndex,
-    },
-    SqrtW {
-        qubit_idx: QubitIndex,
-    },
-    X {
-        qubit_idx: QubitIndex,
-    },
+pub enum GateDefn {
+    PauliY(QubitIndex),
+    PauliZ(QubitIndex),
+    Hadamard(QubitIndex),
+    T(QubitIndex),
+    SqrtX(QubitIndex),
+    SqrtY(QubitIndex),
+    SqrtW(QubitIndex),
+    X(QubitIndex),
     CX {
         control: QubitIndex,
         target: QubitIndex,
@@ -34,7 +18,7 @@ enum GateDefn {
         target: QubitIndex,
     },
     CCX {
-        control: QubitIndex,
+        control1: QubitIndex,
         control2: QubitIndex,
         target: QubitIndex,
     },
@@ -75,7 +59,11 @@ enum GateDefn {
     },
 }
 
-pub struct Gate {}
+pub struct Gate {
+    pub name: String,
+    pub params: Vec<String>,
+    pub args: Vec<QubitIndex>,
+}
 
 impl Gate {
     pub fn apply(&self, basis: ()) {
