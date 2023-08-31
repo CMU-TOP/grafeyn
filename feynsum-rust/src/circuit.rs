@@ -77,7 +77,12 @@ impl Circuit {
                             target: args[1],
                             rot: params[0],
                         },
-                        ("fsim", 0, 0) => unimplemented!(),
+                        ("fsim", 2, 2) => GateDefn::FSim {
+                            left: args[0],
+                            right: args[1],
+                            theta: params[0],
+                            phi: params[1],
+                        },
                         ("ry", 1, 1) => GateDefn::RY {
                             rot: params[0],
                             target: args[0],
@@ -109,7 +114,7 @@ impl Circuit {
                             phi: 0.0,
                             lambda: params[0],
                         },
-                        _ => panic!("Unexpected gate"),
+                        _ => GateDefn::Other { name, params, args },
                     };
 
                     gates.push(gate);

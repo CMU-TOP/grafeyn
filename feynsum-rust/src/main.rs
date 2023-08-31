@@ -24,7 +24,7 @@ fn main() -> io::Result<()> {
         panic!("Failed to construct circuit")
     };
 
-    let result = simulator::simulate(&circuit);
+    let _result = simulator::simulate(&circuit);
 
     Ok(())
 }

@@ -67,7 +67,7 @@ pub struct Gate {
 }
 
 impl Gate {
-    pub fn apply(&self, basis: ()) {
+    pub fn _apply(&self, _basis: ()) {
         unimplemented!()
     }
 }
