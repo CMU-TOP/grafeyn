@@ -32,8 +32,8 @@ impl Circuit {
         for statement in statements {
             match statement {
                 QasmStatement::QReg { name, size } => {
-                    num_qubits_so_far += size;
                     qregs.insert(name, (num_qubits_so_far, num_qubits_so_far + size));
+                    num_qubits_so_far += size;
                 }
                 QasmStatement::GateCall { name, params, args } => {
                     let param_arity = params.len();
