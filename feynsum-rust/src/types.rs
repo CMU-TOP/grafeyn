@@ -1,2 +1,2 @@
-pub type QubitIndex = u32;
+pub type QubitIndex = usize;
 pub type Real = f64;
