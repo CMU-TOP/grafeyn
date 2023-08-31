@@ -213,5 +213,6 @@ mod tests {
 
         let circuit = Circuit::new(program).unwrap();
         println!("{:?}", circuit);
+        // TODO: Write tests
     }
 }
