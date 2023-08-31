@@ -1,4 +1,4 @@
-pub use qasmsim::grammar::ast::{Argument, Expression};
+pub use qasmsim::grammar::ast::{Argument, Expression, OpCode};
 use qasmsim::{
     self,
     grammar::ast::{QuantumOperation, Statement as OpenQasmStatement, UnitaryOperation},

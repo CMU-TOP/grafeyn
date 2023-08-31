@@ -1,8 +1,9 @@
 mod gate;
 
+use core::panic;
 use std::collections::HashMap;
 
-use crate::parser::{Argument, Expression, QasmStatement};
+use crate::parser::{Argument, Expression, OpCode, QasmStatement};
 use crate::types::{QubitIndex, Real};
 pub use gate::{Gate, GateDefn};
 
@@ -120,5 +121,23 @@ impl Circuit {
 }
 
 fn eval(exp: Expression) -> Real {
-    unimplemented!()
+    match exp {
+        Expression::Pi => std::f64::consts::PI,
+        Expression::Real(x) => x,
+        Expression::Int(x) => x as f64,
+        Expression::Op(opcode, e1, e2) => {
+            let v1 = eval(*e1);
+            let v2 = eval(*e2);
+            match opcode {
+                OpCode::Add => v1 + v2,
+                OpCode::Sub => v1 - v2,
+                OpCode::Mul => v1 * v2,
+                OpCode::Div => v1 / v2,
+                OpCode::Pow => v1.powf(v2),
+                _ => panic!("unsupported opcode"),
+            }
+        }
+        Expression::Id(_) => panic!("unsupported identifier"),
+        _ => panic!("unsupported expression"),
+    }
 }
