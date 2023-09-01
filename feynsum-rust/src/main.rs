@@ -4,6 +4,7 @@ mod options;
 mod parser;
 mod simulator;
 mod state_expander;
+mod table;
 mod types;
 
 use std::fs;
@@ -33,7 +34,7 @@ fn main() -> io::Result<()> {
         }
     };
 
-    let _result = simulator::run(&config, circuit);
+    let _result = simulator::bfs_simulator::run(&config, circuit);
 
     Ok(())
 }
