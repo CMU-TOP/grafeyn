@@ -155,6 +155,10 @@ impl Circuit {
             gates,
         })
     }
+
+    pub fn depth(&self) -> usize {
+        self.gates.len()
+    }
 }
 
 fn eval(exp: Expression) -> Result<Real, CircuitBuildError> {

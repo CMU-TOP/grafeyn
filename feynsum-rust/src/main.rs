@@ -1,9 +1,9 @@
 mod circuit;
 mod config;
-mod expand_state;
 mod options;
 mod parser;
 mod simulator;
+mod state_expander;
 mod types;
 
 use std::fs;
@@ -11,11 +11,14 @@ use std::io;
 use structopt::StructOpt;
 
 use circuit::Circuit;
+use config::Config;
 use options::Options;
 
 fn main() -> io::Result<()> {
     let options = Options::from_args();
     let source = fs::read_to_string(&options.input)?;
+
+    let config = Config::new();
 
     let program = match parser::parse_program(&source) {
         Ok(program) => program,
@@ -30,7 +33,7 @@ fn main() -> io::Result<()> {
         }
     };
 
-    let _result = simulator::simulate(&circuit);
+    let _result = simulator::run(&config, circuit);
 
     Ok(())
 }
