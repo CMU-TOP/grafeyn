@@ -28,3 +28,6 @@ impl SparseStateTable {
         self.table.insert(bidx, weight);
     }
 }
+
+#[derive(Debug)]
+pub struct DenseStateTable {}

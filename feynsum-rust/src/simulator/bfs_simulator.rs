@@ -2,11 +2,12 @@ use log::{error, info};
 
 use crate::circuit::Circuit;
 use crate::config::Config;
-use crate::state_expander::{self, ExpandResult, State};
-use crate::table::SparseStateTable;
 use crate::types::basis_idx::MAX_QUBITS;
 use crate::types::{BasisIdx, Complex};
 
+use super::state::State;
+use super::state_expander::{self, ExpandResult};
+use super::table::SparseStateTable;
 use super::SimulatorError;
 
 pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {

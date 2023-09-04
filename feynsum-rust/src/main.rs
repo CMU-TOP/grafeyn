@@ -3,8 +3,6 @@ mod config;
 mod options;
 mod parser;
 mod simulator;
-mod state_expander;
-mod table;
 mod types;
 
 use env_logger;

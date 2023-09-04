@@ -1,20 +1,9 @@
 use log::debug;
 
 use crate::circuit::{GateDefn, MaybeBranchingOutput};
-use crate::table::SparseStateTable;
 
-#[derive(Debug)]
-pub enum State {
-    Sparse(SparseStateTable),
-    #[allow(dead_code)]
-    Dense(DenseStateTable), // TODO: use this
-    #[allow(dead_code)]
-    DenseKnownNonzeroSize(DenseStateTable, usize), // TODO: use this
-}
-// TODO: maybe better to use trait objects instead of enums
-
-#[derive(Debug)]
-pub struct DenseStateTable {}
+use super::state::State;
+use super::table::SparseStateTable;
 
 pub struct ExpandResult {
     pub state: State,
