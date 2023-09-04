@@ -26,7 +26,7 @@ fn main() -> io::Result<()> {
 
     let source = fs::read_to_string(&options.input)?;
 
-    let config = Config::new();
+    let config = Config::new(); // TODO: use options to set block size, max load, gate scheduling policy, etc.
 
     let program = match parser::parse_program(&source) {
         Ok(program) => program,
