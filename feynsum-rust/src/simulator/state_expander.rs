@@ -15,10 +15,7 @@ pub fn expand(gates: Vec<&GateDefn>, _num_qubits: usize, state: State) -> Expand
     let mut num_gate_apps = 0;
     let mut num_nonzero = 0;
 
-    let prev_entries = match state {
-        State::Sparse(table) => table.compactify(),
-        _ => panic!("TODO"),
-    };
+    let prev_entries = state.compactify();
     debug!("prev entries compactified");
 
     let mut table = SparseStateTable::new();
