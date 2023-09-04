@@ -1,3 +1,5 @@
+use std::fmt::{self, Display, Formatter};
+
 use bit_vec::BitVec;
 
 pub const MAX_QUBITS: usize = 63;
@@ -5,6 +7,21 @@ pub const MAX_QUBITS: usize = 63;
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct BasisIdx {
     bits: BitVec,
+}
+
+impl Display for BasisIdx {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        // write formatting function here
+        let mut s = String::new();
+        for i in 0..self.bits.len() {
+            if self.bits.get(i).expect("index out of bounds") {
+                s.push('1');
+            } else {
+                s.push('0');
+            }
+        }
+        s.fmt(f)
+    }
 }
 
 impl BasisIdx {

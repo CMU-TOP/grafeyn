@@ -1,4 +1,4 @@
-use log::{debug, error, info};
+use log::{error, info};
 
 use crate::circuit::Circuit;
 use crate::config::Config;
@@ -26,6 +26,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
     )); // initial state
 
     let mut gate_scheduler = config.create_gate_scheduler(depth);
+    info!("gate scheduler initialized. starting gate application loop.");
 
     loop {
         let these_gates = gate_scheduler
@@ -33,7 +34,9 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
             .into_iter()
             .map(|idx| &circuit.gates[idx])
             .collect::<Vec<_>>();
+
         if these_gates.len() == 0 {
+            info!("no more gates to apply. terminating loop.");
             break;
         }
 
@@ -44,16 +47,24 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
             num_nonzero,
             num_gate_apps: num_gate_apps_here,
         } = state_expander::expand(these_gates, num_qubits, state);
-        debug!(
-            "state expanded: new_state: {:?}, num_nonzero: {}, num_gate_apps: {}",
-            new_state, num_nonzero, num_gate_apps_here
+
+        let density = {
+            let max_num_states = 1 << num_qubits;
+            num_nonzero as f64 / max_num_states as f64
+        };
+
+        info!(
+            "gate: {:<2} hop: {:<2} density: {:.8} nonzero: {:<10}",
+            num_gates_visited + 1,
+            num_gates_visited_here,
+            density,
+            num_nonzero
         );
+        // TODO: performance profiling
 
         num_gates_visited += num_gates_visited_here;
         num_gate_apps += num_gate_apps_here;
         state = new_state;
-
-        // TODO: calculate and log density
     }
 
     assert!(num_gates_visited >= depth);

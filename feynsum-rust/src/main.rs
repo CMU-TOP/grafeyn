@@ -7,6 +7,8 @@ mod state_expander;
 mod table;
 mod types;
 
+use env_logger;
+use log::info;
 use std::fs;
 use std::io;
 use structopt::StructOpt;
@@ -16,7 +18,12 @@ use config::Config;
 use options::Options;
 
 fn main() -> io::Result<()> {
+    env_logger::init();
+
     let options = Options::from_args();
+
+    info!("Input file name: {}", options.input.display());
+
     let source = fs::read_to_string(&options.input)?;
 
     let config = Config::new();
@@ -27,6 +34,8 @@ fn main() -> io::Result<()> {
             panic!("Failed to parse program: {:?}", err);
         }
     };
+    info!("parse complete");
+
     let circuit = match Circuit::new(program) {
         Ok(circuit) => circuit,
         Err(err) => {
@@ -34,7 +43,11 @@ fn main() -> io::Result<()> {
         }
     };
 
-    let _result = simulator::bfs_simulator::run(&config, circuit);
-
+    let result = match simulator::bfs_simulator::run(&config, circuit) {
+        Ok(result) => result,
+        Err(err) => {
+            panic!("Failed to run simulator: {:?}", err);
+        }
+    };
     Ok(())
 }
