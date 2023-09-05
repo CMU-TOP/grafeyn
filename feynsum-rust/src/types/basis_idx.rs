@@ -39,9 +39,9 @@ impl BasisIdx {
         Ok(BasisIdx { bits: new_bits })
     }
 
-    pub fn zeros() -> Self {
+    pub fn zeros(num_qubits: usize) -> Self {
         Self {
-            bits: BitVec::from_elem(MAX_QUBITS, false),
+            bits: BitVec::from_elem(num_qubits, false),
         }
     }
 
