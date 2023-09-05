@@ -2,6 +2,7 @@ use log::{error, info};
 
 use crate::circuit::Circuit;
 use crate::config::Config;
+use crate::profile;
 use crate::types::basis_idx::MAX_QUBITS;
 use crate::types::{BasisIdx, Complex};
 
@@ -43,11 +44,14 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
 
         let num_gates_visited_here = these_gates.len();
 
-        let ExpandResult {
-            state: new_state,
-            num_nonzero,
-            num_gate_apps: num_gate_apps_here,
-        } = state_expander::expand(these_gates, num_qubits, state)?;
+        let (
+            duration,
+            ExpandResult {
+                state: new_state,
+                num_nonzero,
+                num_gate_apps: num_gate_apps_here,
+            },
+        ) = profile!(state_expander::expand(these_gates, num_qubits, state)?);
 
         let density = {
             let max_num_states = 1 << num_qubits;
@@ -55,13 +59,13 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
         };
 
         info!(
-            "gate: {:<2} hop: {:<2} density: {:.8} nonzero: {:<10}",
+            "gate: {:<2} hop: {:<2} density: {:.8} nonzero: {:<10} time: {:.4}s",
             num_gates_visited + 1,
             num_gates_visited_here,
             density,
-            num_nonzero
+            num_nonzero,
+            duration.as_secs_f64(),
         );
-        // TODO: performance profiling
 
         num_gates_visited += num_gates_visited_here;
         num_gate_apps += num_gate_apps_here;
