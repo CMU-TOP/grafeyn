@@ -2,6 +2,7 @@ use log::{error, info};
 
 use crate::circuit::Circuit;
 use crate::config::Config;
+use crate::gate_scheduler::GateScheduler;
 use crate::profile;
 use crate::types::basis_idx::MAX_QUBITS;
 use crate::types::{BasisIdx, Complex};

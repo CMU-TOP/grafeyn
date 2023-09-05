@@ -1,5 +1,6 @@
 mod circuit;
 mod config;
+mod gate_scheduler;
 mod options;
 mod parser;
 mod simulator;
@@ -27,7 +28,7 @@ fn main() -> io::Result<()> {
 
     let source = fs::read_to_string(&options.input)?;
 
-    let config = Config::new(); // TODO: use options to set block size, max load, gate scheduling policy, etc.
+    let config = Config::new(&options);
 
     let program = match parser::parse_program(&source) {
         Ok(program) => program,
