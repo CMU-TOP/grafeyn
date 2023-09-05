@@ -63,7 +63,7 @@ fn main() -> io::Result<()> {
 fn dump_densities(path: &PathBuf, state: State) -> io::Result<()> {
     let mut file = fs::File::create(path)?;
     for (bidx, weight) in state.compactify() {
-        file.write_fmt(format_args!("{} {}\n", bidx, weight))?;
+        file.write_fmt(format_args!("{} {:.4}\n", bidx, weight))?;
     }
     Ok(())
 }
