@@ -106,21 +106,18 @@ impl GateDefn {
                 Ok(MaybeBranchingOutput::OuptutOne((bidx.clone(), new_weight)))
             }
             Self::Hadamard(qi) => {
-                let crs2 = Complex::new(constants::RECP_SQRT_2, 0.0);
-                let cnrs2 = Complex::new(-constants::RECP_SQRT_2, 0.0);
-
                 let bidx1 = bidx.unset(qi);
                 let bidx2 = bidx.set(qi);
 
                 if bidx.get(qi)? {
                     Ok(MaybeBranchingOutput::OutputTwo(
-                        (bidx1, weight * crs2),
-                        (bidx2, weight * cnrs2),
+                        (bidx1, weight * Complex::new(constants::RECP_SQRT_2, 0.0)),
+                        (bidx2, weight * Complex::new(-constants::RECP_SQRT_2, 0.0)),
                     ))
                 } else {
                     Ok(MaybeBranchingOutput::OutputTwo(
-                        (bidx1, crs2),
-                        (bidx2, crs2),
+                        (bidx1, weight * Complex::new(constants::RECP_SQRT_2, 0.0)),
+                        (bidx2, weight * Complex::new(constants::RECP_SQRT_2, 0.0)),
                     ))
                 }
             }
