@@ -21,7 +21,6 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
     }
 
     let mut num_gates_visited = 0;
-    let mut num_gate_apps = 0;
     let mut state = State::Sparse(SparseStateTable::singleton(
         BasisIdx::zeros(num_qubits),
         Complex::new(1.0, 0.0),
@@ -49,7 +48,6 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
             ExpandResult {
                 state: new_state,
                 num_nonzero,
-                num_gate_apps: num_gate_apps_here,
             },
         ) = profile!(state_expander::expand(these_gates, num_qubits, state)?);
 
@@ -68,11 +66,9 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
         );
 
         num_gates_visited += num_gates_visited_here;
-        num_gate_apps += num_gate_apps_here;
         state = new_state;
     }
 
     assert!(num_gates_visited >= depth);
-    info!("run complete: {} gate applications", num_gate_apps);
     Ok(state)
 }

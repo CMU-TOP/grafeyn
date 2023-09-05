@@ -23,7 +23,7 @@ fn main() -> io::Result<()> {
 
     let options = Options::from_args();
 
-    info!("Input file name: {}", options.input.display());
+    info!("reading file: {}", options.input.display());
 
     let source = fs::read_to_string(&options.input)?;
 
@@ -35,7 +35,7 @@ fn main() -> io::Result<()> {
             panic!("Failed to parse program: {:?}", err);
         }
     };
-    info!("parse complete");
+    info!("parse complete. starting circuit construction.");
 
     let circuit = match Circuit::new(program) {
         Ok(circuit) => circuit,
@@ -44,12 +44,16 @@ fn main() -> io::Result<()> {
         }
     };
 
+    info!("circuit construction complete. starting simulation");
+
     let result = match simulator::bfs_simulator::run(&config, circuit) {
         Ok(result) => result,
         Err(err) => {
             panic!("Failed to run simulator: {:?}", err);
         }
     };
+
+    info!("simulation complete");
 
     if let Some(output) = options.output {
         info!("dumping densities to: {}", output.display());

@@ -9,7 +9,6 @@ use super::SimulatorError;
 pub struct ExpandResult {
     pub state: State,
     pub num_nonzero: usize,
-    pub num_gate_apps: usize,
 }
 
 pub fn expand(
@@ -17,7 +16,6 @@ pub fn expand(
     _num_qubits: usize,
     state: State,
 ) -> Result<ExpandResult, SimulatorError> {
-    let mut num_gate_apps = 0;
     let mut num_nonzero = 0;
 
     let prev_entries = state.compactify();
@@ -48,12 +46,10 @@ pub fn expand(
                 }
             }
         }
-        num_gate_apps += 1;
     }
 
     Ok(ExpandResult {
         state: State::Sparse(table), // TODO: use DenseStateTable if necessary
         num_nonzero,
-        num_gate_apps,
     })
 }
