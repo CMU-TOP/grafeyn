@@ -4,6 +4,7 @@ mod options;
 mod parser;
 mod simulator;
 mod types;
+mod utility;
 
 use env_logger;
 use log::info;
