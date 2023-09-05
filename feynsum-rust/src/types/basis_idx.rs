@@ -12,7 +12,7 @@ pub struct BasisIdx {
 impl Display for BasisIdx {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut s = String::from('|');
-        for bit in self.bits.iter() {
+        for bit in self.bits.iter().rev() {
             if bit {
                 s.push('1');
             } else {
