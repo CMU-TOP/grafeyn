@@ -11,15 +11,15 @@ pub struct BasisIdx {
 
 impl Display for BasisIdx {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        // write formatting function here
-        let mut s = String::new();
-        for i in 0..self.bits.len() {
-            if self.bits.get(i).expect("index out of bounds") {
+        let mut s = String::from('|');
+        for bit in self.bits.iter() {
+            if bit {
                 s.push('1');
             } else {
                 s.push('0');
             }
         }
+        s.push('>');
         s.fmt(f)
     }
 }
