@@ -454,7 +454,7 @@ struct
           val weight' =
             if BasisIdx.get bidx qi then C.* (weight, mult) else weight
         in
-          (bidx, weight)
+          (bidx, weight')
         end
     in
       makePushPull {touches = Seq.singleton qi, action = NonBranching apply}
