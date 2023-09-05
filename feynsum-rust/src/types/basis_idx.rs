@@ -24,16 +24,19 @@ impl Display for BasisIdx {
     }
 }
 
+pub enum BasisIdxErr {
+    IndexOutOfBounds,
+}
+
 impl BasisIdx {
-    // TODO: error handling
-    pub fn get(&self, qi: usize) -> bool {
-        self.bits.get(qi).expect("index out of bounds")
+    pub fn get(&self, qi: usize) -> Result<bool, BasisIdxErr> {
+        self.bits.get(qi).ok_or(BasisIdxErr::IndexOutOfBounds)
     }
 
-    pub fn flip(&self, qi: usize) -> Self {
+    pub fn flip(&self, qi: usize) -> Result<Self, BasisIdxErr> {
         let mut new_bits = self.bits.clone();
-        new_bits.set(qi, !self.bits.get(qi).expect("index out of bounds"));
-        BasisIdx { bits: new_bits }
+        new_bits.set(qi, !self.bits.get(qi).ok_or(BasisIdxErr::IndexOutOfBounds)?);
+        Ok(BasisIdx { bits: new_bits })
     }
 
     pub fn zeros() -> Self {
@@ -54,11 +57,11 @@ impl BasisIdx {
         BasisIdx { bits: new_bits }
     }
 
-    pub fn swap(&self, qi1: usize, qi2: usize) -> Self {
+    pub fn swap(&self, qi1: usize, qi2: usize) -> Result<Self, BasisIdxErr> {
         let mut new_bits = self.bits.clone();
-        let tmp = new_bits.get(qi1).expect("index out of bounds");
-        new_bits.set(qi1, new_bits.get(qi2).expect("index out of bounds"));
+        let tmp = new_bits.get(qi1).ok_or(BasisIdxErr::IndexOutOfBounds)?;
+        new_bits.set(qi1, new_bits.get(qi2).ok_or(BasisIdxErr::IndexOutOfBounds)?);
         new_bits.set(qi2, tmp);
-        BasisIdx { bits: new_bits }
+        Ok(BasisIdx { bits: new_bits })
     }
 }

@@ -47,7 +47,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
             state: new_state,
             num_nonzero,
             num_gate_apps: num_gate_apps_here,
-        } = state_expander::expand(these_gates, num_qubits, state);
+        } = state_expander::expand(these_gates, num_qubits, state)?;
 
         let density = {
             let max_num_states = 1 << num_qubits;
