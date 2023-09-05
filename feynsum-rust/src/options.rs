@@ -10,4 +10,10 @@ pub struct Options {
         help = "path to the input qasm file"
     )]
     pub input: PathBuf,
+    #[structopt(
+        parse(from_os_str),
+        name = "output",
+        help = "output file path to dump densities to. if not specified, densities are not printed"
+    )]
+    pub output: Option<PathBuf>,
 }

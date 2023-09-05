@@ -9,12 +9,14 @@ mod utility;
 use env_logger;
 use log::info;
 use std::fs;
-use std::io;
+use std::io::{self, Write};
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 use circuit::Circuit;
 use config::Config;
 use options::Options;
+use simulator::State;
 
 fn main() -> io::Result<()> {
     env_logger::init();
@@ -48,5 +50,20 @@ fn main() -> io::Result<()> {
             panic!("Failed to run simulator: {:?}", err);
         }
     };
+
+    if let Some(output) = options.output {
+        info!("dumping densities to: {}", output.display());
+        dump_densities(&output, result)?;
+        info!("output written to: {}", output.display());
+    }
+
+    Ok(())
+}
+
+fn dump_densities(path: &PathBuf, state: State) -> io::Result<()> {
+    let mut file = fs::File::create(path)?;
+    for (bidx, weight) in state.compactify() {
+        file.write_fmt(format_args!("{} {}\n", bidx, weight))?;
+    }
     Ok(())
 }

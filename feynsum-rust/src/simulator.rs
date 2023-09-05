@@ -4,6 +4,7 @@ mod state_expander;
 mod table;
 
 use crate::circuit::GateApplyErr;
+pub use state::State;
 
 #[derive(Debug)]
 pub enum SimulatorError {
