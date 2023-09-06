@@ -7,7 +7,6 @@ mod simulator;
 mod types;
 mod utility;
 
-use env_logger;
 use log::info;
 use std::fs;
 use std::io::{self, Write};

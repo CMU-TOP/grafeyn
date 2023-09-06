@@ -37,7 +37,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
             .map(|idx| &circuit.gates[idx])
             .collect::<Vec<_>>();
 
-        if these_gates.len() == 0 {
+        if these_gates.is_empty() {
             info!("no more gates to apply. terminating loop.");
             break;
         }
