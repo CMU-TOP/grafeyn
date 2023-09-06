@@ -1,6 +1,6 @@
 use log::debug;
 
-use crate::circuit::{GateDefn, MaybeBranchingOutput};
+use crate::circuit::{Gate, MaybeBranchingOutput, PushApplicable};
 
 use super::state::State;
 use super::table::SparseStateTable;
@@ -12,7 +12,7 @@ pub struct ExpandResult {
 }
 
 pub fn expand(
-    gates: Vec<&GateDefn>,
+    gates: Vec<&Gate>,
     _num_qubits: usize,
     state: State,
 ) -> Result<ExpandResult, SimulatorError> {
@@ -26,7 +26,7 @@ pub fn expand(
     for (bidx, weight) in prev_entries {
         for gate in gates.iter() {
             debug!("applying gate {:?} to idx {}", gate, bidx);
-            match gate.apply(&bidx, &weight)? {
+            match gate.push_apply(&bidx, &weight)? {
                 MaybeBranchingOutput::OuptutOne((new_bidx, new_weight)) => {
                     debug!("gate applied. one output: ({}, {})", new_bidx, new_weight);
                     table.put(new_bidx, new_weight);

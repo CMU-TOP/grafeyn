@@ -5,7 +5,9 @@ use std::collections::HashMap;
 
 use crate::parser::{Argument, Expression, OpCode, QasmStatement};
 use crate::types::{QubitIndex, Real};
-pub use gate::{GateApplyErr, GateDefn, MaybeBranchingOutput};
+pub use gate::{
+    Gate, GateApplyErr, GateDefn, MaybeBranchingOutput, PullApplicable, PushApplicable,
+};
 
 #[derive(Debug)]
 pub enum CircuitBuildError {
@@ -20,14 +22,14 @@ pub enum CircuitBuildError {
 #[derive(Debug)]
 pub struct Circuit {
     pub num_qubits: usize,
-    pub gates: Vec<GateDefn>,
+    pub gates: Vec<Gate>,
 }
 
 impl Circuit {
     pub fn new(statements: Vec<QasmStatement>) -> Result<Self, CircuitBuildError> {
         let mut num_qubits_so_far: usize = 0;
         let mut qregs = HashMap::<String, (QubitIndex, QubitIndex)>::new();
-        let mut gates = Vec::<GateDefn>::new();
+        let mut gates = Vec::<Gate>::new();
 
         for statement in statements {
             match statement {
@@ -78,7 +80,7 @@ impl Circuit {
                         .map(eval)
                         .collect::<Result<Vec<_>, _>>()?;
 
-                    let gate = match (name.as_str(), param_arity, arg_arity) {
+                    let gate_defn = match (name.as_str(), param_arity, arg_arity) {
                         ("h", 0, 1) => GateDefn::Hadamard(args[0]),
                         ("y", 0, 1) => GateDefn::PauliY(args[0]),
                         ("z", 0, 1) => GateDefn::PauliZ(args[0]),
@@ -145,7 +147,7 @@ impl Circuit {
                         _ => GateDefn::Other { name, params, args },
                     };
 
-                    gates.push(gate);
+                    gates.push(Gate::new(gate_defn));
                 }
             }
         }
