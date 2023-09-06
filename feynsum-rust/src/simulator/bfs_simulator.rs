@@ -13,7 +13,7 @@ use super::table::SparseStateTable;
 use super::SimulatorError;
 
 pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
-    let depth = circuit.depth();
+    let num_gates = circuit.num_gates();
     let num_qubits = circuit.num_qubits;
 
     if num_qubits > MAX_QUBITS {
@@ -27,7 +27,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
         Complex::new(1.0, 0.0),
     )); // initial state
 
-    let mut gate_scheduler = config.create_gate_scheduler(depth);
+    let mut gate_scheduler = config.create_gate_scheduler(num_gates);
     info!("gate scheduler initialized. starting gate application loop.");
 
     loop {
@@ -70,6 +70,6 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
         state = new_state;
     }
 
-    assert!(num_gates_visited >= depth);
+    assert!(num_gates_visited >= num_gates);
     Ok(state)
 }

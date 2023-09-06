@@ -158,7 +158,7 @@ impl Circuit {
         })
     }
 
-    pub fn depth(&self) -> usize {
+    pub fn num_gates(&self) -> usize {
         self.gates.len()
     }
 }
