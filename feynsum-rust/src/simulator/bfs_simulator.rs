@@ -26,6 +26,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
         Complex::new(1.0, 0.0),
     )); // initial state
     let mut num_nonzero = 1;
+    let mut num_gate_apps = 0;
 
     let gate_touches = circuit.gates.iter().map(|gate| &gate.touches).collect();
     let gate_is_branching = circuit
@@ -59,6 +60,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
             ExpandResult {
                 state: new_state,
                 num_nonzero: new_num_nonzero,
+                num_gate_apps: num_gate_apps_here,
             },
         ) = profile!(state_expander::expand(these_gates, num_qubits, state)?);
 
@@ -77,12 +79,14 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
         );
 
         num_gates_visited += num_gates_visited_here;
+        num_gate_apps += num_gate_apps_here;
         num_nonzero = new_num_nonzero;
         state = new_state;
     });
 
     info!(
-        "gate application loop terminated. time: {}s",
+        "gate application loop terminated.  gate app count: {}, time: {}s",
+        num_gate_apps,
         duration.as_secs_f64()
     );
 

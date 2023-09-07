@@ -9,6 +9,7 @@ use super::SimulatorError;
 pub struct ExpandResult {
     pub state: State,
     pub num_nonzero: usize,
+    pub num_gate_apps: usize,
 }
 
 fn apply_gates(
@@ -16,22 +17,23 @@ fn apply_gates(
     table: &mut SparseStateTable,
     bidx: BasisIdx,
     weight: Complex,
-) -> Result<(), SimulatorError> {
+) -> Result<usize, SimulatorError> {
     if is_zero(weight) {
-        return Ok(());
+        return Ok(0);
     }
     if gates.is_empty() {
         table.put(bidx, weight);
-        return Ok(());
+        return Ok(0);
     }
 
     match gates[0].push_apply(bidx, weight)? {
         MaybeBranchingOutput::OuptutOne((new_bidx, new_weight)) => {
-            apply_gates(&gates[1..], table, new_bidx, new_weight)
+            Ok(1 + apply_gates(&gates[1..], table, new_bidx, new_weight)?)
         }
         MaybeBranchingOutput::OutputTwo((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
-            apply_gates(&gates[1..], table, new_bidx1, new_weight1)?;
-            apply_gates(&gates[1..], table, new_bidx2, new_weight2)
+            let num_gate_apps_1 = apply_gates(&gates[1..], table, new_bidx1, new_weight1)?;
+            let num_gate_apps_2 = apply_gates(&gates[1..], table, new_bidx2, new_weight2)?;
+            Ok(1 + num_gate_apps_1 + num_gate_apps_2)
         }
     }
 }
@@ -45,8 +47,10 @@ pub fn expand(
 
     let mut table = SparseStateTable::new();
 
+    let mut num_gate_apps = 0;
+
     for (bidx, weight) in prev_entries {
-        apply_gates(&gates, &mut table, bidx, weight)?;
+        num_gate_apps += apply_gates(&gates, &mut table, bidx, weight)?;
     }
 
     let num_nonzero = table.size();
@@ -54,5 +58,6 @@ pub fn expand(
     Ok(ExpandResult {
         state: State::Sparse(table), // TODO: use DenseStateTable if necessary
         num_nonzero,
+        num_gate_apps,
     })
 }
