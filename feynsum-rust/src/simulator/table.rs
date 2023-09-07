@@ -25,7 +25,10 @@ impl SparseStateTable {
     }
 
     pub fn put(&mut self, bidx: BasisIdx, weight: Complex) {
-        self.table.insert(bidx, weight);
+        self.table
+            .entry(bidx)
+            .and_modify(|w| *w += weight)
+            .or_insert(weight);
     }
 }
 
