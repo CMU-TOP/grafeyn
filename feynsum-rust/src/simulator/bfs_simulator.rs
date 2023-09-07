@@ -84,8 +84,16 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
         state = new_state;
     });
 
-    info!(
-        "gate application loop terminated.  gate app count: {}, time: {}s",
+    let final_density = {
+        let max_num_states = 1 << num_qubits;
+        num_nonzero as f64 / max_num_states as f64
+    };
+
+    println!(
+        "gate: {:<2} density: {:.8} nonzero: {:>10}\ngate app count: {}, time: {}s",
+        num_gates_visited,
+        final_density,
+        num_nonzero,
         num_gate_apps,
         duration.as_secs_f64()
     );
