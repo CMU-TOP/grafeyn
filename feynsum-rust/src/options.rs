@@ -26,7 +26,7 @@ pub struct Options {
 
     #[structopt(
         name = "gate scheduling policy",
-        short = "scheduler",
+        long = "scheduler",
         short = "s",
         default_value = "naive",
         help = "gate scheduling policy to use"
