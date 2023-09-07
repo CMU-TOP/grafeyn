@@ -187,13 +187,13 @@ impl PushApplicable for Gate {
 
                 if bidx.get(qi)? {
                     Ok(MaybeBranchingOutput::OutputTwo(
-                        (bidx1, weight * Complex::new(constants::RECP_SQRT_2, 0.0)),
-                        (bidx2, weight * Complex::new(-constants::RECP_SQRT_2, 0.0)),
+                        (bidx1, weight * constants::RECP_SQRT_2),
+                        (bidx2, -weight * constants::RECP_SQRT_2),
                     ))
                 } else {
                     Ok(MaybeBranchingOutput::OutputTwo(
-                        (bidx1, weight * Complex::new(constants::RECP_SQRT_2, 0.0)),
-                        (bidx2, weight * Complex::new(constants::RECP_SQRT_2, 0.0)),
+                        (bidx1, weight * constants::RECP_SQRT_2),
+                        (bidx2, weight * constants::RECP_SQRT_2),
                     ))
                 }
             }
