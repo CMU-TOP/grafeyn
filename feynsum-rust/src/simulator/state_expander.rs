@@ -14,8 +14,6 @@ pub fn expand(
     _num_qubits: usize,
     state: State,
 ) -> Result<ExpandResult, SimulatorError> {
-    let mut num_nonzero = 0;
-
     let prev_entries = state.compactify();
 
     let mut table = SparseStateTable::new();
@@ -25,7 +23,6 @@ pub fn expand(
             match gate.push_apply(&bidx, &weight)? {
                 MaybeBranchingOutput::OuptutOne((new_bidx, new_weight)) => {
                     table.put(new_bidx, new_weight);
-                    num_nonzero += 1;
                 }
                 MaybeBranchingOutput::OutputTwo(
                     (new_bidx1, new_weight1),
@@ -33,11 +30,12 @@ pub fn expand(
                 ) => {
                     table.put(new_bidx1, new_weight1);
                     table.put(new_bidx2, new_weight2);
-                    num_nonzero += 2;
                 }
             }
         }
     }
+
+    let num_nonzero = table.size();
 
     Ok(ExpandResult {
         state: State::Sparse(table), // TODO: use DenseStateTable if necessary

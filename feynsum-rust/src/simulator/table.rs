@@ -30,6 +30,10 @@ impl SparseStateTable {
             .and_modify(|w| *w += weight)
             .or_insert(weight);
     }
+
+    pub fn size(&self) -> usize {
+        self.table.len()
+    }
 }
 
 #[derive(Debug)]
