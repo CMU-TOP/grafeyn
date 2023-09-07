@@ -39,7 +39,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
 
     info!("starting gate application loop.");
 
-    loop {
+    let (duration, _) = profile!(loop {
         let these_gates = gate_scheduler
             .pick_next_gates()
             .into_iter()
@@ -49,7 +49,6 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
         debug!("applying gates: {:?}", these_gates);
 
         if these_gates.is_empty() {
-            info!("no more gates to apply. terminating loop.");
             break;
         }
 
@@ -80,7 +79,12 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
         num_gates_visited += num_gates_visited_here;
         num_nonzero = new_num_nonzero;
         state = new_state;
-    }
+    });
+
+    info!(
+        "gate application loop terminated. time: {}s",
+        duration.as_secs_f64()
+    );
 
     assert!(num_gates_visited >= num_gates);
     Ok(state)
