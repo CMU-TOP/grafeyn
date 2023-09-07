@@ -1,9 +1,0 @@
-gate: 0  hop: 2  density: 0.00000000 nonzero:          1 time: 0.0000s
-gate: 2  hop: 2  density: 0.00000000 nonzero:          4 time: 0.0000s
-gate: 4  hop: 2  density: 0.00000001 nonzero:         12 time: 0.0000s
-gate: 6  hop: 2  density: 0.00000003 nonzero:         28 time: 0.0001s
-gate: 8  hop: 2  density: 0.00000006 nonzero:         60 time: 0.0002s
-gate: 10 hop: 2  density: 0.00000012 nonzero:        124 time: 0.0005s
-gate: 12 hop: 2  density: 0.00000035 nonzero:        372 time: 0.0012s
-gate: 14 hop: 2  density: 0.00000081 nonzero:        868 time: 0.0030s
-gate: 16 hop: 2  density: 0.00000243 nonzero:       2604 time: 0.0069s
