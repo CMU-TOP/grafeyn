@@ -1,4 +1,5 @@
 use crate::circuit::{Gate, MaybeBranchingOutput, PushApplicable};
+use crate::utility::is_zero;
 
 use super::state::State;
 use super::table::SparseStateTable;
@@ -19,6 +20,9 @@ pub fn expand(
     let mut table = SparseStateTable::new();
 
     for (bidx, weight) in prev_entries {
+        if is_zero(weight) {
+            continue;
+        }
         for gate in gates.iter() {
             match gate.push_apply(&bidx, &weight)? {
                 MaybeBranchingOutput::OuptutOne((new_bidx, new_weight)) => {

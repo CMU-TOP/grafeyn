@@ -1,3 +1,5 @@
+use crate::types::{constants, Complex, Real};
+
 #[macro_export]
 macro_rules! profile {
     ($($exp:expr)+) => {
@@ -11,6 +13,13 @@ macro_rules! profile {
             (_duration, _result)
         }
     }
+}
+
+fn is_real_zero(x: Real) -> bool {
+    x.abs() < constants::ZERO_THRESHOLD
+}
+pub fn is_zero(c: Complex) -> bool {
+    is_real_zero(c.re) && is_real_zero(c.im)
 }
 
 #[cfg(test)]
