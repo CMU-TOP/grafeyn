@@ -22,6 +22,10 @@ pub fn is_zero(c: Complex) -> bool {
     is_real_zero(c.re) && is_real_zero(c.im)
 }
 
+pub fn is_nonzero(c: Complex) -> bool {
+    !is_real_zero(c.re) || !is_real_zero(c.im)
+}
+
 #[cfg(test)]
 mod tests {
 

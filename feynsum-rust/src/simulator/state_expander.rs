@@ -53,7 +53,7 @@ pub fn expand(
         num_gate_apps += apply_gates(&gates, &mut table, bidx, weight)?;
     }
 
-    let num_nonzero = table.size();
+    let num_nonzero = table.num_nonzero();
 
     Ok(ExpandResult {
         state: State::Sparse(table), // TODO: use DenseStateTable if necessary

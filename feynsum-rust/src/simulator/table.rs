@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::types::{BasisIdx, Complex};
+use crate::utility;
 
 #[derive(Debug)]
 pub struct SparseStateTable {
@@ -31,8 +32,11 @@ impl SparseStateTable {
             .or_insert(weight);
     }
 
-    pub fn size(&self) -> usize {
-        self.table.len()
+    pub fn num_nonzero(&self) -> usize {
+        self.table
+            .iter()
+            .filter(|(_, w)| utility::is_nonzero(**w))
+            .count()
     }
 }
 
