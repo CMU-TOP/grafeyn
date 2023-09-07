@@ -139,20 +139,20 @@ impl Gate {
 
     pub fn is_branching(&self) -> bool {
         // FIXME: Define and use output type (instead of using MaybeBranchingOutput)
-        match self.defn {
+        !matches!(
+            self.defn,
             GateDefn::PauliY(_)
-            | GateDefn::PauliZ(_)
-            | GateDefn::T(_)
-            | GateDefn::X(_)
-            | GateDefn::CX { .. }
-            | GateDefn::CZ { .. }
-            | GateDefn::CCX { .. }
-            | GateDefn::CPhase { .. }
-            | GateDefn::FSim { .. }
-            | GateDefn::RZ { .. }
-            | GateDefn::CSwap { .. } => false,
-            _ => true,
-        }
+                | GateDefn::PauliZ(_)
+                | GateDefn::T(_)
+                | GateDefn::X(_)
+                | GateDefn::CX { .. }
+                | GateDefn::CZ { .. }
+                | GateDefn::CCX { .. }
+                | GateDefn::CPhase { .. }
+                | GateDefn::FSim { .. }
+                | GateDefn::RZ { .. }
+                | GateDefn::CSwap { .. },
+        )
     }
 }
 
