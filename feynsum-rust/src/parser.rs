@@ -1,4 +1,4 @@
-use log::warn;
+use log::debug;
 pub use qasmsim::grammar::ast::{Argument, Expression, OpCode};
 use qasmsim::{
     self,
@@ -33,7 +33,7 @@ pub fn parse_program(source: &str) -> Result<Vec<QasmStatement>, QasmSimError> {
                 args,
             ))) => Some(QasmStatement::GateCall { name, params, args }),
             _ => {
-                warn!("Ignored unsupported statement: {:?}", *span.node);
+                debug!("Ignored unsupported statement: {:?}", *span.node);
                 None
             }
         })
