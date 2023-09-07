@@ -84,16 +84,16 @@ impl From<BasisIdxErr> for GateApplyErr {
 pub trait PushApplicable {
     fn push_apply(
         &self,
-        bidx: &BasisIdx,
-        weight: &Complex,
+        bidx: BasisIdx,
+        weight: Complex,
     ) -> Result<MaybeBranchingOutput, GateApplyErr>;
 }
 
 pub trait PullApplicable {
     fn pull_apply(
         &self,
-        bidx: &BasisIdx,
-        weight: &Complex,
+        bidx: BasisIdx,
+        weight: Complex,
     ) -> Result<MaybeBranchingOutput, GateApplyErr>;
 }
 
@@ -159,8 +159,8 @@ impl Gate {
 impl PushApplicable for Gate {
     fn push_apply(
         &self,
-        bidx: &BasisIdx,
-        weight: &Complex,
+        bidx: BasisIdx,
+        weight: Complex,
     ) -> Result<MaybeBranchingOutput, GateApplyErr> {
         match self.defn {
             GateDefn::PauliY(qi) => {
@@ -177,9 +177,9 @@ impl PushApplicable for Gate {
                 let new_weight = if bidx.get(qi)? {
                     weight * Complex::new(-1.0, 0.0)
                 } else {
-                    *weight
+                    weight
                 };
-                Ok(MaybeBranchingOutput::OuptutOne((bidx.clone(), new_weight)))
+                Ok(MaybeBranchingOutput::OuptutOne((bidx, new_weight)))
             }
             GateDefn::Hadamard(qi) => {
                 let bidx1 = bidx.unset(qi);
@@ -200,13 +200,9 @@ impl PushApplicable for Gate {
             GateDefn::T(qi) => {
                 let mult = Complex::new(constants::RECP_SQRT_2, constants::RECP_SQRT_2);
 
-                let new_weight = if bidx.get(qi)? {
-                    weight * mult
-                } else {
-                    *weight
-                };
+                let new_weight = if bidx.get(qi)? { weight * mult } else { weight };
 
-                Ok(MaybeBranchingOutput::OuptutOne((bidx.clone(), new_weight)))
+                Ok(MaybeBranchingOutput::OuptutOne((bidx, new_weight)))
             }
             GateDefn::SqrtX(qi) => {
                 let bidx1 = bidx.unset(qi);
@@ -261,24 +257,24 @@ impl PushApplicable for Gate {
             }
             GateDefn::X(qi) => {
                 let new_bidx = bidx.flip(qi)?;
-                Ok(MaybeBranchingOutput::OuptutOne((new_bidx, *weight)))
+                Ok(MaybeBranchingOutput::OuptutOne((new_bidx, weight)))
             }
             GateDefn::CX { control, target } => {
                 let new_bidx = if bidx.get(control)? {
                     bidx.flip(target)?
                 } else {
-                    bidx.clone()
+                    bidx
                 };
-                Ok(MaybeBranchingOutput::OuptutOne((new_bidx, *weight)))
+                Ok(MaybeBranchingOutput::OuptutOne((new_bidx, weight)))
             }
             GateDefn::CZ { control, target } => {
                 let new_weight = if bidx.get(control)? && bidx.get(target)? {
                     weight * Complex::new(-1.0, 0.0)
                 } else {
-                    *weight
+                    weight
                 };
 
-                Ok(MaybeBranchingOutput::OuptutOne((bidx.clone(), new_weight)))
+                Ok(MaybeBranchingOutput::OuptutOne((bidx, new_weight)))
             }
             GateDefn::CCX {
                 control1,
@@ -288,10 +284,10 @@ impl PushApplicable for Gate {
                 let new_bidx = if bidx.get(control1)? && bidx.get(control2)? {
                     bidx.flip(target)?
                 } else {
-                    bidx.clone()
+                    bidx
                 };
 
-                Ok(MaybeBranchingOutput::OuptutOne((new_bidx, *weight)))
+                Ok(MaybeBranchingOutput::OuptutOne((new_bidx, weight)))
             }
             GateDefn::CPhase {
                 control,
@@ -299,12 +295,12 @@ impl PushApplicable for Gate {
                 rot,
             } => {
                 let new_weight = if !bidx.get(control)? || !bidx.get(target)? {
-                    *weight
+                    weight
                 } else {
                     weight * Complex::new(rot.cos(), rot.sin())
                 };
 
-                Ok(MaybeBranchingOutput::OuptutOne((bidx.clone(), new_weight)))
+                Ok(MaybeBranchingOutput::OuptutOne((bidx, new_weight)))
             }
             GateDefn::FSim {
                 left,
@@ -312,9 +308,9 @@ impl PushApplicable for Gate {
                 theta,
                 phi,
             } => match (bidx.get(left)?, bidx.get(right)?) {
-                (false, false) => Ok(MaybeBranchingOutput::OuptutOne((bidx.clone(), *weight))),
+                (false, false) => Ok(MaybeBranchingOutput::OuptutOne((bidx, weight))),
                 (true, true) => Ok(MaybeBranchingOutput::OuptutOne((
-                    bidx.clone(),
+                    bidx,
                     weight * Complex::new((-phi).cos(), (-phi).sin()),
                 ))),
                 _ => {
@@ -348,7 +344,7 @@ impl PushApplicable for Gate {
                     weight * rot1
                 };
 
-                Ok(MaybeBranchingOutput::OuptutOne((bidx.clone(), new_weight)))
+                Ok(MaybeBranchingOutput::OuptutOne((bidx, new_weight)))
             }
             GateDefn::RY { rot, target } => {
                 let x = rot / 2.0;
@@ -376,10 +372,10 @@ impl PushApplicable for Gate {
                 let new_bidx = if bidx.get(control)? {
                     bidx.swap(target1, target2)?
                 } else {
-                    bidx.clone()
+                    bidx
                 };
 
-                Ok(MaybeBranchingOutput::OuptutOne((new_bidx, *weight)))
+                Ok(MaybeBranchingOutput::OuptutOne((new_bidx, weight)))
             }
             GateDefn::U {
                 target: _,
@@ -395,8 +391,8 @@ impl PushApplicable for Gate {
 impl PullApplicable for Gate {
     fn pull_apply(
         &self,
-        _bidx: &BasisIdx,
-        _weight: &Complex,
+        _bidx: BasisIdx,
+        _weight: Complex,
     ) -> Result<MaybeBranchingOutput, GateApplyErr> {
         unimplemented!()
     }

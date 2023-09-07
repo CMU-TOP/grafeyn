@@ -25,7 +25,7 @@ fn apply_gates(
         return Ok(());
     }
 
-    match gates[0].push_apply(&bidx, &weight)? {
+    match gates[0].push_apply(bidx, weight)? {
         MaybeBranchingOutput::OuptutOne((new_bidx, new_weight)) => {
             apply_gates(&gates[1..], table, new_bidx, new_weight)
         }
