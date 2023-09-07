@@ -1,3 +1,4 @@
+OPENQASM 2.0;
 qreg q[8];
 h q[7];
 cphase(pi / 2) q[6], q[7];

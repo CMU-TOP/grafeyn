@@ -1,67 +1,80 @@
 use std::fmt::{self, Display, Formatter};
 
-use bit_vec::BitVec;
-
 pub const MAX_QUBITS: usize = 63;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct BasisIdx {
-    bits: BitVec,
+    bits: u64,
 }
 
 impl Display for BasisIdx {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let mut s = String::from('|');
-        for bit in self.bits.iter().rev() {
-            if bit {
-                s.push('1');
-            } else {
-                s.push('0');
-            }
-        }
-        s.push('>');
-        s.fmt(f)
+        format!("{:b}", self.bits).fmt(f)
     }
 }
 
+#[derive(Debug)]
 pub enum BasisIdxErr {
     IndexOutOfBounds,
 }
 
 impl BasisIdx {
     pub fn get(&self, qi: usize) -> Result<bool, BasisIdxErr> {
-        self.bits.get(qi).ok_or(BasisIdxErr::IndexOutOfBounds)
-    }
-
-    pub fn flip(&self, qi: usize) -> Result<Self, BasisIdxErr> {
-        let mut new_bits = self.bits.clone();
-        new_bits.set(qi, !self.bits.get(qi).ok_or(BasisIdxErr::IndexOutOfBounds)?);
-        Ok(BasisIdx { bits: new_bits })
-    }
-
-    pub fn zeros(num_qubits: usize) -> Self {
-        Self {
-            bits: BitVec::from_elem(num_qubits, false),
+        if qi >= MAX_QUBITS {
+            Err(BasisIdxErr::IndexOutOfBounds)
+        } else {
+            Ok(self.bits & (1 << qi) != 0)
         }
     }
 
+    pub fn flip(&self, qi: usize) -> Result<Self, BasisIdxErr> {
+        if qi >= MAX_QUBITS {
+            Err(BasisIdxErr::IndexOutOfBounds)
+        } else {
+            Ok(BasisIdx {
+                bits: self.bits ^ (1 << qi),
+            })
+        }
+    }
+
+    pub fn zeros(num_qubits: usize) -> Self {
+        assert!(num_qubits <= MAX_QUBITS);
+        Self { bits: 0 }
+    }
+
     pub fn set(&self, qi: usize) -> Self {
-        let mut new_bits = self.bits.clone();
-        new_bits.set(qi, true);
-        BasisIdx { bits: new_bits }
+        Self {
+            bits: self.bits | (1 << qi),
+        }
     }
 
     pub fn unset(&self, qi: usize) -> Self {
-        let mut new_bits = self.bits.clone();
-        new_bits.set(qi, false);
-        BasisIdx { bits: new_bits }
+        Self {
+            bits: self.bits & !(1 << qi),
+        }
     }
 
     pub fn swap(&self, qi1: usize, qi2: usize) -> Result<Self, BasisIdxErr> {
-        let mut new_bits = self.bits.clone();
-        let tmp = new_bits.get(qi1).ok_or(BasisIdxErr::IndexOutOfBounds)?;
-        new_bits.set(qi1, new_bits.get(qi2).ok_or(BasisIdxErr::IndexOutOfBounds)?);
-        new_bits.set(qi2, tmp);
-        Ok(BasisIdx { bits: new_bits })
+        if qi1 >= MAX_QUBITS || qi2 >= MAX_QUBITS {
+            Err(BasisIdxErr::IndexOutOfBounds)
+        } else {
+            let tmp = ((self.bits >> qi1) ^ (self.bits >> qi2)) & 1;
+
+            Ok(Self {
+                bits: self.bits ^ (tmp << qi1) ^ (tmp << qi2),
+            })
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_swap() {
+        let bidx = BasisIdx { bits: 0b1010 };
+        let bidx = bidx.swap(0, 1).unwrap();
+        assert_eq!(bidx.bits, 0b1001);
     }
 }
