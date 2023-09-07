@@ -1,0 +1,13 @@
+// https://raw.githubusercontent.com/pnnl/QASMBench/master/large/bv_n30/bv_n30.qasm
+OPENQASM 2.0;
+include "qelib1.inc";
+qreg q0[30];
+creg c0[30];
+h q0[0];
+h q0[1];
+h q0[2];
+h q0[3];
+h q0[4];
+h q0[5];
+h q0[6];
+h q0[7];

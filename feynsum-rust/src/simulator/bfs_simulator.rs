@@ -1,8 +1,7 @@
-use log::{error, info};
+use log::{debug, error, info};
 
 use crate::circuit::Circuit;
 use crate::config::Config;
-use crate::gate_scheduler::GateScheduler;
 use crate::profile;
 use crate::types::basis_idx::MAX_QUBITS;
 use crate::types::{BasisIdx, Complex};
@@ -26,9 +25,19 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
         BasisIdx::zeros(num_qubits),
         Complex::new(1.0, 0.0),
     )); // initial state
+    let mut num_nonzero = 1;
 
-    let mut gate_scheduler = config.create_gate_scheduler(num_gates);
-    info!("gate scheduler initialized. starting gate application loop.");
+    let gate_touches = circuit.gates.iter().map(|gate| &gate.touches).collect();
+    let gate_is_branching = circuit
+        .gates
+        .iter()
+        .map(|gate| gate.is_branching())
+        .collect();
+
+    let mut gate_scheduler =
+        config.create_gate_scheduler(num_gates, num_qubits, gate_touches, gate_is_branching);
+
+    info!("starting gate application loop.");
 
     loop {
         let these_gates = gate_scheduler
@@ -36,6 +45,8 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
             .into_iter()
             .map(|idx| &circuit.gates[idx])
             .collect::<Vec<_>>();
+
+        debug!("applying gates: {:?}", these_gates);
 
         if these_gates.is_empty() {
             info!("no more gates to apply. terminating loop.");
@@ -48,7 +59,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
             duration,
             ExpandResult {
                 state: new_state,
-                num_nonzero,
+                num_nonzero: new_num_nonzero,
             },
         ) = profile!(state_expander::expand(these_gates, num_qubits, state)?);
 
@@ -57,16 +68,17 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
             num_nonzero as f64 / max_num_states as f64
         };
 
-        info!(
-            "gate: {:<2} hop: {:<2} density: {:.8} nonzero: {:<10} time: {:.4}s",
-            num_gates_visited + 1,
-            num_gates_visited_here,
+        println!(
+            "gate: {:<2} density: {:.8} nonzero: {:>10} hop: {:<2}  time: {:.4}s",
+            num_gates_visited,
             density,
             num_nonzero,
+            num_gates_visited_here,
             duration.as_secs_f64(),
         );
 
         num_gates_visited += num_gates_visited_here;
+        num_nonzero = new_num_nonzero;
         state = new_state;
     }
 

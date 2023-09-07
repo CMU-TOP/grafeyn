@@ -136,6 +136,24 @@ impl Gate {
         };
         Self { defn, touches }
     }
+
+    pub fn is_branching(&self) -> bool {
+        // FIXME: Define and use output type (instead of using MaybeBranchingOutput)
+        match self.defn {
+            GateDefn::PauliY(_)
+            | GateDefn::PauliZ(_)
+            | GateDefn::T(_)
+            | GateDefn::X(_)
+            | GateDefn::CX { .. }
+            | GateDefn::CZ { .. }
+            | GateDefn::CCX { .. }
+            | GateDefn::CPhase { .. }
+            | GateDefn::FSim { .. }
+            | GateDefn::RZ { .. }
+            | GateDefn::CSwap { .. } => false,
+            _ => true,
+        }
+    }
 }
 
 impl PushApplicable for Gate {

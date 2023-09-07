@@ -1,6 +1,12 @@
-use crate::gate_scheduler::{GateScheduler, GateSchedulingPolicy, NaiveGateScheduler};
+use std::collections::HashSet;
+
+use log::info;
+
+use crate::gate_scheduler::{
+    GateScheduler, GateSchedulingPolicy, GreedyNonbranchingGateScheduler, NaiveGateScheduler,
+};
 use crate::options::Options;
-use crate::types::Real;
+use crate::types::{QubitIndex, Real};
 
 pub struct Config {
     #[allow(dead_code)]
@@ -19,9 +25,27 @@ impl Config {
         }
     }
 
-    pub fn create_gate_scheduler(&self, num_gates: usize) -> impl GateScheduler {
+    pub fn create_gate_scheduler<'a>(
+        &self,
+        num_gates: usize,
+        num_qubits: usize,
+        gate_touches: Vec<&'a HashSet<QubitIndex>>,
+        gate_is_branching: Vec<bool>,
+    ) -> Box<dyn GateScheduler + 'a> {
         match self.gate_scheduling_policy {
-            GateSchedulingPolicy::Naive => NaiveGateScheduler::new(num_gates),
+            GateSchedulingPolicy::Naive => {
+                info!("using naive gate scheduler");
+                Box::new(NaiveGateScheduler::new(num_gates))
+            }
+            GateSchedulingPolicy::GreedyNonbranching => {
+                info!("using greedy nonbranching gate scheduler");
+                Box::new(GreedyNonbranchingGateScheduler::new(
+                    num_gates,
+                    num_qubits,
+                    gate_touches,
+                    gate_is_branching,
+                ))
+            }
         }
     }
 }

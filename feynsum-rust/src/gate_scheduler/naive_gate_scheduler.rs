@@ -6,9 +6,6 @@ pub struct NaiveGateScheduler {
 }
 
 impl GateScheduler for NaiveGateScheduler {
-    fn new(num_gates: usize) -> Self {
-        Self { next: 0, num_gates }
-    }
     fn pick_next_gates(&mut self) -> Vec<usize> {
         if self.next >= self.num_gates {
             vec![]
@@ -17,5 +14,11 @@ impl GateScheduler for NaiveGateScheduler {
             self.next += 1;
             vec![gate_idx]
         }
+    }
+}
+
+impl NaiveGateScheduler {
+    pub fn new(num_gates: usize) -> Self {
+        Self { next: 0, num_gates }
     }
 }

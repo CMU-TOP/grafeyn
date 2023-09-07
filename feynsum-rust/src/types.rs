@@ -1,6 +1,7 @@
 use num::complex;
 
 pub type QubitIndex = usize;
+pub type GateIndex = usize;
 pub type Real = f64;
 pub type Complex = complex::Complex<Real>;
 
