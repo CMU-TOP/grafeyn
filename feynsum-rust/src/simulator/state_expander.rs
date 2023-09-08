@@ -1,4 +1,5 @@
 use std::cmp;
+use std::fmt::{self, Display, Formatter};
 
 use crate::circuit::{Gate, MaybeBranchingOutput, PushApplicable};
 use crate::config::Config;
@@ -8,10 +9,25 @@ use crate::utility::is_zero;
 use super::state::{DenseStateTable, SparseStateTable, State, Table};
 use super::SimulatorError;
 
+pub enum ExpandMethod {
+    Sparse,
+    Dense,
+}
+
+impl Display for ExpandMethod {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            ExpandMethod::Sparse => write!(f, "sparse"),
+            ExpandMethod::Dense => write!(f, "dense"),
+        }
+    }
+}
+
 pub struct ExpandResult {
     pub state: State,
     pub num_nonzero: usize,
     pub num_gate_apps: usize,
+    pub method: ExpandMethod,
 }
 
 pub fn expand(
@@ -55,6 +71,7 @@ fn expand_sparse(gates: Vec<&Gate>, state: State) -> Result<ExpandResult, Simula
         state: State::Sparse(table), // TODO: use DenseStateTable if necessary
         num_nonzero,
         num_gate_apps,
+        method: ExpandMethod::Sparse,
     })
 }
 
@@ -79,6 +96,7 @@ fn expand_dense(
         state: State::Dense(table), // TODO: use DenseStateTable if necessary
         num_nonzero,
         num_gate_apps,
+        method: ExpandMethod::Dense,
     })
 }
 
