@@ -69,13 +69,16 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
             num_nonzero as f64 / max_num_states as f64
         };
 
+        let throughput = (num_gate_apps_here as f64 / 1e6) / duration.as_secs_f64();
+
         println!(
-            "gate: {:<2} density: {:.8} nonzero: {:>10} hop: {:<2}  time: {:.4}s",
+            "gate: {:<2} density: {:.8} nonzero: {:>10} hop: {:<2}  time: {:.4}s throughput: {:.2}M gates/s",
             num_gates_visited,
             density,
             num_nonzero,
             num_gates_visited_here,
             duration.as_secs_f64(),
+            throughput
         );
 
         num_gates_visited += num_gates_visited_here;
