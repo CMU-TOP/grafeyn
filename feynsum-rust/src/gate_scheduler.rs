@@ -3,7 +3,6 @@ use std::str::FromStr;
 
 use log::info;
 
-use crate::config::Config;
 use crate::types::QubitIndex;
 
 mod greedy_nonbranching_gate_scheduler;
