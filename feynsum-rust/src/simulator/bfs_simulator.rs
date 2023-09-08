@@ -2,13 +2,13 @@ use log::{debug, error, info};
 
 use crate::circuit::Circuit;
 use crate::config::Config;
+use crate::gate_scheduler;
 use crate::profile;
 use crate::types::basis_idx::MAX_QUBITS;
 use crate::types::{BasisIdx, Complex};
 
-use super::state::State;
+use super::state::{SparseStateTable, State};
 use super::state_expander::{self, ExpandResult};
-use super::table::SparseStateTable;
 use super::SimulatorError;
 
 pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
@@ -36,8 +36,13 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
         .map(|gate| gate.is_branching())
         .collect();
 
-    let mut gate_scheduler =
-        config.create_gate_scheduler(num_gates, num_qubits, gate_touches, gate_is_branching);
+    let mut gate_scheduler = gate_scheduler::create_gate_scheduler(
+        &config.gate_scheduling_policy,
+        num_gates,
+        num_qubits,
+        gate_touches,
+        gate_is_branching,
+    );
 
     info!("starting gate application loop.");
 

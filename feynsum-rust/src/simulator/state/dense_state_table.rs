@@ -31,7 +31,9 @@ impl BuildHasher for BuildTrivialHashser {
 
 #[derive(Debug)]
 pub struct DenseStateTable {
-    table: HashMap<BasisIdx, Complex, BuildTrivialHashser>,
+    pub(super) table: HashMap<BasisIdx, Complex, BuildTrivialHashser>,
+    // NOTE: We use `pub(super)` to allow access from `impl State`, to reduce
+    // boilerplate and unnecessary dynamic dispatch
 }
 
 impl DenseStateTable {
@@ -47,10 +49,6 @@ impl DenseStateTable {
             .iter()
             .filter(|(_, w)| utility::is_nonzero(**w))
             .count()
-    }
-
-    pub fn compactify(self) -> impl Iterator<Item = (BasisIdx, Complex)> {
-        self.table.into_iter()
     }
 }
 

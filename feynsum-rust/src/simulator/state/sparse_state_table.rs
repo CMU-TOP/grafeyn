@@ -7,7 +7,9 @@ use super::Table;
 
 #[derive(Debug)]
 pub struct SparseStateTable {
-    table: HashMap<BasisIdx, Complex>,
+    pub(super) table: HashMap<BasisIdx, Complex>,
+    // NOTE: We use `pub(super)` to allow access from `impl State`, to reduce
+    // boilerplate and unnecessary dynamic dispatch
 }
 
 impl SparseStateTable {
@@ -21,10 +23,6 @@ impl SparseStateTable {
         Self {
             table: HashMap::new(),
         }
-    }
-
-    pub fn compactify(self) -> impl Iterator<Item = (BasisIdx, Complex)> {
-        self.table.into_iter()
     }
 
     pub fn num_nonzero(&self) -> usize {

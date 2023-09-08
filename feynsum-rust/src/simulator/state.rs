@@ -1,21 +1,29 @@
 use crate::types::{BasisIdx, Complex};
 
-use super::table::{DenseStateTable, SparseStateTable};
+mod dense_state_table;
+mod sparse_state_table;
+
+pub use dense_state_table::DenseStateTable;
+pub use sparse_state_table::SparseStateTable;
+
+pub trait Table {
+    fn put(&mut self, bidx: BasisIdx, weight: Complex);
+}
 
 #[derive(Debug)]
 pub enum State {
     Sparse(SparseStateTable),
     #[allow(dead_code)]
-    Dense(DenseStateTable), // TODO: use this
+    Dense(DenseStateTable),
     #[allow(dead_code)]
     DenseKnownNonzeroSize(DenseStateTable, usize), // TODO: use this
 }
 
 impl State {
-    pub fn compactify(self) -> Box<dyn Iterator<Item = (BasisIdx, Complex)>> {
+    pub fn compactify(self) -> impl Iterator<Item = (BasisIdx, Complex)> {
         match self {
-            State::Sparse(table) => Box::new(table.compactify()),
-            State::Dense(table) => Box::new(table.compactify()),
+            State::Sparse(table) => table.table.into_iter(),
+            State::Dense(table) => table.table.into_iter(),
             _ => panic!("TODO"),
         }
     }

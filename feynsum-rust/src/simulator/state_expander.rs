@@ -5,8 +5,7 @@ use crate::config::Config;
 use crate::types::{BasisIdx, Complex};
 use crate::utility::is_zero;
 
-use super::state::State;
-use super::table::{DenseStateTable, SparseStateTable, Table};
+use super::state::{DenseStateTable, SparseStateTable, State, Table};
 use super::SimulatorError;
 
 pub struct ExpandResult {
@@ -59,6 +58,30 @@ fn expand_sparse(gates: Vec<&Gate>, state: State) -> Result<ExpandResult, Simula
     })
 }
 
+fn expand_dense(
+    gates: Vec<&Gate>,
+    num_qubits: usize,
+    state: State,
+) -> Result<ExpandResult, SimulatorError> {
+    let prev_entries = state.compactify();
+
+    let mut table = DenseStateTable::new(num_qubits);
+
+    let mut num_gate_apps = 0;
+
+    for (bidx, weight) in prev_entries {
+        num_gate_apps += apply_gates(&gates, &mut table, bidx, weight)?;
+    }
+
+    let num_nonzero = table.num_nonzero();
+
+    Ok(ExpandResult {
+        state: State::Dense(table), // TODO: use DenseStateTable if necessary
+        num_nonzero,
+        num_gate_apps,
+    })
+}
+
 fn apply_gates(
     gates: &[&Gate],
     table: &mut impl Table,
@@ -83,28 +106,4 @@ fn apply_gates(
             Ok(1 + num_gate_apps_1 + num_gate_apps_2)
         }
     }
-}
-
-fn expand_dense(
-    gates: Vec<&Gate>,
-    num_qubits: usize,
-    state: State,
-) -> Result<ExpandResult, SimulatorError> {
-    let prev_entries = state.compactify();
-
-    let mut table = DenseStateTable::new(num_qubits);
-
-    let mut num_gate_apps = 0;
-
-    for (bidx, weight) in prev_entries {
-        num_gate_apps += apply_gates(&gates, &mut table, bidx, weight)?;
-    }
-
-    let num_nonzero = table.num_nonzero();
-
-    Ok(ExpandResult {
-        state: State::Dense(table), // TODO: use DenseStateTable if necessary
-        num_nonzero,
-        num_gate_apps,
-    })
 }
