@@ -68,7 +68,7 @@ fn expand_sparse(gates: Vec<&Gate>, state: State) -> Result<ExpandResult, Simula
     let num_nonzero = table.num_nonzero();
 
     Ok(ExpandResult {
-        state: State::Sparse(table), // TODO: use DenseStateTable if necessary
+        state: State::Sparse(table),
         num_nonzero,
         num_gate_apps,
         method: ExpandMethod::Sparse,
@@ -93,7 +93,7 @@ fn expand_dense(
     let num_nonzero = table.num_nonzero();
 
     Ok(ExpandResult {
-        state: State::Dense(table), // TODO: use DenseStateTable if necessary
+        state: State::Dense(table),
         num_nonzero,
         num_gate_apps,
         method: ExpandMethod::Dense,
