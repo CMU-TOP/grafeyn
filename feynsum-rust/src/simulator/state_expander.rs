@@ -11,14 +11,16 @@ use super::SimulatorError;
 
 pub enum ExpandMethod {
     Sparse,
-    Dense,
+    PushDense,
+    PullDense,
 }
 
 impl Display for ExpandMethod {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            ExpandMethod::Sparse => write!(f, "sparse"),
-            ExpandMethod::Dense => write!(f, "dense"),
+            ExpandMethod::Sparse => write!(f, "push sparse"),
+            ExpandMethod::PushDense => write!(f, "push dense"),
+            ExpandMethod::PullDense => write!(f, "pull dense"),
         }
     }
 }
@@ -47,10 +49,16 @@ pub fn expand(
     let current_density = num_nonzero as f64 / max_num_states as f64;
     let expected_cost = expected_density.max(current_density);
 
-    if expected_cost >= config.dense_threshold {
-        expand_dense(gates, num_qubits, state)
-    } else {
+    let all_gates_pullable = gates.iter().all(|_| todo!());
+
+    assert!(config.dense_threshold <= config.pull_threshold);
+
+    if expected_cost < config.dense_threshold {
         expand_sparse(gates, state)
+    } else if expected_cost >= config.pull_threshold && all_gates_pullable {
+        expand_pull_dense(gates, num_qubits, state)
+    } else {
+        expand_push_dense(gates, num_qubits, state)
     }
 }
 
@@ -75,7 +83,7 @@ fn expand_sparse(gates: Vec<&Gate>, state: State) -> Result<ExpandResult, Simula
     })
 }
 
-fn expand_dense(
+fn expand_push_dense(
     gates: Vec<&Gate>,
     num_qubits: usize,
     state: State,
@@ -96,8 +104,16 @@ fn expand_dense(
         state: State::Dense(table),
         num_nonzero,
         num_gate_apps,
-        method: ExpandMethod::Dense,
+        method: ExpandMethod::PushDense,
     })
+}
+
+fn expand_pull_dense(
+    _gates: Vec<&Gate>,
+    _num_qubits: usize,
+    _state: State,
+) -> Result<ExpandResult, SimulatorError> {
+    unimplemented!()
 }
 
 fn apply_gates(

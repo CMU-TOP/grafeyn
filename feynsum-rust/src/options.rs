@@ -40,4 +40,12 @@ pub struct Options {
         default_value = "0.25"
     )]
     pub dense_threshold: f64,
+
+    #[structopt(
+        name = "pull threshold",
+        long = "pull-threshold",
+        short = "pt",
+        default_value = "0.8"
+    )]
+    pub pull_threshold: f64,
 }

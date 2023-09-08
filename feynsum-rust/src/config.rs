@@ -9,6 +9,7 @@ pub struct Config {
     maxload: Real,
     pub gate_scheduling_policy: GateSchedulingPolicy, // TODO: Add pullThreshold
     pub dense_threshold: Real,
+    pub pull_threshold: Real,
 }
 
 impl Config {
@@ -18,6 +19,7 @@ impl Config {
             maxload: 0.0,  // FIXME
             gate_scheduling_policy: options.gate_schduling_policy,
             dense_threshold: options.dense_threshold,
+            pull_threshold: options.pull_threshold,
         }
     }
 }
