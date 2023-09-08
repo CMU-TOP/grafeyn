@@ -2,6 +2,9 @@ use std::collections::HashMap;
 use std::hash::{BuildHasher, Hasher};
 
 use crate::types::{BasisIdx, Complex};
+use crate::utility;
+
+use super::Table;
 
 pub struct TrivialHashser(u64);
 
@@ -37,5 +40,25 @@ impl DenseStateTable {
         Self {
             table: HashMap::with_capacity_and_hasher(capacity, BuildTrivialHashser),
         }
+    }
+
+    pub fn num_nonzero(&self) -> usize {
+        self.table
+            .iter()
+            .filter(|(_, w)| utility::is_nonzero(**w))
+            .count()
+    }
+
+    pub fn compactify(self) -> impl Iterator<Item = (BasisIdx, Complex)> {
+        self.table.into_iter()
+    }
+}
+
+impl Table for DenseStateTable {
+    fn put(&mut self, bidx: BasisIdx, weight: Complex) {
+        self.table
+            .entry(bidx)
+            .and_modify(|w| *w += weight)
+            .or_insert(weight);
     }
 }

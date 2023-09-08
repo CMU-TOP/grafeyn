@@ -12,9 +12,10 @@ pub enum State {
 }
 
 impl State {
-    pub fn compactify(self) -> impl Iterator<Item = (BasisIdx, Complex)> {
+    pub fn compactify(self) -> Box<dyn Iterator<Item = (BasisIdx, Complex)>> {
         match self {
-            State::Sparse(table) => table.compactify(),
+            State::Sparse(table) => Box::new(table.compactify()),
+            State::Dense(table) => Box::new(table.compactify()),
             _ => panic!("TODO"),
         }
     }
@@ -22,6 +23,7 @@ impl State {
     pub fn num_nonzero(&self) -> usize {
         match self {
             State::Sparse(table) => table.num_nonzero(),
+            State::Dense(table) => table.num_nonzero(),
             _ => panic!("TODO"),
         }
     }
