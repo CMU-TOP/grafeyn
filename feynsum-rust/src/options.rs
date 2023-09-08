@@ -32,4 +32,12 @@ pub struct Options {
         help = "gate scheduling policy to use"
     )]
     pub gate_schduling_policy: GateSchedulingPolicy,
+
+    #[structopt(
+        name = "dense threshold",
+        long = "dense-threshold",
+        short = "dt",
+        default_value = "0.25"
+    )]
+    pub dense_threshold: f64,
 }

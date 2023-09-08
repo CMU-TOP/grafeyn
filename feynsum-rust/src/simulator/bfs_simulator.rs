@@ -27,6 +27,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
     )); // initial state
     let mut num_nonzero = 1;
     let mut num_gate_apps = 0;
+    let mut prev_num_nonzero = 1;
 
     let gate_touches = circuit.gates.iter().map(|gate| &gate.touches).collect();
     let gate_is_branching = circuit
@@ -62,7 +63,13 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
                 num_nonzero: new_num_nonzero,
                 num_gate_apps: num_gate_apps_here,
             },
-        ) = profile!(state_expander::expand(these_gates, num_qubits, state)?);
+        ) = profile!(state_expander::expand(
+            these_gates,
+            config,
+            num_qubits,
+            prev_num_nonzero,
+            state
+        )?);
 
         let density = {
             let max_num_states = 1 << num_qubits;
@@ -83,6 +90,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
 
         num_gates_visited += num_gates_visited_here;
         num_gate_apps += num_gate_apps_here;
+        prev_num_nonzero = num_nonzero;
         num_nonzero = new_num_nonzero;
         state = new_state;
     });

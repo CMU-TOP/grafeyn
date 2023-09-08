@@ -18,4 +18,11 @@ impl State {
             _ => panic!("TODO"),
         }
     }
+
+    pub fn num_nonzero(&self) -> usize {
+        match self {
+            State::Sparse(table) => table.num_nonzero(),
+            _ => panic!("TODO"),
+        }
+    }
 }

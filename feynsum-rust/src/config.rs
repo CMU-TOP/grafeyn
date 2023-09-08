@@ -13,7 +13,8 @@ pub struct Config {
     block_size: u32,
     #[allow(dead_code)]
     maxload: Real,
-    gate_scheduling_policy: GateSchedulingPolicy, // TODO: Add denseThreshold, pullThreshold
+    gate_scheduling_policy: GateSchedulingPolicy, // TODO: Add pullThreshold
+    pub dense_threshold: Real,
 }
 
 impl Config {
@@ -22,6 +23,7 @@ impl Config {
             block_size: 0, // FIXME
             maxload: 0.0,  // FIXME
             gate_scheduling_policy: options.gate_schduling_policy,
+            dense_threshold: options.dense_threshold,
         }
     }
 
