@@ -3,7 +3,7 @@ use std::fmt::{self, Display, Formatter};
 
 use crate::circuit::{Gate, MaybeBranchingOutput, PushApplicable};
 use crate::config::Config;
-use crate::types::{BasisIdx, Complex};
+use crate::types::{BasisIdx, Complex, Real};
 use crate::utility::is_zero;
 
 use super::state::{DenseStateTable, SparseStateTable, State, Table};
@@ -39,15 +39,7 @@ pub fn expand(
     prev_num_nonzeros: usize,
     state: State,
 ) -> Result<ExpandResult, SimulatorError> {
-    let max_num_states = 1 << num_qubits;
-
-    let num_nonzeros = state.num_nonzeros();
-
-    let rate = f64::max(1.0, num_nonzeros as f64 / prev_num_nonzeros as f64);
-    let expected = cmp::min(max_num_states, (rate * num_nonzeros as f64) as i64);
-    let expected_density = expected as f64 / max_num_states as f64;
-    let current_density = num_nonzeros as f64 / max_num_states as f64;
-    let expected_cost = expected_density.max(current_density);
+    let expected_cost = expected_cost(num_qubits, state.num_nonzeros(), prev_num_nonzeros);
 
     let all_gates_pullable = gates.iter().all(|_| todo!());
 
@@ -60,6 +52,15 @@ pub fn expand(
     } else {
         expand_push_dense(gates, num_qubits, state)
     }
+}
+
+fn expected_cost(num_qubits: usize, num_nonzeros: usize, prev_num_nonzeros: usize) -> Real {
+    let max_num_states = 1 << num_qubits;
+    let rate = f64::max(1.0, num_nonzeros as f64 / prev_num_nonzeros as f64);
+    let expected = cmp::min(max_num_states, (rate * num_nonzeros as f64) as i64);
+    let expected_density = expected as f64 / max_num_states as f64;
+    let current_density = num_nonzeros as f64 / max_num_states as f64;
+    expected_density.max(current_density)
 }
 
 fn expand_sparse(gates: Vec<&Gate>, state: State) -> Result<ExpandResult, SimulatorError> {
