@@ -9,6 +9,7 @@ pub enum MaybeBranchingOutput {
 }
 
 #[derive(Debug)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum GateDefn {
     PauliY(QubitIndex),
     PauliZ(QubitIndex),
