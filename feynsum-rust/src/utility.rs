@@ -28,6 +28,7 @@ pub fn is_nonzero(c: Complex) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
 
     #[test]
     fn test_profile() {
@@ -38,5 +39,16 @@ mod tests {
         let (duration, result) = profile!(f(2, 3));
         assert_eq!(result, 6);
         assert!(duration.as_nanos() > 0);
+    }
+
+    #[test]
+    fn test_is_zero() {
+        assert!(is_zero(Complex::new(0.0, 0.0)));
+        assert!(is_zero(Complex::new(0.0, constants::ZERO_THRESHOLD / 2.0)));
+        assert!(is_zero(Complex::new(constants::ZERO_THRESHOLD / 2.0, 0.0)));
+        assert!(is_zero(Complex::new(
+            constants::ZERO_THRESHOLD / 2.0,
+            constants::ZERO_THRESHOLD / 2.0
+        )));
     }
 }
