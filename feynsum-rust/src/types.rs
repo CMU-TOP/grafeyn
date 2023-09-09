@@ -7,7 +7,6 @@ pub type Complex = complex::Complex<Real>;
 
 pub mod constants {
     pub const RECP_SQRT_2: super::Real = std::f64::consts::FRAC_1_SQRT_2;
-    //TODO: support more precision. this should be 0.70710678118654752440
     pub const ZERO_THRESHOLD: super::Real = 0.00000001;
 }
 
