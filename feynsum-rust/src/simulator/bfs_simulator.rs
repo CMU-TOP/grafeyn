@@ -119,3 +119,139 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
     assert!(num_gates_visited >= num_gates);
     Ok(state)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser;
+    use crate::types::constants;
+    use approx::abs_diff_eq;
+
+    #[test]
+    fn test_run() {
+        let config = Config::default();
+        // bv_n30.qasm
+        let circuit = Circuit::new(
+            parser::parse_program(
+                r#"
+OPENQASM 2.0;
+include "qelib1.inc";
+qreg q0[30];
+creg c0[30];
+h q0[0];
+h q0[1];
+h q0[2];
+h q0[3];
+h q0[4];
+h q0[5];
+h q0[6];
+h q0[7];
+h q0[8];
+h q0[9];
+h q0[10];
+h q0[11];
+h q0[12];
+h q0[13];
+h q0[14];
+h q0[15];
+h q0[16];
+h q0[17];
+h q0[18];
+h q0[19];
+h q0[20];
+h q0[21];
+h q0[22];
+h q0[23];
+h q0[24];
+h q0[25];
+h q0[26];
+h q0[27];
+h q0[28];
+x q0[29];
+h q0[29];
+//barrier q0[0],q0[1],q0[2],q0[3],q0[4],q0[5],q0[6],q0[7],q0[8],q0[9],q0[10],q0[11],q0[12],q0[13],q0[14],q0[15],q0[16],q0[17],q0[18],q0[19],q0[20],q0[21],q0[22],q0[23],q0[24],q0[25],q0[26],q0[27],q0[28],q0[29];
+cx q0[0],q0[29];
+cx q0[4],q0[29];
+cx q0[5],q0[29];
+cx q0[7],q0[29];
+cx q0[8],q0[29];
+cx q0[10],q0[29];
+cx q0[11],q0[29];
+cx q0[13],q0[29];
+cx q0[15],q0[29];
+cx q0[17],q0[29];
+cx q0[21],q0[29];
+cx q0[22],q0[29];
+cx q0[23],q0[29];
+cx q0[24],q0[29];
+cx q0[25],q0[29];
+cx q0[26],q0[29];
+cx q0[27],q0[29];
+cx q0[28],q0[29];
+//barrier q0[0],q0[1],q0[2],q0[3],q0[4],q0[5],q0[6],q0[7],q0[8],q0[9],q0[10],q0[11],q0[12],q0[13],q0[14],q0[15],q0[16],q0[17],q0[18],q0[19],q0[20],q0[21],q0[22],q0[23],q0[24],q0[25],q0[26],q0[27],q0[28],q0[29];
+h q0[0];
+h q0[1];
+h q0[2];
+h q0[3];
+h q0[4];
+h q0[5];
+h q0[6];
+h q0[7];
+h q0[8];
+h q0[9];
+h q0[10];
+h q0[11];
+h q0[12];
+h q0[13];
+h q0[14];
+h q0[15];
+h q0[16];
+h q0[17];
+h q0[18];
+h q0[19];
+h q0[20];
+h q0[21];
+h q0[22];
+h q0[23];
+h q0[24];
+h q0[25];
+h q0[26];
+h q0[27];
+h q0[28];
+            "#,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        let state = run(&config, circuit).unwrap();
+
+        println!("{:?}", state);
+
+        assert!(matches!(state, State::Sparse(SparseStateTable { .. })));
+
+        let table = match state {
+            State::Sparse(table) => table,
+            _ => panic!(),
+        };
+
+        assert_eq!(table.num_nonzeros(), 2);
+        let nonzero_field_1 = table
+            .get(&BasisIdx::new("11111111000101010110110110001"))
+            .unwrap();
+        assert!(abs_diff_eq!(
+            nonzero_field_1.re,
+            constants::RECP_SQRT_2,
+            epsilon = 0.0001
+        ));
+
+        let nonzero_field_2 = table
+            .get(&BasisIdx::new("111111111000101010110110110001"))
+            .unwrap();
+        assert!(abs_diff_eq!(
+            nonzero_field_2.re,
+            -constants::RECP_SQRT_2,
+            epsilon = 0.0001
+        ));
+    }
+}

@@ -31,6 +31,11 @@ impl SparseStateTable {
             .filter(|(_, w)| utility::is_nonzero(**w))
             .count()
     }
+
+    #[cfg(test)]
+    pub fn get(&self, bidx: &BasisIdx) -> Option<&Complex> {
+        self.table.get(&bidx)
+    }
 }
 
 impl Table for SparseStateTable {

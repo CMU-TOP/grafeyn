@@ -41,7 +41,7 @@ pub fn expand(
 ) -> Result<ExpandResult, SimulatorError> {
     let expected_cost = expected_cost(num_qubits, state.num_nonzeros(), prev_num_nonzeros);
 
-    let all_gates_pullable = gates.iter().all(|_| todo!());
+    let all_gates_pullable = gates.iter().all(|_| false);
 
     assert!(config.dense_threshold <= config.pull_threshold);
 

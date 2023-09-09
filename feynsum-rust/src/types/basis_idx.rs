@@ -65,6 +65,13 @@ impl BasisIdx {
             })
         }
     }
+
+    #[cfg(test)]
+    pub fn new(bits: &str) -> Self {
+        Self {
+            bits: u64::from_str_radix(bits, 2).unwrap(),
+        }
+    }
 }
 
 #[cfg(test)]

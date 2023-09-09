@@ -23,3 +23,16 @@ impl Config {
         }
     }
 }
+
+// used for testing
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            block_size: 0, // FIXME
+            maxload: 0.0,  // FIXME
+            gate_scheduling_policy: GateSchedulingPolicy::GreedyNonbranching,
+            dense_threshold: 0.25,
+            pull_threshold: 0.8,
+        }
+    }
+}
