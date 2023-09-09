@@ -196,7 +196,6 @@ mod tests {
         OPENQASM 2.0;
         include "qelib1.inc";
         qreg q[4];
-        creg c[4];
         x q[3];
         h q[0];
         h q[1];
@@ -209,16 +208,19 @@ mod tests {
         h q[1];
         h q[2];
         h q[3];
-        measure q[0] -> c[0];
-        measure q[1] -> c[1];
-        measure q[2] -> c[2];
-        measure q[3] -> c[3];
         "#;
 
         let program = parser::parse_program(&source).unwrap();
 
         let circuit = Circuit::new(program).unwrap();
-        println!("{:?}", circuit);
-        // TODO: Write tests
+        assert_eq!(circuit.gates.len(), 12);
+        assert_eq!(
+            circuit
+                .gates
+                .iter()
+                .map(|gate| gate.is_branching())
+                .collect::<Vec<bool>>(),
+            vec![false, true, true, true, true, false, false, false, true, true, true, true]
+        )
     }
 }
