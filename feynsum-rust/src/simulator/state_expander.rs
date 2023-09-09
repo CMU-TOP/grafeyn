@@ -27,7 +27,7 @@ impl Display for ExpandMethod {
 
 pub struct ExpandResult {
     pub state: State,
-    pub num_nonzero: usize,
+    pub num_nonzeros: usize,
     pub num_gate_apps: usize,
     pub method: ExpandMethod,
 }
@@ -36,17 +36,17 @@ pub fn expand(
     gates: Vec<&Gate>,
     config: &Config,
     num_qubits: usize,
-    prev_num_nonzero: usize,
+    prev_num_nonzeros: usize,
     state: State,
 ) -> Result<ExpandResult, SimulatorError> {
     let max_num_states = 1 << num_qubits;
 
-    let num_nonzero = state.num_nonzero();
+    let num_nonzeros = state.num_nonzeros();
 
-    let rate = f64::max(1.0, num_nonzero as f64 / prev_num_nonzero as f64);
-    let expected = cmp::min(max_num_states, (rate * num_nonzero as f64) as i64);
+    let rate = f64::max(1.0, num_nonzeros as f64 / prev_num_nonzeros as f64);
+    let expected = cmp::min(max_num_states, (rate * num_nonzeros as f64) as i64);
     let expected_density = expected as f64 / max_num_states as f64;
-    let current_density = num_nonzero as f64 / max_num_states as f64;
+    let current_density = num_nonzeros as f64 / max_num_states as f64;
     let expected_cost = expected_density.max(current_density);
 
     let all_gates_pullable = gates.iter().all(|_| todo!());
@@ -73,11 +73,11 @@ fn expand_sparse(gates: Vec<&Gate>, state: State) -> Result<ExpandResult, Simula
         num_gate_apps += apply_gates(&gates, &mut table, bidx, weight)?;
     }
 
-    let num_nonzero = table.num_nonzero();
+    let num_nonzeros = table.num_nonzeros();
 
     Ok(ExpandResult {
         state: State::Sparse(table),
-        num_nonzero,
+        num_nonzeros,
         num_gate_apps,
         method: ExpandMethod::Sparse,
     })
@@ -98,11 +98,11 @@ fn expand_push_dense(
         num_gate_apps += apply_gates(&gates, &mut table, bidx, weight)?;
     }
 
-    let num_nonzero = table.num_nonzero();
+    let num_nonzeros = table.num_nonzeros();
 
     Ok(ExpandResult {
         state: State::Dense(table),
-        num_nonzero,
+        num_nonzeros,
         num_gate_apps,
         method: ExpandMethod::PushDense,
     })

@@ -25,7 +25,7 @@ impl SparseStateTable {
         }
     }
 
-    pub fn num_nonzero(&self) -> usize {
+    pub fn num_nonzeros(&self) -> usize {
         self.table
             .iter()
             .filter(|(_, w)| utility::is_nonzero(**w))

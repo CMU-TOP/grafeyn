@@ -25,9 +25,9 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
         BasisIdx::zeros(num_qubits),
         Complex::new(1.0, 0.0),
     )); // initial state
-    let mut num_nonzero = 1;
+    let mut num_nonzeros = 1;
     let mut num_gate_apps = 0;
-    let mut prev_num_nonzero = 1;
+    let mut prev_num_nonzeros = 1;
 
     let gate_touches = circuit.gates.iter().map(|gate| &gate.touches).collect();
     let gate_is_branching = circuit
@@ -65,7 +65,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
             duration,
             ExpandResult {
                 state: new_state,
-                num_nonzero: new_num_nonzero,
+                num_nonzeros: new_num_nonzeros,
                 num_gate_apps: num_gate_apps_here,
                 method,
             },
@@ -73,13 +73,13 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
             these_gates,
             config,
             num_qubits,
-            prev_num_nonzero,
+            prev_num_nonzeros,
             state
         )?);
 
         let density = {
             let max_num_states = 1 << num_qubits;
-            num_nonzero as f64 / max_num_states as f64
+            num_nonzeros as f64 / max_num_states as f64
         };
 
         let throughput = (num_gate_apps_here as f64 / 1e6) / duration.as_secs_f64();
@@ -88,7 +88,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
             "gate: {:<2} density: {:.8} nonzero: {:>10} hop: {:<2} {} time: {:.4}s throughput: {:.2}M gates/s",
             num_gates_visited,
             density,
-            num_nonzero,
+            num_nonzeros,
             num_gates_visited_here,
             method,
             duration.as_secs_f64(),
@@ -97,21 +97,21 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
 
         num_gates_visited += num_gates_visited_here;
         num_gate_apps += num_gate_apps_here;
-        prev_num_nonzero = num_nonzero;
-        num_nonzero = new_num_nonzero;
+        prev_num_nonzeros = num_nonzeros;
+        num_nonzeros = new_num_nonzeros;
         state = new_state;
     });
 
     let final_density = {
         let max_num_states = 1 << num_qubits;
-        num_nonzero as f64 / max_num_states as f64
+        num_nonzeros as f64 / max_num_states as f64
     };
 
     println!(
         "gate: {:<2} density: {:.8} nonzero: {:>10}\ngate app count: {}, time: {}s",
         num_gates_visited,
         final_density,
-        num_nonzero,
+        num_nonzeros,
         num_gate_apps,
         duration.as_secs_f64()
     );

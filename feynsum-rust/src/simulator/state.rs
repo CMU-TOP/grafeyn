@@ -28,10 +28,10 @@ impl State {
         }
     }
 
-    pub fn num_nonzero(&self) -> usize {
+    pub fn num_nonzeros(&self) -> usize {
         match self {
-            State::Sparse(table) => table.num_nonzero(),
-            State::Dense(table) => table.num_nonzero(),
+            State::Sparse(table) => table.num_nonzeros(),
+            State::Dense(table) => table.num_nonzeros(),
             _ => panic!("TODO"),
         }
     }
