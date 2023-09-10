@@ -66,6 +66,15 @@ impl BasisIdx {
         }
     }
 
+    // NOTE: DenseStateTable uses BasisIdx as an index into its array
+    pub fn into_idx(self) -> usize {
+        self.bits as usize
+    }
+
+    pub fn from_idx(idx: usize) -> Self {
+        Self { bits: idx as u64 }
+    }
+
     #[cfg(test)]
     pub fn new(bits: &str) -> Self {
         Self {

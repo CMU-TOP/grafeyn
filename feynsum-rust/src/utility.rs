@@ -18,6 +18,10 @@ macro_rules! profile {
 fn is_real_zero(x: Real) -> bool {
     x.abs() < constants::ZERO_THRESHOLD
 }
+
+pub fn is_real_nonzero(x: Real) -> bool {
+    !is_real_zero(x)
+}
 pub fn is_zero(c: Complex) -> bool {
     is_real_zero(c.re) && is_real_zero(c.im)
 }

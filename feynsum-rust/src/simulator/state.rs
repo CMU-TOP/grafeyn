@@ -1,3 +1,5 @@
+use std::sync::atomic::Ordering;
+
 use crate::types::{BasisIdx, Complex};
 
 mod dense_state_table;
@@ -20,10 +22,17 @@ pub enum State {
 }
 
 impl State {
-    pub fn compactify(self) -> impl Iterator<Item = (BasisIdx, Complex)> {
+    pub fn compactify(self) -> Box<dyn Iterator<Item = (BasisIdx, Complex)>> {
         match self {
-            State::Sparse(table) => table.table.into_iter(),
-            State::Dense(table) => table.table.into_iter(),
+            State::Sparse(table) => Box::new(table.table.into_iter()),
+            State::Dense(table) => {
+                Box::new(table.array.into_iter().enumerate().map(|(idx, (re, im))| {
+                    (
+                        BasisIdx::from_idx(idx),
+                        Complex::new(re.load(Ordering::Relaxed), im.load(Ordering::Relaxed)),
+                    )
+                }))
+            }
             _ => panic!("TODO"),
         }
     }
