@@ -49,7 +49,8 @@ pub fn expand(
     if expected_cost < config.dense_threshold {
         expand_sparse(gates, state)
     } else if expected_cost >= config.pull_threshold && all_gates_pullable {
-        expand_pull_dense(gates, num_qubits, state)
+        // TODO: expand_pull_dense(gates, num_qubits, state)
+        expand_push_dense(gates, num_qubits, state)
     } else {
         expand_push_dense(gates, num_qubits, state)
     }
@@ -110,6 +111,7 @@ fn expand_push_dense(
     })
 }
 
+#[allow(dead_code)]
 fn expand_pull_dense(
     _gates: Vec<&Gate>,
     _num_qubits: usize,
