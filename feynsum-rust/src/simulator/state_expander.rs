@@ -42,15 +42,14 @@ pub fn expand(
 ) -> Result<ExpandResult, SimulatorError> {
     let expected_cost = expected_cost(num_qubits, state.num_nonzeros(), prev_num_nonzeros);
 
-    let all_gates_pullable = gates.iter().all(|_| false);
+    let all_gates_pullable = gates.iter().all(|_| false); // FIXME
 
     assert!(config.dense_threshold <= config.pull_threshold);
 
     if expected_cost < config.dense_threshold {
         expand_sparse(gates, state)
     } else if expected_cost >= config.pull_threshold && all_gates_pullable {
-        // TODO: expand_pull_dense(gates, num_qubits, state)
-        expand_push_dense(gates, num_qubits, state)
+        expand_pull_dense(gates, num_qubits, state)
     } else {
         expand_push_dense(gates, num_qubits, state)
     }
@@ -66,15 +65,14 @@ fn expected_cost(num_qubits: usize, num_nonzeros: usize, prev_num_nonzeros: usiz
 }
 
 fn expand_sparse(gates: Vec<&Gate>, state: State) -> Result<ExpandResult, SimulatorError> {
-    let prev_entries = state.compactify();
-
     let mut table = SparseStateTable::new();
 
-    let mut num_gate_apps = 0;
-
-    for (bidx, weight) in prev_entries {
-        num_gate_apps += apply_gates(&gates, &mut table, bidx, weight)?;
-    }
+    let num_gate_apps = state.compactify().fold(
+        Ok(0),
+        |num_gate_apps: Result<usize, SimulatorError>, (bidx, weight)| {
+            num_gate_apps.and_then(|acc| Ok(acc + apply_gates(&gates, &mut table, bidx, weight)?))
+        },
+    )?;
 
     let num_nonzeros = table.num_nonzeros();
 
@@ -91,15 +89,14 @@ fn expand_push_dense(
     num_qubits: usize,
     state: State,
 ) -> Result<ExpandResult, SimulatorError> {
-    let prev_entries = state.compactify();
-
     let mut table = DenseStateTable::new(num_qubits);
 
-    let mut num_gate_apps = 0;
-
-    for (bidx, weight) in prev_entries {
-        num_gate_apps += apply_gates(&gates, &mut table, bidx, weight)?;
-    }
+    let num_gate_apps = state.compactify().fold(
+        Ok(0),
+        |num_gate_apps: Result<usize, SimulatorError>, (bidx, weight)| {
+            num_gate_apps.and_then(|acc| Ok(acc + apply_gates(&gates, &mut table, bidx, weight)?))
+        },
+    )?;
 
     let num_nonzeros = table.num_nonzeros();
 
@@ -111,7 +108,6 @@ fn expand_push_dense(
     })
 }
 
-#[allow(dead_code)]
 fn expand_pull_dense(
     _gates: Vec<&Gate>,
     _num_qubits: usize,
