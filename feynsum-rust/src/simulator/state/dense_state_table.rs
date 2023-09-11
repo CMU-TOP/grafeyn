@@ -9,8 +9,7 @@ use super::Table;
 
 #[derive(Debug)]
 pub struct DenseStateTable {
-    pub(super) array: Vec<(AtomicF64, AtomicF64)>, // NOTE: We use `pub(super)` to allow access from `impl State`, to reduce
-                                                   // boilerplate and unnecessary dynamic dispatch
+    pub array: Vec<(AtomicF64, AtomicF64)>,
 }
 
 impl DenseStateTable {

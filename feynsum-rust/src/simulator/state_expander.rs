@@ -1,5 +1,10 @@
 use std::cmp;
 use std::fmt::{self, Display, Formatter};
+use std::ops::Deref;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
+
+use rayon::prelude::*;
 
 use crate::circuit::{Gate, MaybeBranchingOutput, PushApplicable};
 use crate::config::Config;
@@ -89,15 +94,30 @@ fn expand_push_dense(
     num_qubits: usize,
     state: State,
 ) -> Result<ExpandResult, SimulatorError> {
-    let mut table = DenseStateTable::new(num_qubits);
+    let table = Arc::new(DenseStateTable::new(num_qubits));
 
-    let num_gate_apps = state.compactify().fold(
-        Ok(0),
-        |num_gate_apps: Result<usize, SimulatorError>, (bidx, weight)| {
-            num_gate_apps.and_then(|acc| Ok(acc + apply_gates(&gates, &mut table, bidx, weight)?))
-        },
-    )?;
+    let num_gate_apps = match state {
+        State::Sparse(prev_table) => prev_table
+            .table
+            .into_par_iter()
+            .map(|(bidx, weight)| {
+                apply_gates_par(&gates, Arc::clone(&table), bidx, weight).unwrap()
+            })
+            .reduce(|| 0, |num_gate_apps, app| num_gate_apps + app),
+        State::Dense(prev_table) => prev_table
+            .array
+            .into_par_iter()
+            .enumerate()
+            .map(|(idx, (re, im))| {
+                let bidx = BasisIdx::from_idx(idx);
+                let weight = Complex::new(re.load(Ordering::Relaxed), im.load(Ordering::Relaxed));
+                apply_gates_par(&gates, Arc::clone(&table), bidx, weight).unwrap()
+            })
+            .reduce(|| 0, |num_gate_apps, app| num_gate_apps + app),
+        _ => unimplemented!(),
+    };
 
+    let table = Arc::<DenseStateTable>::into_inner(table).unwrap();
     let num_nonzeros = table.num_nonzeros();
 
     Ok(ExpandResult {
@@ -137,6 +157,37 @@ fn apply_gates(
         MaybeBranchingOutput::OutputTwo((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
             let num_gate_apps_1 = apply_gates(&gates[1..], table, new_bidx1, new_weight1)?;
             let num_gate_apps_2 = apply_gates(&gates[1..], table, new_bidx2, new_weight2)?;
+            Ok(1 + num_gate_apps_1 + num_gate_apps_2)
+        }
+    }
+}
+
+fn apply_gates_par(
+    gates: &[&Gate],
+    table: Arc<DenseStateTable>,
+    bidx: BasisIdx,
+    weight: Complex,
+) -> Result<usize, SimulatorError> {
+    if is_zero(weight) {
+        return Ok(0);
+    }
+    if gates.is_empty() {
+        let idx = bidx.into_idx();
+        let (re, im) = &table.deref().array[idx];
+
+        re.fetch_add(weight.re, Ordering::Relaxed);
+        im.fetch_add(weight.im, Ordering::Relaxed);
+        return Ok(0);
+    }
+
+    match gates[0].push_apply(bidx, weight)? {
+        MaybeBranchingOutput::OuptutOne((new_bidx, new_weight)) => {
+            Ok(1 + apply_gates_par(&gates[1..], table, new_bidx, new_weight)?)
+        }
+        MaybeBranchingOutput::OutputTwo((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
+            let num_gate_apps_1 =
+                apply_gates_par(&gates[1..], Arc::clone(&table), new_bidx1, new_weight1)?;
+            let num_gate_apps_2 = apply_gates_par(&gates[1..], table, new_bidx2, new_weight2)?;
             Ok(1 + num_gate_apps_1 + num_gate_apps_2)
         }
     }

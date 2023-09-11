@@ -7,9 +7,7 @@ use super::Table;
 
 #[derive(Debug)]
 pub struct SparseStateTable {
-    pub(super) table: HashMap<BasisIdx, Complex>,
-    // NOTE: We use `pub(super)` to allow access from `impl State`, to reduce
-    // boilerplate and unnecessary dynamic dispatch
+    pub table: HashMap<BasisIdx, Complex>,
 }
 
 impl SparseStateTable {
