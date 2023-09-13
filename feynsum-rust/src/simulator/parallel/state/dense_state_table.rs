@@ -1,6 +1,4 @@
-use std::sync::atomic::Ordering;
-
-use atomic_float::AtomicF32;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::types::{BasisIdx, Complex};
 use crate::utility;
@@ -9,7 +7,7 @@ use super::Table;
 
 #[derive(Debug)]
 pub struct DenseStateTable {
-    pub array: Vec<(AtomicF32, AtomicF32)>,
+    pub array: Vec<AtomicU64>,
 }
 
 impl DenseStateTable {
@@ -17,18 +15,16 @@ impl DenseStateTable {
         let capacity = 1 << num_qubits;
         // TODO: Check if the initialization is performance bottleneck
         Self {
-            array: (0..capacity)
-                .map(|_| (AtomicF32::new(0.0), AtomicF32::new(0.0)))
-                .collect(),
+            array: (0..capacity).map(|_| AtomicU64::new(0)).collect(),
         }
     }
 
     pub fn num_nonzeros(&self) -> usize {
         self.array
             .iter()
-            .filter(|&(re, im)| {
-                utility::is_real_nonzero(re.load(Ordering::Relaxed))
-                    || utility::is_real_nonzero(im.load(Ordering::Relaxed))
+            .filter(|v| {
+                let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
+                utility::is_real_nonzero(re) || utility::is_real_nonzero(im)
             })
             .count()
     }
@@ -37,8 +33,7 @@ impl DenseStateTable {
         // change the signature of `put` method from `&mut self` to &self
         let idx = bidx.into_idx();
 
-        atomic_add(&self.array[idx].0, weight.re);
-        atomic_add(&self.array[idx].1, weight.im);
+        atomic_put(&self.array[idx], weight);
     }
 }
 
@@ -46,30 +41,28 @@ impl Table for DenseStateTable {
     fn put(&mut self, bidx: BasisIdx, weight: Complex) {
         let idx = bidx.into_idx();
 
-        atomic_add(&self.array[idx].0, weight.re);
-        atomic_add(&self.array[idx].1, weight.im);
+        atomic_put(&self.array[idx], weight);
     }
 }
 
-fn atomic_add(num: &AtomicF32, adder: f32) {
-    let mut old = num.load(Ordering::Relaxed);
-    let mut new = old + adder;
-    while let Err(actual) = num.compare_exchange(old, new, Ordering::Relaxed, Ordering::Relaxed) {
+fn atomic_put(to: &AtomicU64, c: Complex) {
+    let mut old = to.load(Ordering::Relaxed);
+    let (mut old_re, mut old_im) = utility::unpack_complex(old);
+    let (mut new_re, mut new_im) = (old_re + c.re, old_im + c.im);
+    let mut new = utility::pack_complex(new_re, new_im);
+    while let Err(actual) = to.compare_exchange(old, new, Ordering::Relaxed, Ordering::Relaxed) {
         old = actual;
-        new = old + adder;
+        (old_re, old_im) = utility::unpack_complex(old);
+        (new_re, new_im) = (old_re + c.re, old_im + c.im);
+        new = utility::pack_complex(new_re, new_im);
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_atomic_put() {
-        let table = DenseStateTable::new(2);
-        table.atomic_put(BasisIdx::from_idx(2), Complex::new(1.0, 0.0));
-
-        assert_eq!(table.array[2].0.load(Ordering::Relaxed), 1.0);
-        assert_eq!(table.array[2].1.load(Ordering::Relaxed), 0.0);
+        todo!()
     }
 }

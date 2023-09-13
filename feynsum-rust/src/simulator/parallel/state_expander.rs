@@ -7,7 +7,7 @@ use rayon::prelude::*;
 use crate::circuit::{Gate, MaybeBranchingOutput, PushApplicable};
 use crate::config::Config;
 use crate::types::{BasisIdx, Complex, Real};
-use crate::utility::is_zero;
+use crate::utility;
 
 use super::super::{Compactifiable, SimulatorError};
 use super::state::{DenseStateTable, SparseStateTable, State, Table};
@@ -122,15 +122,13 @@ fn expand_push_dense(
                     chunk
                         .into_iter()
                         .enumerate()
-                        .map(|(idx, (re, im))| {
+                        .map(|(idx, v)| {
+                            let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
                             apply_gates_par(
                                 &gates,
                                 Arc::clone(&table),
                                 BasisIdx::from_idx(block_size * chunk_idx + idx),
-                                Complex::new(
-                                    re.load(Ordering::Relaxed),
-                                    im.load(Ordering::Relaxed),
-                                ),
+                                Complex::new(re, im),
                             )
                         })
                         .sum::<Result<usize, SimulatorError>>()
@@ -169,7 +167,7 @@ fn apply_gates(
     bidx: BasisIdx,
     weight: Complex,
 ) -> Result<usize, SimulatorError> {
-    if is_zero(weight) {
+    if utility::is_zero(weight) {
         return Ok(0);
     }
     if gates.is_empty() {
@@ -195,7 +193,7 @@ fn apply_gates_par(
     bidx: BasisIdx,
     weight: Complex,
 ) -> Result<usize, SimulatorError> {
-    if is_zero(weight) {
+    if utility::is_zero(weight) {
         return Ok(0);
     }
     if gates.is_empty() {
@@ -224,7 +222,7 @@ fn apply_gates_par_internal(
     bidx: BasisIdx,
     weight: Complex,
 ) -> Result<usize, SimulatorError> {
-    if is_zero(weight) {
+    if utility::is_zero(weight) {
         return Ok(0);
     }
     if gates.is_empty() {

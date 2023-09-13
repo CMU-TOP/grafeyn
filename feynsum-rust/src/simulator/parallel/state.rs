@@ -1,6 +1,7 @@
 use std::sync::atomic::Ordering;
 
 use crate::types::{BasisIdx, Complex};
+use crate::utility;
 
 mod dense_state_table;
 mod sparse_state_table;
@@ -37,14 +38,10 @@ impl Compactifiable for State {
     fn compactify(self) -> Box<dyn Iterator<Item = (BasisIdx, Complex)>> {
         match self {
             State::Sparse(table) => Box::new(table.table.into_iter()),
-            State::Dense(table) => {
-                Box::new(table.array.into_iter().enumerate().map(|(idx, (re, im))| {
-                    (
-                        BasisIdx::from_idx(idx),
-                        Complex::new(re.load(Ordering::Relaxed), im.load(Ordering::Relaxed)),
-                    )
-                }))
-            }
+            State::Dense(table) => Box::new(table.array.into_iter().enumerate().map(|(idx, v)| {
+                let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
+                (BasisIdx::from_idx(idx), Complex::new(re, im))
+            })),
             _ => panic!("TODO"),
         }
     }

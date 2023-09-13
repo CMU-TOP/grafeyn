@@ -30,6 +30,15 @@ pub fn is_nonzero(c: Complex) -> bool {
     !is_real_zero(c.re) || !is_real_zero(c.im)
 }
 
+pub fn unpack_complex(num: u64) -> (f32, f32) {
+    let [re, im]: [f32; 2] = bytemuck::cast(num);
+    (re, im)
+}
+
+pub fn pack_complex(re: f32, im: f32) -> u64 {
+    bytemuck::cast([re, im])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
