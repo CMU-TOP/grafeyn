@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 use crate::gate_scheduler::GateSchedulingPolicy;
+use crate::types::Real;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "feynsum", about = "Feynsum quantum simulator")]
@@ -39,7 +40,7 @@ pub struct Options {
         short = "dt",
         default_value = "0.25"
     )]
-    pub dense_threshold: f64,
+    pub dense_threshold: Real,
 
     #[structopt(
         name = "pull threshold",
@@ -47,7 +48,7 @@ pub struct Options {
         short = "pt",
         default_value = "0.8"
     )]
-    pub pull_threshold: f64,
+    pub pull_threshold: Real,
 
     #[structopt(
         name = "parallelism",

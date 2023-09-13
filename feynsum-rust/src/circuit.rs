@@ -167,7 +167,7 @@ fn eval(exp: Expression) -> Result<Real, CircuitBuildError> {
     match exp {
         Expression::Pi => Ok(std::f64::consts::PI),
         Expression::Real(x) => Ok(x),
-        Expression::Int(x) => Ok(x as f64),
+        Expression::Int(x) => Ok(x as Real),
         Expression::Op(opcode, e1, e2) => {
             let v1 = eval(*e1)?;
             let v2 = eval(*e2)?;

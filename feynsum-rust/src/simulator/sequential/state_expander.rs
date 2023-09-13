@@ -57,10 +57,10 @@ pub fn expand(
 
 fn expected_cost(num_qubits: usize, num_nonzeros: usize, prev_num_nonzeros: usize) -> Real {
     let max_num_states = 1 << num_qubits;
-    let rate = f64::max(1.0, num_nonzeros as f64 / prev_num_nonzeros as f64);
-    let expected = cmp::min(max_num_states, (rate * num_nonzeros as f64) as i64);
-    let expected_density = expected as f64 / max_num_states as f64;
-    let current_density = num_nonzeros as f64 / max_num_states as f64;
+    let rate = Real::max(1.0, num_nonzeros as Real / prev_num_nonzeros as Real);
+    let expected = cmp::min(max_num_states, (rate * num_nonzeros as Real) as i64);
+    let expected_density = expected as Real / max_num_states as Real;
+    let current_density = num_nonzeros as Real / max_num_states as Real;
     expected_density.max(current_density)
 }
 
