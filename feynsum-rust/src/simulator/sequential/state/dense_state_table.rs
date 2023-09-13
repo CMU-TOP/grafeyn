@@ -29,6 +29,6 @@ impl Table for DenseStateTable {
     fn put(&mut self, bidx: BasisIdx, weight: Complex) {
         let idx = bidx.into_idx();
 
-        self.array[idx] = weight;
+        self.array[idx] += weight;
     }
 }
