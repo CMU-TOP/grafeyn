@@ -1,6 +1,6 @@
 use std::sync::atomic::Ordering;
 
-use atomic_float::AtomicF64;
+use atomic_float::AtomicF32;
 
 use crate::types::{BasisIdx, Complex};
 use crate::utility;
@@ -9,7 +9,7 @@ use super::Table;
 
 #[derive(Debug)]
 pub struct DenseStateTable {
-    pub array: Vec<(AtomicF64, AtomicF64)>,
+    pub array: Vec<(AtomicF32, AtomicF32)>,
 }
 
 impl DenseStateTable {
@@ -18,7 +18,7 @@ impl DenseStateTable {
         // TODO: Check if the initialization is performance bottleneck
         Self {
             array: (0..capacity)
-                .map(|_| (AtomicF64::new(0.0), AtomicF64::new(0.0)))
+                .map(|_| (AtomicF32::new(0.0), AtomicF32::new(0.0)))
                 .collect(),
         }
     }
@@ -51,7 +51,7 @@ impl Table for DenseStateTable {
     }
 }
 
-fn atomic_add(num: &AtomicF64, adder: f64) {
+fn atomic_add(num: &AtomicF32, adder: f32) {
     let mut old = num.load(Ordering::Relaxed);
     let mut new = old + adder;
     while let Err(actual) = num.compare_exchange(old, new, Ordering::Relaxed, Ordering::Relaxed) {

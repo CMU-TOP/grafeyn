@@ -134,7 +134,7 @@ impl Circuit {
                         },
                         ("u2", 2, 1) => GateDefn::U {
                             target: args[0],
-                            theta: std::f64::consts::PI / 2.0,
+                            theta: std::f32::consts::PI / 2.0,
                             phi: params[0],
                             lambda: params[1],
                         },
@@ -165,8 +165,8 @@ impl Circuit {
 
 fn eval(exp: Expression) -> Result<Real, CircuitBuildError> {
     match exp {
-        Expression::Pi => Ok(std::f64::consts::PI),
-        Expression::Real(x) => Ok(x),
+        Expression::Pi => Ok(std::f32::consts::PI),
+        Expression::Real(x) => Ok(x as Real),
         Expression::Int(x) => Ok(x as Real),
         Expression::Op(opcode, e1, e2) => {
             let v1 = eval(*e1)?;

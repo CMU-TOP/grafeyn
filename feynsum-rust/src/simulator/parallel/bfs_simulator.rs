@@ -82,7 +82,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
             num_nonzeros as Real / max_num_states as Real
         };
 
-        let throughput = (num_gate_apps_here as Real / 1e6) / duration.as_secs_f64();
+        let throughput = (num_gate_apps_here as Real / 1e6) / duration.as_secs_f32();
 
         println!(
             "gate: {:<3} density: {:.8} nonzero: {:>10} hop: {:<2} {} time: {:.4}s throughput: {:.2}M gates/s",
@@ -91,7 +91,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
             num_nonzeros,
             num_gates_visited_here,
             method,
-            duration.as_secs_f64(),
+            duration.as_secs_f32(),
             throughput
         );
 
@@ -113,7 +113,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
         final_density,
         num_nonzeros,
         num_gate_apps,
-        duration.as_secs_f64()
+        duration.as_secs_f32()
     );
 
     assert!(num_gates_visited >= num_gates);
