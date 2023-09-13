@@ -38,7 +38,16 @@ impl Table for DenseStateTable {
     fn put(&mut self, bidx: BasisIdx, weight: Complex) {
         let idx = bidx.into_idx();
 
-        self.array[idx].0.fetch_add(weight.re, Ordering::Relaxed);
-        self.array[idx].1.fetch_add(weight.im, Ordering::Relaxed);
+        atomic_add(&self.array[idx].0, weight.re);
+        atomic_add(&self.array[idx].1, weight.re);
+    }
+}
+
+fn atomic_add(num: &AtomicF64, adder: f64) {
+    let mut old = num.load(Ordering::Relaxed);
+    let mut new = old + adder;
+    while let Err(actual) = num.compare_exchange(old, new, Ordering::Relaxed, Ordering::Relaxed) {
+        old = actual;
+        new = old + adder;
     }
 }
