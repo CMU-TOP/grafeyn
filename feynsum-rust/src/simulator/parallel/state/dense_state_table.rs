@@ -32,6 +32,14 @@ impl DenseStateTable {
             })
             .count()
     }
+    pub fn atomic_put(&self, bidx: BasisIdx, weight: Complex) {
+        // FIXME: We can use `put` method instead of `atomic_put` method if we
+        // change the signature of `put` method from `&mut self` to &self
+        let idx = bidx.into_idx();
+
+        atomic_add(&self.array[idx].0, weight.re);
+        atomic_add(&self.array[idx].1, weight.im);
+    }
 }
 
 impl Table for DenseStateTable {
@@ -39,7 +47,7 @@ impl Table for DenseStateTable {
         let idx = bidx.into_idx();
 
         atomic_add(&self.array[idx].0, weight.re);
-        atomic_add(&self.array[idx].1, weight.re);
+        atomic_add(&self.array[idx].1, weight.im);
     }
 }
 
@@ -49,5 +57,19 @@ fn atomic_add(num: &AtomicF64, adder: f64) {
     while let Err(actual) = num.compare_exchange(old, new, Ordering::Relaxed, Ordering::Relaxed) {
         old = actual;
         new = old + adder;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_atomic_put() {
+        let table = DenseStateTable::new(2);
+        table.atomic_put(BasisIdx::from_idx(2), Complex::new(1.0, 0.0));
+
+        assert_eq!(table.array[2].0.load(Ordering::Relaxed), 1.0);
+        assert_eq!(table.array[2].1.load(Ordering::Relaxed), 0.0);
     }
 }

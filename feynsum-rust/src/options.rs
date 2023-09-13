@@ -51,4 +51,13 @@ pub struct Options {
 
     #[structopt(name = "parallelism", long = "parallelism", short = "p")]
     pub parallelism: bool,
+
+    #[structopt(
+        name = "block size",
+        long = "block-size",
+        short = "bs",
+        default_value = "10000",
+        help = "block size for parallelism"
+    )]
+    pub block_size: usize,
 }
