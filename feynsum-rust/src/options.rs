@@ -49,8 +49,14 @@ pub struct Options {
     )]
     pub pull_threshold: f64,
 
-    #[structopt(name = "parallelism", long = "parallelism", short = "p")]
-    pub parallelism: bool,
+    #[structopt(
+        name = "parallelism",
+        long = "parallelism",
+        short = "p",
+        default_value = "1",
+        help = "number of threads to use"
+    )]
+    pub parallelism: usize,
 
     #[structopt(
         name = "block size",

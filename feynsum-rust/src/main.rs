@@ -8,6 +8,7 @@ mod types;
 mod utility;
 
 use log::info;
+use rayon::ThreadPoolBuilder;
 use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
@@ -46,7 +47,12 @@ fn main() -> io::Result<()> {
 
     info!("circuit construction complete. starting simulation");
 
-    if options.parallelism {
+    ThreadPoolBuilder::new()
+        .num_threads(options.parallelism)
+        .build_global()
+        .unwrap();
+
+    if options.parallelism == 1 {
         info!("using parallel simulator");
         let result = match simulator::parallel::bfs_simulator::run(&config, circuit) {
             Ok(result) => result,
