@@ -16,7 +16,7 @@ use structopt::StructOpt;
 use circuit::Circuit;
 use config::Config;
 use options::Options;
-use simulator::State;
+use simulator::Compactifiable;
 
 fn main() -> io::Result<()> {
     env_logger::init();
@@ -46,25 +46,40 @@ fn main() -> io::Result<()> {
 
     info!("circuit construction complete. starting simulation");
 
-    let result = match simulator::bfs_simulator::run(&config, circuit) {
-        Ok(result) => result,
-        Err(err) => {
-            panic!("Failed to run simulator: {:?}", err);
-        }
+    if options.parallelism {
+        info!("using parallel simulator");
+        let result = match simulator::parallel::bfs_simulator::run(&config, circuit) {
+            Ok(result) => result,
+            Err(err) => {
+                panic!("Failed to run simulator: {:?}", err);
+            }
+        };
+        if let Some(output) = options.output {
+            info!("dumping densities to: {}", output.display());
+            dump_densities(&output, result)?;
+            info!("output written to: {}", output.display());
+        };
+    } else {
+        info!("using sequential simulator");
+        let result = match simulator::sequential::bfs_simulator::run(&config, circuit) {
+            Ok(result) => result,
+            Err(err) => {
+                panic!("Failed to run simulator: {:?}", err);
+            }
+        };
+        if let Some(output) = options.output {
+            info!("dumping densities to: {}", output.display());
+            dump_densities(&output, result)?;
+            info!("output written to: {}", output.display());
+        };
     };
 
     info!("simulation complete");
 
-    if let Some(output) = options.output {
-        info!("dumping densities to: {}", output.display());
-        dump_densities(&output, result)?;
-        info!("output written to: {}", output.display());
-    }
-
     Ok(())
 }
 
-fn dump_densities(path: &PathBuf, state: State) -> io::Result<()> {
+fn dump_densities(path: &PathBuf, state: impl Compactifiable) -> io::Result<()> {
     let mut file = fs::File::create(path)?;
     for (bidx, weight) in state.compactify() {
         file.write_fmt(format_args!("{} {:.4}\n", bidx, weight))?;

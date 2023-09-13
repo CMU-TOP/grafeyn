@@ -48,4 +48,7 @@ pub struct Options {
         default_value = "0.8"
     )]
     pub pull_threshold: f64,
+
+    #[structopt(name = "parallelism", long = "parallelism", short = "p")]
+    pub parallelism: bool,
 }

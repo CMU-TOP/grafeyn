@@ -1,9 +1,12 @@
-pub mod bfs_simulator;
-mod state;
-mod state_expander;
+pub mod parallel;
+pub mod sequential;
 
 use crate::circuit::GateApplyErr;
-pub use state::State;
+use crate::types::{BasisIdx, Complex};
+
+pub trait Compactifiable {
+    fn compactify(self) -> Box<dyn Iterator<Item = (BasisIdx, Complex)>>;
+}
 
 #[derive(Debug)]
 pub enum SimulatorError {

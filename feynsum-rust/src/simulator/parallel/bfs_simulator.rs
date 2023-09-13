@@ -7,9 +7,9 @@ use crate::profile;
 use crate::types::basis_idx::MAX_QUBITS;
 use crate::types::{BasisIdx, Complex};
 
+use super::super::SimulatorError;
 use super::state::{SparseStateTable, State};
 use super::state_expander::{self, ExpandResult};
-use super::SimulatorError;
 
 pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
     let num_gates = circuit.num_gates();
