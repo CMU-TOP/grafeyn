@@ -120,7 +120,7 @@ fn expand_push_dense(
                 .enumerate()
                 .map(|(chunk_idx, chunk)| {
                     chunk
-                        .into_iter()
+                        .iter()
                         .enumerate()
                         .map(|(idx, v)| {
                             let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
