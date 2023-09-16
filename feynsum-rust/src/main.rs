@@ -52,7 +52,7 @@ fn main() -> io::Result<()> {
         .build_global()
         .unwrap();
 
-    if options.parallelism == 1 {
+    if options.parallelism > 1 {
         info!("using parallel simulator");
         let result = match simulator::parallel::bfs_simulator::run(&config, circuit) {
             Ok(result) => result,
