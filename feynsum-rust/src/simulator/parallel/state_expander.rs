@@ -4,7 +4,7 @@ use std::sync::{atomic::Ordering, Arc};
 
 use rayon::prelude::*;
 
-use crate::circuit::{Gate, MaybeBranchingOutput, PushApplicable};
+use crate::circuit::{Gate, PushApplicable, PushApplyOutput};
 use crate::config::Config;
 use crate::types::{BasisIdx, Complex, Real};
 use crate::utility;
@@ -176,10 +176,10 @@ fn apply_gates(
     }
 
     match gates[0].push_apply(bidx, weight)? {
-        MaybeBranchingOutput::OuptutOne((new_bidx, new_weight)) => {
+        PushApplyOutput::Nonbranching((new_bidx, new_weight)) => {
             Ok(1 + apply_gates(&gates[1..], table, new_bidx, new_weight)?)
         }
-        MaybeBranchingOutput::OutputTwo((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
+        PushApplyOutput::Branching((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
             let num_gate_apps_1 = apply_gates(&gates[1..], table, new_bidx1, new_weight1)?;
             let num_gate_apps_2 = apply_gates(&gates[1..], table, new_bidx2, new_weight2)?;
             Ok(1 + num_gate_apps_1 + num_gate_apps_2)
@@ -202,10 +202,10 @@ fn apply_gates_par(
     }
 
     match gates[0].push_apply(bidx, weight)? {
-        MaybeBranchingOutput::OuptutOne((new_bidx, new_weight)) => {
+        PushApplyOutput::Nonbranching((new_bidx, new_weight)) => {
             Ok(1 + apply_gates_par_internal(&gates[1..], &table, new_bidx, new_weight)?)
         }
-        MaybeBranchingOutput::OutputTwo((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
+        PushApplyOutput::Branching((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
             let num_gate_apps_1 =
                 apply_gates_par_internal(&gates[1..], &table, new_bidx1, new_weight1)?;
             let num_gate_apps_2 =
@@ -231,10 +231,10 @@ fn apply_gates_par_internal(
     }
 
     match gates[0].push_apply(bidx, weight)? {
-        MaybeBranchingOutput::OuptutOne((new_bidx, new_weight)) => {
+        PushApplyOutput::Nonbranching((new_bidx, new_weight)) => {
             Ok(1 + apply_gates_par_internal(&gates[1..], table, new_bidx, new_weight)?)
         }
-        MaybeBranchingOutput::OutputTwo((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
+        PushApplyOutput::Branching((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
             let num_gate_apps_1 =
                 apply_gates_par_internal(&gates[1..], table, new_bidx1, new_weight1)?;
             let num_gate_apps_2 =

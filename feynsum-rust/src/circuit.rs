@@ -5,9 +5,7 @@ use std::collections::HashMap;
 
 use crate::parser::{Argument, Expression, OpCode, QasmStatement};
 use crate::types::{QubitIndex, Real};
-pub use gate::{
-    Gate, GateApplyErr, GateDefn, MaybeBranchingOutput, PullApplicable, PushApplicable,
-};
+pub use gate::{Gate, GateApplyErr, GateDefn, PullApplicable, PushApplicable, PushApplyOutput};
 
 #[derive(Debug)]
 pub enum CircuitBuildError {
