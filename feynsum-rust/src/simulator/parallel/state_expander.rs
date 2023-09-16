@@ -176,7 +176,7 @@ fn apply_gates(
     }
 
     match gates[0].push_apply(bidx, weight)? {
-        PushApplyOutput::Nonbranching((new_bidx, new_weight)) => {
+        PushApplyOutput::Nonbranching(new_bidx, new_weight) => {
             Ok(1 + apply_gates(&gates[1..], table, new_bidx, new_weight)?)
         }
         PushApplyOutput::Branching((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
@@ -202,7 +202,7 @@ fn apply_gates_par(
     }
 
     match gates[0].push_apply(bidx, weight)? {
-        PushApplyOutput::Nonbranching((new_bidx, new_weight)) => {
+        PushApplyOutput::Nonbranching(new_bidx, new_weight) => {
             Ok(1 + apply_gates_par_internal(&gates[1..], &table, new_bidx, new_weight)?)
         }
         PushApplyOutput::Branching((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
@@ -231,7 +231,7 @@ fn apply_gates_par_internal(
     }
 
     match gates[0].push_apply(bidx, weight)? {
-        PushApplyOutput::Nonbranching((new_bidx, new_weight)) => {
+        PushApplyOutput::Nonbranching(new_bidx, new_weight) => {
             Ok(1 + apply_gates_par_internal(&gates[1..], table, new_bidx, new_weight)?)
         }
         PushApplyOutput::Branching((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {

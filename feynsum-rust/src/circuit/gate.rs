@@ -4,7 +4,7 @@ use crate::types::{constants, BasisIdx, BasisIdxErr, Complex, QubitIndex, Real};
 
 #[derive(Debug)]
 pub enum PushApplyOutput {
-    Nonbranching((BasisIdx, Complex)),
+    Nonbranching(BasisIdx, Complex),
     Branching((BasisIdx, Complex), (BasisIdx, Complex)),
 }
 
@@ -160,7 +160,7 @@ impl PushApplicable for Gate {
                     Complex::new(0.0, 1.0)
                 };
                 let new_weight = weight * multipler;
-                Ok(PushApplyOutput::Nonbranching((new_bidx, new_weight)))
+                Ok(PushApplyOutput::Nonbranching(new_bidx, new_weight))
             }
             GateDefn::PauliZ(qi) => {
                 let new_weight = if bidx.get(qi)? {
@@ -168,7 +168,7 @@ impl PushApplicable for Gate {
                 } else {
                     weight
                 };
-                Ok(PushApplyOutput::Nonbranching((bidx, new_weight)))
+                Ok(PushApplyOutput::Nonbranching(bidx, new_weight))
             }
             GateDefn::Hadamard(qi) => {
                 let bidx1 = bidx.unset(qi);
@@ -191,7 +191,7 @@ impl PushApplicable for Gate {
 
                 let new_weight = if bidx.get(qi)? { weight * mult } else { weight };
 
-                Ok(PushApplyOutput::Nonbranching((bidx, new_weight)))
+                Ok(PushApplyOutput::Nonbranching(bidx, new_weight))
             }
             GateDefn::SqrtX(qi) => {
                 let bidx1 = bidx.unset(qi);
@@ -246,7 +246,7 @@ impl PushApplicable for Gate {
             }
             GateDefn::X(qi) => {
                 let new_bidx = bidx.flip(qi)?;
-                Ok(PushApplyOutput::Nonbranching((new_bidx, weight)))
+                Ok(PushApplyOutput::Nonbranching(new_bidx, weight))
             }
             GateDefn::CX { control, target } => {
                 let new_bidx = if bidx.get(control)? {
@@ -254,7 +254,7 @@ impl PushApplicable for Gate {
                 } else {
                     bidx
                 };
-                Ok(PushApplyOutput::Nonbranching((new_bidx, weight)))
+                Ok(PushApplyOutput::Nonbranching(new_bidx, weight))
             }
             GateDefn::CZ { control, target } => {
                 let new_weight = if bidx.get(control)? && bidx.get(target)? {
@@ -263,7 +263,7 @@ impl PushApplicable for Gate {
                     weight
                 };
 
-                Ok(PushApplyOutput::Nonbranching((bidx, new_weight)))
+                Ok(PushApplyOutput::Nonbranching(bidx, new_weight))
             }
             GateDefn::CCX {
                 control1,
@@ -276,7 +276,7 @@ impl PushApplicable for Gate {
                     bidx
                 };
 
-                Ok(PushApplyOutput::Nonbranching((new_bidx, weight)))
+                Ok(PushApplyOutput::Nonbranching(new_bidx, weight))
             }
             GateDefn::CPhase {
                 control,
@@ -289,7 +289,7 @@ impl PushApplicable for Gate {
                     weight * Complex::new(rot.cos(), rot.sin())
                 };
 
-                Ok(PushApplyOutput::Nonbranching((bidx, new_weight)))
+                Ok(PushApplyOutput::Nonbranching(bidx, new_weight))
             }
             GateDefn::FSim {
                 left,
@@ -297,11 +297,11 @@ impl PushApplicable for Gate {
                 theta,
                 phi,
             } => match (bidx.get(left)?, bidx.get(right)?) {
-                (false, false) => Ok(PushApplyOutput::Nonbranching((bidx, weight))),
-                (true, true) => Ok(PushApplyOutput::Nonbranching((
+                (false, false) => Ok(PushApplyOutput::Nonbranching(bidx, weight)),
+                (true, true) => Ok(PushApplyOutput::Nonbranching(
                     bidx,
                     weight * Complex::new((-phi).cos(), (-phi).sin()),
-                ))),
+                )),
                 _ => {
                     let bidx1 = bidx.clone();
                     let bidx2 = bidx.flip(left)?.flip(right)?;
@@ -333,7 +333,7 @@ impl PushApplicable for Gate {
                     weight * rot1
                 };
 
-                Ok(PushApplyOutput::Nonbranching((bidx, new_weight)))
+                Ok(PushApplyOutput::Nonbranching(bidx, new_weight))
             }
             GateDefn::RY { rot, target } => {
                 let x = rot / 2.0;
@@ -364,7 +364,7 @@ impl PushApplicable for Gate {
                     bidx
                 };
 
-                Ok(PushApplyOutput::Nonbranching((new_bidx, weight)))
+                Ok(PushApplyOutput::Nonbranching(new_bidx, weight))
             }
             GateDefn::U {
                 target: _,
