@@ -23,6 +23,11 @@ impl DenseStateTable {
             .filter(|c| utility::is_nonzero(**c))
             .count()
     }
+
+    pub fn get(&self, bidx: &BasisIdx) -> Option<&Complex> {
+        self.array.get(bidx.clone().into_idx())
+        // FIXME: No clone
+    }
 }
 
 impl Table for DenseStateTable {

@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fmt::Display;
 use std::str::FromStr;
 
 use log::info;
@@ -28,6 +29,15 @@ impl FromStr for GateSchedulingPolicy {
                 "unknown gate scheduling policy: {}; valid values are: naive, gnb",
                 s
             )),
+        }
+    }
+}
+
+impl Display for GateSchedulingPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GateSchedulingPolicy::Naive => write!(f, "naive"),
+            GateSchedulingPolicy::GreedyNonbranching => write!(f, "greedy-nonbranching"),
         }
     }
 }
