@@ -24,7 +24,17 @@ fn main() -> io::Result<()> {
 
     let options = Options::from_args();
 
-    info!("reading file: {}", options.input.display());
+    info!("input file: {}", options.input.display());
+    if let Some(output) = &options.output {
+        info!("output file: {}", output.display());
+    } else {
+        info!("output file: none");
+    }
+    info!("gate scheduling policy: {}", options.gate_schduling_policy);
+    info!("dense threshold: {}", options.dense_threshold);
+    info!("pull threshold: {}", options.pull_threshold);
+    info!("parallelism: {}", options.parallelism);
+    info!("block size: {}", options.block_size);
 
     let source = fs::read_to_string(&options.input)?;
 
