@@ -22,7 +22,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
 
     let mut num_gates_visited = 0;
     let mut state = State::Sparse(SparseStateTable::singleton(
-        BasisIdx::zeros(num_qubits),
+        BasisIdx::zeros(),
         Complex::new(1.0, 0.0),
     )); // initial state
     let mut num_nonzeros = 1;

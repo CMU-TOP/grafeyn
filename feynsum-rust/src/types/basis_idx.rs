@@ -37,8 +37,7 @@ impl BasisIdx {
         }
     }
 
-    pub fn zeros(num_qubits: usize) -> Self {
-        assert!(num_qubits <= MAX_QUBITS);
+    pub fn zeros() -> Self {
         Self { bits: 0 }
     }
 
@@ -105,13 +104,13 @@ mod tests {
 
     #[test]
     fn test_zeros() {
-        let bidx = BasisIdx::zeros(4);
+        let bidx = BasisIdx::zeros();
         assert_eq!(bidx.bits, 0);
     }
 
     #[test]
     fn test_set() {
-        let bidx = BasisIdx::zeros(4);
+        let bidx = BasisIdx::zeros();
         let bidx1 = bidx.set(0);
         assert_eq!(bidx1.bits, 1);
 
