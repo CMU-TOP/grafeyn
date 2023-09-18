@@ -208,11 +208,7 @@ impl PushApplicable for Gate {
                 Ok(PushApplyOutput::Nonbranching(new_bidx, new_weight))
             }
             GateDefn::PauliZ(qi) => {
-                let new_weight = if bidx.get(qi)? {
-                    weight * Complex::new(-1.0, 0.0)
-                } else {
-                    weight
-                };
+                let new_weight = if bidx.get(qi)? { -weight } else { weight };
                 Ok(PushApplyOutput::Nonbranching(bidx, new_weight))
             }
             GateDefn::Hadamard(qi) => {
@@ -303,7 +299,7 @@ impl PushApplicable for Gate {
             }
             GateDefn::CZ { control, target } => {
                 let new_weight = if bidx.get(control)? && bidx.get(target)? {
-                    weight * Complex::new(-1.0, 0.0)
+                    -weight
                 } else {
                     weight
                 };
@@ -367,15 +363,10 @@ impl PushApplicable for Gate {
                 }
             },
             GateDefn::RZ { rot, target } => {
-                let x = rot / 2.0;
-
-                let rot1 = Complex::new((-x).cos(), (-x).sin());
-                let rot2 = Complex::new(x.cos(), x.sin());
-
                 let new_weight = if bidx.get(target)? {
-                    weight * rot2
+                    weight * Complex::new((rot / 2.0).cos(), (rot / 2.0).sin())
                 } else {
-                    weight * rot1
+                    weight * Complex::new((rot / 2.0).cos(), -(rot / 2.0).sin())
                 };
 
                 Ok(PushApplyOutput::Nonbranching(bidx, new_weight))

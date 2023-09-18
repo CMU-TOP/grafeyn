@@ -4,7 +4,7 @@ use std::fmt::{self, Display, Formatter};
 use crate::circuit::{Gate, PullApplicable, PullApplyOutput, PushApplicable, PushApplyOutput};
 use crate::config::Config;
 use crate::types::{BasisIdx, Complex, Real};
-use crate::utility::is_zero;
+use crate::utility;
 
 use super::super::{Compactifiable, SimulatorError};
 use super::state::{DenseStateTable, SparseStateTable, State, Table};
@@ -69,11 +69,8 @@ fn expand_sparse(gates: Vec<&Gate>, state: State) -> Result<ExpandResult, Simula
 
     let num_gate_apps = state
         .compactify()
-        .try_fold(0, |num_gate_apps, (bidx, weight)| {
-            Ok::<usize, SimulatorError>(
-                num_gate_apps + apply_gates(&gates, &mut table, bidx, weight)?,
-            )
-        })?;
+        .map(|(bidx, weight)| apply_gates(&gates, &mut table, bidx, weight))
+        .sum::<Result<usize, SimulatorError>>()?;
 
     let num_nonzeros = table.num_nonzeros();
 
@@ -144,7 +141,7 @@ fn apply_gates(
     bidx: BasisIdx,
     weight: Complex,
 ) -> Result<usize, SimulatorError> {
-    if is_zero(weight) {
+    if utility::is_zero(weight) {
         return Ok(0);
     }
     if gates.is_empty() {
