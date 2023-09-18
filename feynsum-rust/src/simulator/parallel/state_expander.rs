@@ -97,51 +97,47 @@ fn expand_push_dense(
     // FIXME: Remove code duplicate by defining and use par_compactify().
     // This is difficult because we cannot easily write the type of the parallel
     // iterator
-    let (table, num_gate_apps) = match state {
-        State::Sparse(prev_table) => {
-            let mut table = DenseStateTable::new(num_qubits);
+    let block_size = config.block_size;
+    let table = Arc::new(DenseStateTable::new(num_qubits));
 
-            let num_gate_apps = prev_table
-                .table
-                .into_iter()
-                .map(|(bidx, weight)| apply_gates_seq(&gates, &mut table, bidx, weight))
-                .sum::<Result<usize, SimulatorError>>()?;
-
-            (table, num_gate_apps)
-        }
-        State::Dense(prev_table) => {
-            let table = Arc::new(DenseStateTable::new(num_qubits));
-
-            let block_size = config.block_size;
-
-            let num_gate_apps = prev_table
-                .array
-                .par_chunks(block_size)
-                .enumerate()
-                .map(|(chunk_idx, chunk)| {
-                    chunk
-                        .iter()
-                        .enumerate()
-                        .map(|(idx, v)| {
-                            let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
-                            apply_gates(
-                                &gates,
-                                Arc::clone(&table),
-                                BasisIdx::from_idx(block_size * chunk_idx + idx),
-                                Complex::new(re, im),
-                            )
-                        })
-                        .sum::<Result<usize, SimulatorError>>()
-                })
-                .sum::<Result<usize, SimulatorError>>()?;
-
-            let table = Arc::<DenseStateTable>::try_unwrap(table)
-                .expect("all other references to table should have been dropped");
-
-            (table, num_gate_apps)
-        }
+    let num_gate_apps = match state {
+        State::Sparse(prev_table) => prev_table
+            .table
+            .into_iter()
+            .collect::<Vec<_>>()
+            .par_chunks(block_size)
+            .map(|chunk| {
+                chunk
+                    .to_owned()
+                    .into_iter()
+                    .map(|(bidx, weight)| apply_gates(&gates, Arc::clone(&table), bidx, weight))
+                    .sum::<Result<usize, SimulatorError>>()
+            })
+            .sum::<Result<usize, SimulatorError>>()?,
+        State::Dense(prev_table) => prev_table
+            .array
+            .par_chunks(block_size)
+            .enumerate()
+            .map(|(chunk_idx, chunk)| {
+                chunk
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, v)| {
+                        let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
+                        apply_gates(
+                            &gates,
+                            Arc::clone(&table),
+                            BasisIdx::from_idx(block_size * chunk_idx + idx),
+                            Complex::new(re, im),
+                        )
+                    })
+                    .sum::<Result<usize, SimulatorError>>()
+            })
+            .sum::<Result<usize, SimulatorError>>()?,
         _ => panic!("TODO"),
     };
+    let table = Arc::<DenseStateTable>::try_unwrap(table)
+        .expect("all other references to table should have been dropped");
 
     let num_nonzeros = table.num_nonzeros();
 
