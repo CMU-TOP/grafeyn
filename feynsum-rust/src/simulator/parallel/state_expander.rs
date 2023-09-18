@@ -161,15 +161,14 @@ fn expand_pull_dense(
 
     let block_size = config.block_size;
 
-    let num_gate_apps = (0..capacity)
-        .collect::<Vec<_>>() // FIXME: Do we need to collect?
-        .par_chunks(block_size)
+    let num_blocks = ((capacity as f32) / (block_size as f32)).ceil() as usize;
+
+    let num_gate_apps = (0..num_blocks)
         .into_par_iter()
-        .map(|chunk| {
-            chunk
-                .iter()
+        .map(|chunk_idx| {
+            ((chunk_idx * block_size)..(((chunk_idx + 1) * block_size).min(capacity - 1)))
                 .map(|idx| {
-                    let bidx = BasisIdx::from_idx(*idx);
+                    let bidx = BasisIdx::from_idx(idx);
                     let (weight, num_gate_apps) = apply_pull_gates(&gates, &state, &bidx)?;
                     table.atomic_put(bidx, weight);
 
