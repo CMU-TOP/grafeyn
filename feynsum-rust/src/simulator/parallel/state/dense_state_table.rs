@@ -35,6 +35,14 @@ impl DenseStateTable {
 
         atomic_put(&self.array[idx], weight);
     }
+
+    pub fn get(&self, bidx: &BasisIdx) -> Option<Complex> {
+        self.array.get(bidx.clone().into_idx()).map(|v| {
+            let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
+            Complex::new(re, im)
+        })
+        // FIXME: No clone
+    }
 }
 
 impl Table for DenseStateTable {

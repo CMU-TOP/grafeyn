@@ -32,6 +32,14 @@ impl State {
             _ => panic!("TODO"),
         }
     }
+
+    pub fn get(&self, bidx: &BasisIdx) -> Option<Complex> {
+        match self {
+            State::Sparse(table) => table.get(bidx),
+            State::Dense(table) => table.get(bidx),
+            _ => panic!("TODO"),
+        }
+    }
 }
 
 impl Compactifiable for State {

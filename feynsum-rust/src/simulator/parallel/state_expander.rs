@@ -4,7 +4,7 @@ use std::sync::{atomic::Ordering, Arc};
 
 use rayon::prelude::*;
 
-use crate::circuit::{Gate, PushApplicable, PushApplyOutput};
+use crate::circuit::{Gate, PullApplicable, PullApplyOutput, PushApplicable, PushApplyOutput};
 use crate::config::Config;
 use crate::types::{BasisIdx, Complex, Real};
 use crate::utility;
@@ -45,14 +45,14 @@ pub fn expand(
 ) -> Result<ExpandResult, SimulatorError> {
     let expected_cost = expected_cost(num_qubits, state.num_nonzeros(), prev_num_nonzeros);
 
-    let all_gates_pullable = gates.iter().all(|_| false); // FIXME
+    let all_gates_pullable = gates.iter().all(|gate| gate.is_pullable());
 
     assert!(config.dense_threshold <= config.pull_threshold);
 
     if expected_cost < config.dense_threshold {
         expand_sparse(gates, state)
     } else if expected_cost >= config.pull_threshold && all_gates_pullable {
-        expand_pull_dense(gates, num_qubits, state)
+        expand_pull_dense(gates, config, num_qubits, state)
     } else {
         expand_push_dense(gates, config, num_qubits, state)
     }
@@ -154,11 +154,45 @@ fn expand_push_dense(
 }
 
 fn expand_pull_dense(
-    _gates: Vec<&Gate>,
-    _num_qubits: usize,
-    _state: State,
+    gates: Vec<&Gate>,
+    config: &Config,
+    num_qubits: usize,
+    state: State,
 ) -> Result<ExpandResult, SimulatorError> {
-    unimplemented!()
+    let table = Arc::new(DenseStateTable::new(num_qubits));
+
+    let capacity = 1 << num_qubits;
+
+    let block_size = config.block_size;
+
+    let num_gate_apps = (0..capacity)
+        .collect::<Vec<_>>() // FIXME: Do we need to collect?
+        .par_chunks(block_size)
+        .into_par_iter()
+        .map(|chunk| {
+            chunk
+                .iter()
+                .map(|idx| {
+                    let bidx = BasisIdx::from_idx(*idx);
+                    let (weight, num_gate_apps) = apply_pull_gates(&gates, &state, &bidx)?;
+                    table.atomic_put(bidx, weight);
+
+                    Ok(num_gate_apps)
+                })
+                .sum::<Result<usize, SimulatorError>>()
+        })
+        .sum::<Result<usize, SimulatorError>>()?;
+
+    let num_nonzeros = table.num_nonzeros();
+
+    Ok(ExpandResult {
+        state: State::Dense(
+            Arc::into_inner(table).expect("all other references to table should have been dropped"),
+        ),
+        num_nonzeros,
+        num_gate_apps,
+        method: ExpandMethod::PullDense,
+    })
 }
 
 fn apply_gates(
@@ -240,6 +274,34 @@ fn apply_gates_par_internal(
             let num_gate_apps_2 =
                 apply_gates_par_internal(&gates[1..], table, new_bidx2, new_weight2)?;
             Ok(1 + num_gate_apps_1 + num_gate_apps_2)
+        }
+    }
+}
+
+fn apply_pull_gates(
+    gates: &[&Gate],
+    prev_state: &State,
+    bidx: &BasisIdx,
+) -> Result<(Complex, usize), SimulatorError> {
+    if gates.is_empty() {
+        let weight = prev_state.get(bidx).unwrap_or(Complex::new(0.0, 0.0));
+        return Ok((weight, 0));
+    }
+
+    match gates[0].pull_apply(bidx.clone())? {
+        // FIXME: No clone
+        PullApplyOutput::Nonbranching(neighbor, multiplier) => {
+            let (weight, num_gate_apps) = apply_pull_gates(&gates[1..], prev_state, &neighbor)?;
+            Ok((weight * multiplier, 1 + num_gate_apps))
+        }
+        PullApplyOutput::Branching((neighbor1, multiplier1), (neighbor2, multiplier2)) => {
+            let (weight1, num_gate_apps_1) = apply_pull_gates(&gates[1..], prev_state, &neighbor1)?;
+            let (weight2, num_gate_apps_2) = apply_pull_gates(&gates[1..], prev_state, &neighbor2)?;
+
+            Ok((
+                weight1 * multiplier1 + weight2 * multiplier2,
+                1 + num_gate_apps_1 + num_gate_apps_2,
+            ))
         }
     }
 }
