@@ -69,8 +69,15 @@ fn atomic_put(to: &AtomicU64, c: Complex) {
 #[cfg(test)]
 mod tests {
 
+    use super::*;
+
     #[test]
     fn test_atomic_put() {
-        todo!()
+        let a = AtomicU64::new(0);
+
+        atomic_put(&a, Complex::new(1.0, 2.0));
+
+        let (re, im) = utility::unpack_complex(a.load(Ordering::Relaxed));
+        assert_eq!(Complex::new(re, im), Complex::new(1.0, 2.0));
     }
 }
