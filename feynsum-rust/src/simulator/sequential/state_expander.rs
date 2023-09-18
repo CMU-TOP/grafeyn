@@ -115,17 +115,19 @@ fn expand_pull_dense(
 
     let capacity = 1 << num_qubits;
 
-    let num_gate_apps = (0..capacity)
-        .map(|idx| {
+    let (num_gate_apps, num_nonzeros) =
+        (0..capacity).try_fold((0, 0), |(num_gate_apps, num_nonzeros), idx| {
             let bidx = BasisIdx::from_idx(idx);
-            let (weight, num_gate_apps) = apply_pull_gates(&gates, &state, &bidx)?;
+            let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, &bidx)?;
+
+            let num_nonzeros_here = if utility::is_nonzero(weight) { 1 } else { 0 };
             table.put(bidx, weight);
 
-            Ok(num_gate_apps)
-        })
-        .sum::<Result<usize, SimulatorError>>()?;
-
-    let num_nonzeros = table.num_nonzeros();
+            Ok::<(usize, usize), SimulatorError>((
+                num_gate_apps + num_gate_apps_here,
+                num_nonzeros + num_nonzeros_here,
+            ))
+        })?;
 
     Ok(ExpandResult {
         state: State::Dense(table),

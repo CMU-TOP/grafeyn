@@ -15,10 +15,7 @@ pub trait Table {
 #[derive(Debug)]
 pub enum State {
     Sparse(SparseStateTable),
-    #[allow(dead_code)]
     Dense(DenseStateTable),
-    #[allow(dead_code)]
-    DenseKnownNonzeroSize(DenseStateTable, usize), // TODO: use this
 }
 
 impl State {
@@ -26,7 +23,6 @@ impl State {
         match self {
             State::Sparse(table) => table.num_nonzeros(),
             State::Dense(table) => table.num_nonzeros(),
-            _ => panic!("TODO"),
         }
     }
 
@@ -34,7 +30,6 @@ impl State {
         match self {
             State::Sparse(table) => table.get(bidx),
             State::Dense(table) => table.get(bidx),
-            _ => panic!("TODO"),
         }
     }
 }
@@ -50,7 +45,6 @@ impl Compactifiable for State {
                     .enumerate()
                     .map(|(idx, c)| (BasisIdx::from_idx(idx), c)),
             ),
-            _ => panic!("TODO"),
         }
     }
 }

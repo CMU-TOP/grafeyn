@@ -134,7 +134,6 @@ fn expand_push_dense(
                     .sum::<Result<usize, SimulatorError>>()
             })
             .sum::<Result<usize, SimulatorError>>()?,
-        _ => panic!("TODO"),
     };
     let table = Arc::<DenseStateTable>::try_unwrap(table)
         .expect("all other references to table should have been dropped");
@@ -163,22 +162,36 @@ fn expand_pull_dense(
 
     let num_blocks = ((capacity as f32) / (block_size as f32)).ceil() as usize;
 
-    let num_gate_apps = (0..num_blocks)
-        .into_par_iter()
-        .map(|chunk_idx| {
-            ((chunk_idx * block_size)..(((chunk_idx + 1) * block_size).min(capacity - 1)))
-                .map(|idx| {
-                    let bidx = BasisIdx::from_idx(idx);
-                    let (weight, num_gate_apps) = apply_pull_gates(&gates, &state, &bidx)?;
-                    table.atomic_put(bidx, weight);
+    let (num_gate_apps, num_nonzeros) =
+        (0..num_blocks)
+            .into_par_iter()
+            .map(|chunk_idx| {
+                ((chunk_idx * block_size)..(((chunk_idx + 1) * block_size).min(capacity - 1)))
+                    .try_fold((0, 0), |(num_gate_apps, num_nonzeros), idx| {
+                        let bidx = BasisIdx::from_idx(idx);
+                        let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, &bidx)?;
+                        table.atomic_put(bidx, weight);
 
-                    Ok(num_gate_apps)
-                })
-                .sum::<Result<usize, SimulatorError>>()
-        })
-        .sum::<Result<usize, SimulatorError>>()?;
-
-    let num_nonzeros = table.num_nonzeros();
+                        Ok::<(usize, usize), SimulatorError>((
+                            num_gate_apps + num_gate_apps_here,
+                            if utility::is_nonzero(weight) {
+                                num_nonzeros + 1
+                            } else {
+                                num_nonzeros
+                            },
+                        ))
+                    })
+            })
+            .try_reduce(
+                || (0, 0),
+                |(num_gate_apps, num_nonzeros), chunk_result| {
+                    let (num_gate_apps_in_chunk, num_nonzeros_in_chunk) = chunk_result;
+                    Ok((
+                        (num_gate_apps + num_gate_apps_in_chunk),
+                        (num_nonzeros + num_nonzeros_in_chunk),
+                    ))
+                },
+            )?;
 
     Ok(ExpandResult {
         state: State::Dense(
