@@ -36,6 +36,21 @@ impl DenseStateTable {
         atomic_put(&self.array[idx], weight);
     }
 
+    // When applying pull actions, we can assume that there are no data races,
+    // as each thread accesses different indices.
+    pub unsafe fn unsafe_put(&self, bidx: BasisIdx, weight: Complex) {
+        let idx = bidx.into_idx();
+
+        unsafe {
+            let old = *self.array[idx].as_ptr();
+            let (old_re, old_im) = utility::unpack_complex(old);
+            let (new_re, new_im) = (old_re + weight.re, old_im + weight.im);
+            let new = utility::pack_complex(new_re, new_im);
+
+            *self.array[idx].as_ptr() = new;
+        }
+    }
+
     pub fn get(&self, bidx: &BasisIdx) -> Option<Complex> {
         self.array.get(bidx.clone().into_idx()).map(|v| {
             let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));

@@ -170,8 +170,9 @@ fn expand_pull_dense(
                     .try_fold((0, 0), |(num_gate_apps, num_nonzeros), idx| {
                         let bidx = BasisIdx::from_idx(idx);
                         let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, &bidx)?;
-                        table.atomic_put(bidx, weight);
-
+                        unsafe {
+                            table.unsafe_put(bidx, weight);
+                        }
                         Ok::<(usize, usize), SimulatorError>((
                             num_gate_apps + num_gate_apps_here,
                             if utility::is_nonzero(weight) {
