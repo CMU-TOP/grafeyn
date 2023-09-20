@@ -72,11 +72,8 @@ fn expand_sparse(gates: Vec<&Gate>, state: State) -> Result<ExpandResult, Simula
 
     let num_gate_apps = state
         .compactify()
-        .try_fold(0, |num_gate_apps, (bidx, weight)| {
-            Ok::<usize, SimulatorError>(
-                num_gate_apps + apply_gates_seq(&gates, &mut table, bidx, weight)?,
-            )
-        })?;
+        .map(|(bidx, weight)| apply_gates_seq(&gates, &mut table, bidx, weight))
+        .sum::<Result<usize, SimulatorError>>()?;
 
     let num_nonzeros = table.num_nonzeros();
 
