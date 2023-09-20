@@ -201,7 +201,7 @@ fn expand_pull_dense(
 // NOTE: Some gate applications are still performed in a sequential manner
 fn apply_gates_seq(
     gates: &[&Gate],
-    table: &mut impl Table,
+    table: &mut SparseStateTable,
     bidx: BasisIdx,
     weight: Complex,
 ) -> usize {

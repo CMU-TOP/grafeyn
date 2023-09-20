@@ -60,10 +60,9 @@ impl DenseStateTable {
 }
 
 impl Table for DenseStateTable {
-    fn put(&mut self, bidx: BasisIdx, weight: Complex) {
-        let idx = bidx.into_idx();
-
-        atomic_put(&self.array[idx], weight);
+    fn put(&mut self, _bidx: BasisIdx, _weight: Complex) {
+        unreachable!()
+        // FIXME
     }
 }
 
