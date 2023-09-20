@@ -504,15 +504,15 @@ macro_rules! push_to_pull {
                 };
 
                 let ((b00, m00), (b01, m01)) = if b00.get(qi) {
-                    ((b01.clone(), m01), (b00.clone(), m00))
+                    ((b01, m01), (b00, m00))
                 } else {
-                    ((b10.clone(), m10), (b11.clone(), m11))
+                    ((b10, m10), (b11, m11))
                 };
 
                 let ((b10, m10), (b11, m11)) = if b10.get(qi) {
-                    ((b11.clone(), m11), (b10.clone(), m10))
+                    ((b11, m11), (b10, m10))
                 } else {
-                    ((b10.clone(), m10), (b11.clone(), m11))
+                    ((b10, m10), (b11, m11))
                 };
 
                 assert!(!b00.get(qi) && !b10.get(qi) && !b01.get(qi) && !b11.get(qi));
