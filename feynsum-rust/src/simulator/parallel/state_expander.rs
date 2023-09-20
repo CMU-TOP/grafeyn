@@ -104,8 +104,8 @@ unsafe fn expand_push_dense(
             .par_chunks(block_size)
             .map(|chunk| {
                 chunk
-                    .to_owned()
-                    .into_iter()
+                    .iter()
+                    .copied()
                     .map(|(bidx, weight)| {
                         apply_gates(&gates, &table as *const DenseStateTable, bidx, weight)
                     })
@@ -234,7 +234,7 @@ unsafe fn apply_gates(
         return 0;
     }
     if gates.is_empty() {
-        (&*table).atomic_put(bidx, weight);
+        (*table).atomic_put(bidx, weight);
         return 0;
     }
 

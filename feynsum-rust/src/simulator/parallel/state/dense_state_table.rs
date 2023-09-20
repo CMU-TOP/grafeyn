@@ -52,7 +52,7 @@ impl DenseStateTable {
     }
 
     pub unsafe fn unsafe_get(&self, bidx: &BasisIdx) -> Option<Complex> {
-        self.array.get(bidx.clone().into_idx()).map(|atomic| {
+        self.array.get(bidx.into_idx()).map(|atomic| {
             let (re, im) = utility::unpack_complex(*atomic.as_ptr());
             Complex::new(re, im)
         })
