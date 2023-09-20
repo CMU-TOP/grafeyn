@@ -50,7 +50,7 @@ pub fn expand(
     if expected_cost < config.dense_threshold {
         expand_sparse(gates, state)
     } else if expected_cost >= config.pull_threshold && all_gates_pullable {
-        expand_pull_dense(gates, config, num_qubits, state)
+        unsafe { expand_pull_dense(gates, config, num_qubits, state) }
     } else {
         unsafe { expand_push_dense(gates, config, num_qubits, state) }
     }
@@ -145,7 +145,7 @@ unsafe fn expand_push_dense(
     }
 }
 
-fn expand_pull_dense(
+unsafe fn expand_pull_dense(
     gates: Vec<&Gate>,
     config: &Config,
     num_qubits: usize,
@@ -165,18 +165,16 @@ fn expand_pull_dense(
                 .iter()
                 .fold((0, 0), |(num_gate_apps, num_nonzeros), idx| {
                     let bidx = BasisIdx::from_idx(*idx);
-                    unsafe {
-                        let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, &bidx);
-                        table.unsafe_put(bidx, weight);
-                        (
-                            num_gate_apps + num_gate_apps_here,
-                            if utility::is_nonzero(weight) {
-                                num_nonzeros + 1
-                            } else {
-                                num_nonzeros
-                            },
-                        )
-                    }
+                    let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, &bidx);
+                    table.unsafe_put(bidx, weight);
+                    (
+                        num_gate_apps + num_gate_apps_here,
+                        if utility::is_nonzero(weight) {
+                            num_nonzeros + 1
+                        } else {
+                            num_nonzeros
+                        },
+                    )
                 })
         })
         .reduce(
