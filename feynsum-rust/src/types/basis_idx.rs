@@ -27,13 +27,17 @@ impl BasisIdx {
         }
     }
 
+    pub const fn flip_unsafe(&self, qi: usize) -> Self {
+        BasisIdx {
+            bits: self.bits ^ (1 << qi),
+        }
+    }    
+
     pub fn flip(&self, qi: usize) -> Result<Self, BasisIdxErr> {
         if qi >= MAX_QUBITS {
             Err(BasisIdxErr::IndexOutOfBounds)
         } else {
-            Ok(BasisIdx {
-                bits: self.bits ^ (1 << qi),
-            })
+	    Ok(self.flip_unsafe(qi))
         }
     }
 
@@ -73,6 +77,14 @@ impl BasisIdx {
 
     pub fn from_idx(idx: usize) -> Self {
         Self { bits: idx as u64 }
+    }
+
+    pub fn into_u64(self) -> u64 {
+	self.bits
+    }
+
+    pub const fn from_u64(u: u64) -> Self {
+	Self { bits: u }
     }
 
     #[cfg(test)]
