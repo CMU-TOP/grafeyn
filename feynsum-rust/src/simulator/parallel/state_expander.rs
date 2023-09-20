@@ -91,9 +91,6 @@ unsafe fn expand_push_dense(
     num_qubits: usize,
     state: State,
 ) -> ExpandResult {
-    // FIXME: Remove code duplicate by defining and use par_compactify().
-    // This is difficult because we cannot easily write the type of the parallel
-    // iterator
     let block_size = config.block_size;
     let table = DenseStateTable::new(num_qubits);
 
