@@ -235,7 +235,7 @@ unsafe fn apply_gates(
         return Ok(0);
     }
     if gates.is_empty() {
-        table.as_ref().unwrap().atomic_put(bidx, weight);
+        (&*table).atomic_put(bidx, weight);
         return Ok(0);
     }
 
