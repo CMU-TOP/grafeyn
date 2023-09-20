@@ -179,7 +179,10 @@ fn eval(exp: Expression) -> Result<Real, CircuitBuildError> {
             }
         }
         Expression::Id(_) => Err(CircuitBuildError::UnsupportedIdentifier),
-        _ => Err(CircuitBuildError::UnsupportedExpression),
+        exp => {
+            error!("unsupported expression: {:?}", exp);
+            Err(CircuitBuildError::UnsupportedExpression)
+        }
     }
 }
 
