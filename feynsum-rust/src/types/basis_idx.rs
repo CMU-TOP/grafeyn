@@ -25,7 +25,9 @@ impl BasisIdx {
     }
 
     pub fn flip(&self, qi: usize) -> Self {
-        self.flip_unsafe(qi)
+        BasisIdx {
+            bits: self.bits ^ (1 << qi),
+        }
     }
 
     pub fn zeros() -> Self {
