@@ -73,7 +73,9 @@ fn expand_sparse(gates: Vec<&Gate>, state: State) -> ExpandResult {
         .map(|(bidx, weight)| apply_gates_seq(&gates, &mut table, bidx, weight))
         .sum();
 
-    let num_nonzeros = table.num_nonzeros();
+    // We don't store zeros in the sparse table, so the number of nonzeros is
+    // always the size of the hash table
+    let num_nonzeros = table.table.len();
 
     ExpandResult {
         state: State::Sparse(table),
@@ -203,11 +205,10 @@ fn apply_gates_seq(
     bidx: BasisIdx,
     weight: Complex,
 ) -> usize {
-    if utility::is_zero(weight) {
-        return 0;
-    }
     if gates.is_empty() {
-        table.put(bidx, weight);
+        if !utility::is_zero(weight) {
+            table.put(bidx, weight);
+        }
         return 0;
     }
 
