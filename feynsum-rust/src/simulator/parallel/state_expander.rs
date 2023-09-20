@@ -160,39 +160,38 @@ fn expand_pull_dense(
 
     let block_size = config.block_size;
 
-    let num_blocks = ((capacity as f32) / (block_size as f32)).ceil() as usize;
-
-    let (num_gate_apps, num_nonzeros) =
-        (0..num_blocks)
-            .into_par_iter()
-            .map(|chunk_idx| {
-                ((chunk_idx * block_size)..(((chunk_idx + 1) * block_size).min(capacity - 1)))
-                    .try_fold((0, 0), |(num_gate_apps, num_nonzeros), idx| {
-                        let bidx = BasisIdx::from_idx(idx);
-                        let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, &bidx)?;
-                        unsafe {
-                            table.unsafe_put(bidx, weight);
-                        }
-                        Ok::<(usize, usize), SimulatorError>((
-                            num_gate_apps + num_gate_apps_here,
-                            if utility::is_nonzero(weight) {
-                                num_nonzeros + 1
-                            } else {
-                                num_nonzeros
-                            },
-                        ))
-                    })
-            })
-            .try_reduce(
-                || (0, 0),
-                |(num_gate_apps, num_nonzeros), chunk_result| {
-                    let (num_gate_apps_in_chunk, num_nonzeros_in_chunk) = chunk_result;
-                    Ok((
-                        (num_gate_apps + num_gate_apps_in_chunk),
-                        (num_nonzeros + num_nonzeros_in_chunk),
+    let (num_gate_apps, num_nonzeros) = (0..capacity)
+        .into_par_iter()
+        .chunks(block_size)
+        .map(|chunk| {
+            chunk
+                .iter()
+                .try_fold((0, 0), |(num_gate_apps, num_nonzeros), idx| {
+                    let bidx = BasisIdx::from_idx(*idx);
+                    let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, &bidx)?;
+                    unsafe {
+                        table.unsafe_put(bidx, weight);
+                    }
+                    Ok::<(usize, usize), SimulatorError>((
+                        num_gate_apps + num_gate_apps_here,
+                        if utility::is_nonzero(weight) {
+                            num_nonzeros + 1
+                        } else {
+                            num_nonzeros
+                        },
                     ))
-                },
-            )?;
+                })
+        })
+        .try_reduce(
+            || (0, 0),
+            |(num_gate_apps, num_nonzeros), chunk_result| {
+                let (num_gate_apps_in_chunk, num_nonzeros_in_chunk) = chunk_result;
+                Ok((
+                    (num_gate_apps + num_gate_apps_in_chunk),
+                    (num_nonzeros + num_nonzeros_in_chunk),
+                ))
+            },
+        )?;
 
     Ok(ExpandResult {
         state: State::Dense(
