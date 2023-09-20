@@ -75,7 +75,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
             num_qubits,
             prev_num_nonzeros,
             state
-        )?);
+        ));
 
         let density = {
             let max_num_states = 1 << num_qubits;

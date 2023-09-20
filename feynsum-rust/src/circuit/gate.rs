@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::types::{constants, BasisIdx, BasisIdxErr, Complex, QubitIndex, Real};
+use crate::types::{constants, BasisIdx, Complex, QubitIndex, Real};
 
 #[derive(Debug)]
 pub enum PushApplyOutput {
@@ -82,25 +82,12 @@ pub enum GateDefn {
     },
 }
 
-#[derive(Debug)]
-pub enum GateApplyErr {
-    InvalidQubitIndex,
-}
-
-impl From<BasisIdxErr> for GateApplyErr {
-    fn from(err: BasisIdxErr) -> Self {
-        match err {
-            BasisIdxErr::IndexOutOfBounds => Self::InvalidQubitIndex,
-        }
-    }
-}
-
 pub trait PushApplicable {
-    fn push_apply(&self, bidx: BasisIdx, weight: Complex) -> Result<PushApplyOutput, GateApplyErr>;
+    fn push_apply(&self, bidx: BasisIdx, weight: Complex) -> PushApplyOutput;
 }
 
 pub trait PullApplicable {
-    fn pull_apply(&self, bidx: BasisIdx) -> Result<PullApplyOutput, GateApplyErr>;
+    fn pull_apply(&self, bidx: BasisIdx) -> PullApplyOutput;
 }
 
 #[derive(Debug)]
@@ -195,44 +182,44 @@ impl Gate {
 }
 
 impl PushApplicable for Gate {
-    fn push_apply(&self, bidx: BasisIdx, weight: Complex) -> Result<PushApplyOutput, GateApplyErr> {
+    fn push_apply(&self, bidx: BasisIdx, weight: Complex) -> PushApplyOutput {
         match self.defn {
             GateDefn::PauliY(qi) => {
-                let new_bidx = bidx.flip(qi)?;
-                let multipler = if bidx.get(qi)? {
+                let new_bidx = bidx.flip(qi);
+                let multipler = if bidx.get(qi) {
                     Complex::new(0.0, -1.0)
                 } else {
                     Complex::new(0.0, 1.0)
                 };
                 let new_weight = weight * multipler;
-                Ok(PushApplyOutput::Nonbranching(new_bidx, new_weight))
+                PushApplyOutput::Nonbranching(new_bidx, new_weight)
             }
             GateDefn::PauliZ(qi) => {
-                let new_weight = if bidx.get(qi)? { -weight } else { weight };
-                Ok(PushApplyOutput::Nonbranching(bidx, new_weight))
+                let new_weight = if bidx.get(qi) { -weight } else { weight };
+                PushApplyOutput::Nonbranching(bidx, new_weight)
             }
             GateDefn::Hadamard(qi) => {
                 let bidx1 = bidx.unset(qi);
                 let bidx2 = bidx.set(qi);
 
-                if bidx.get(qi)? {
-                    Ok(PushApplyOutput::Branching(
+                if bidx.get(qi) {
+                    PushApplyOutput::Branching(
                         (bidx1, weight * constants::RECP_SQRT_2),
                         (bidx2, -weight * constants::RECP_SQRT_2),
-                    ))
+                    )
                 } else {
-                    Ok(PushApplyOutput::Branching(
+                    PushApplyOutput::Branching(
                         (bidx1, weight * constants::RECP_SQRT_2),
                         (bidx2, weight * constants::RECP_SQRT_2),
-                    ))
+                    )
                 }
             }
             GateDefn::T(qi) => {
                 let mult = Complex::new(constants::RECP_SQRT_2, constants::RECP_SQRT_2);
 
-                let new_weight = if bidx.get(qi)? { weight * mult } else { weight };
+                let new_weight = if bidx.get(qi) { weight * mult } else { weight };
 
-                Ok(PushApplyOutput::Nonbranching(bidx, new_weight))
+                PushApplyOutput::Nonbranching(bidx, new_weight)
             }
             GateDefn::SqrtX(qi) => {
                 let bidx1 = bidx.unset(qi);
@@ -241,135 +228,123 @@ impl PushApplicable for Gate {
                 let weight_a = weight * Complex::new(0.5, 0.5);
                 let weight_b = weight * Complex::new(0.5, -0.5);
 
-                if bidx.get(qi)? {
-                    Ok(PushApplyOutput::Branching(
-                        (bidx1, weight_b),
-                        (bidx2, weight_a),
-                    ))
+                if bidx.get(qi) {
+                    PushApplyOutput::Branching((bidx1, weight_b), (bidx2, weight_a))
                 } else {
-                    Ok(PushApplyOutput::Branching(
-                        (bidx1, weight_a),
-                        (bidx2, weight_b),
-                    ))
+                    PushApplyOutput::Branching((bidx1, weight_a), (bidx2, weight_b))
                 }
             }
             GateDefn::SqrtY(qi) => {
                 let bidx1 = bidx.unset(qi);
                 let bidx2 = bidx.set(qi);
 
-                if bidx.get(qi)? {
-                    Ok(PushApplyOutput::Branching(
+                if bidx.get(qi) {
+                    PushApplyOutput::Branching(
                         (bidx1, weight * Complex::new(0.5, -0.5)),
                         (bidx2, weight * Complex::new(0.5, -0.5)),
-                    ))
+                    )
                 } else {
-                    Ok(PushApplyOutput::Branching(
+                    PushApplyOutput::Branching(
                         (bidx1, weight * Complex::new(0.5, -0.5)),
                         (bidx2, weight * Complex::new(-0.5, 0.5)),
-                    ))
+                    )
                 }
             }
             GateDefn::SqrtW(qi) => {
                 let bidx1 = bidx.unset(qi);
                 let bidx2 = bidx.set(qi);
 
-                if bidx.get(qi)? {
-                    Ok(PushApplyOutput::Branching(
+                if bidx.get(qi) {
+                    PushApplyOutput::Branching(
                         (bidx1, weight * Complex::new(0.0, constants::RECP_SQRT_2)),
                         (bidx2, weight * Complex::new(-0.5, -0.5)),
-                    ))
+                    )
                 } else {
-                    Ok(PushApplyOutput::Branching(
+                    PushApplyOutput::Branching(
                         (bidx1, weight * Complex::new(-0.5, -0.5)),
                         (bidx2, weight * Complex::new(-constants::RECP_SQRT_2, 0.0)),
-                    ))
+                    )
                 }
             }
             GateDefn::X(qi) => {
-                let new_bidx = bidx.flip(qi)?;
-                Ok(PushApplyOutput::Nonbranching(new_bidx, weight))
+                let new_bidx = bidx.flip(qi);
+                PushApplyOutput::Nonbranching(new_bidx, weight)
             }
             GateDefn::CX { control, target } => {
-                let new_bidx = if bidx.get(control)? {
-                    bidx.flip(target)?
+                let new_bidx = if bidx.get(control) {
+                    bidx.flip(target)
                 } else {
                     bidx
                 };
-                Ok(PushApplyOutput::Nonbranching(new_bidx, weight))
+                PushApplyOutput::Nonbranching(new_bidx, weight)
             }
             GateDefn::CZ { control, target } => {
-                let new_weight = if bidx.get(control)? && bidx.get(target)? {
+                let new_weight = if bidx.get(control) && bidx.get(target) {
                     -weight
                 } else {
                     weight
                 };
 
-                Ok(PushApplyOutput::Nonbranching(bidx, new_weight))
+                PushApplyOutput::Nonbranching(bidx, new_weight)
             }
             GateDefn::CCX {
                 control1,
                 control2,
                 target,
             } => {
-                let new_bidx = if bidx.get(control1)? && bidx.get(control2)? {
-                    bidx.flip(target)?
+                let new_bidx = if bidx.get(control1) && bidx.get(control2) {
+                    bidx.flip(target)
                 } else {
                     bidx
                 };
 
-                Ok(PushApplyOutput::Nonbranching(new_bidx, weight))
+                PushApplyOutput::Nonbranching(new_bidx, weight)
             }
             GateDefn::CPhase {
                 control,
                 target,
                 rot,
             } => {
-                let new_weight = if !bidx.get(control)? || !bidx.get(target)? {
+                let new_weight = if !bidx.get(control) || !bidx.get(target) {
                     weight
                 } else {
                     weight * Complex::new(rot.cos(), rot.sin())
                 };
 
-                Ok(PushApplyOutput::Nonbranching(bidx, new_weight))
+                PushApplyOutput::Nonbranching(bidx, new_weight)
             }
             GateDefn::FSim {
                 left,
                 right,
                 theta,
                 phi,
-            } => match (bidx.get(left)?, bidx.get(right)?) {
-                (false, false) => Ok(PushApplyOutput::Nonbranching(bidx, weight)),
-                (true, true) => Ok(PushApplyOutput::Nonbranching(
+            } => match (bidx.get(left), bidx.get(right)) {
+                (false, false) => PushApplyOutput::Nonbranching(bidx, weight),
+                (true, true) => PushApplyOutput::Nonbranching(
                     bidx,
                     weight * Complex::new((-phi).cos(), (-phi).sin()),
-                )),
+                ),
                 _ => {
                     let bidx1 = bidx;
-                    let bidx2 = bidx.flip(left)?.flip(right)?;
+                    let bidx2 = bidx.flip(left).flip(right);
                     let weight1 = weight * Complex::new(theta.cos(), 0.0);
                     let weight2 = weight * Complex::new(0.0, -theta.sin());
 
-                    if bidx.get(left)? {
-                        Ok(PushApplyOutput::Branching(
-                            (bidx1, weight2),
-                            (bidx2, weight1),
-                        ))
+                    if bidx.get(left) {
+                        PushApplyOutput::Branching((bidx1, weight2), (bidx2, weight1))
                     } else {
-                        Ok(PushApplyOutput::Branching(
-                            (bidx1, weight1),
-                            (bidx2, weight2),
-                        ))
+                        PushApplyOutput::Branching((bidx1, weight1), (bidx2, weight2))
                     }
                 }
             },
             GateDefn::RZ { rot, target } => {
-                let new_weight = if bidx.get(target)? {
+                let new_weight = if bidx.get(target) {
                     weight * Complex::new((rot / 2.0).cos(), (rot / 2.0).sin())
                 } else {
                     weight * Complex::new((rot / 2.0).cos(), -(rot / 2.0).sin())
                 };
 
-                Ok(PushApplyOutput::Nonbranching(bidx, new_weight))
+                PushApplyOutput::Nonbranching(bidx, new_weight)
             }
             GateDefn::RY { rot, target } => {
                 let x = rot / 2.0;
@@ -377,16 +352,13 @@ impl PushApplicable for Gate {
                 let bidx1 = bidx.unset(target);
                 let bidx2 = bidx.set(target);
 
-                if bidx.get(target)? {
-                    Ok(PushApplyOutput::Branching(
+                if bidx.get(target) {
+                    PushApplyOutput::Branching(
                         (bidx1, weight * -x.sin()),
                         (bidx2, weight * x.cos()),
-                    ))
+                    )
                 } else {
-                    Ok(PushApplyOutput::Branching(
-                        (bidx1, weight * x.cos()),
-                        (bidx2, weight * x.sin()),
-                    ))
+                    PushApplyOutput::Branching((bidx1, weight * x.cos()), (bidx2, weight * x.sin()))
                 }
             }
             GateDefn::CSwap {
@@ -394,13 +366,13 @@ impl PushApplicable for Gate {
                 target1,
                 target2,
             } => {
-                let new_bidx = if bidx.get(control)? {
-                    bidx.swap(target1, target2)?
+                let new_bidx = if bidx.get(control) {
+                    bidx.swap(target1, target2)
                 } else {
                     bidx
                 };
 
-                Ok(PushApplyOutput::Nonbranching(new_bidx, weight))
+                PushApplyOutput::Nonbranching(new_bidx, weight)
             }
             GateDefn::U {
                 target: _,
@@ -421,152 +393,139 @@ macro_rules! push_to_pull {
             (1, BranchingType::Nonbranching) => {
                 let qi = *touches.iter().next().unwrap();
 
-                let (b0, m0) = match $self.push_apply(BasisIdx::zeros(), Complex::new(1.0, 0.0))? {
+                let (b0, m0) = match $self.push_apply(BasisIdx::zeros(), Complex::new(1.0, 0.0)) {
                     PushApplyOutput::Nonbranching(bidx, multiplier) => (bidx, multiplier),
                     _ => unreachable!(),
                 };
 
                 let (_bidx2, m1) =
-                    match $self.push_apply(BasisIdx::zeros().set(qi), Complex::new(1.0, 0.0))? {
+                    match $self.push_apply(BasisIdx::zeros().set(qi), Complex::new(1.0, 0.0)) {
                         PushApplyOutput::Nonbranching(bidx, multiplier) => (bidx, multiplier),
                         _ => unreachable!(),
                     };
 
                 if b0 == BasisIdx::zeros() {
-                    Ok(PullApplyOutput::Nonbranching(
-                        $bidx,
-                        if $bidx.get(qi)? { m1 } else { m0 },
-                    ))
+                    PullApplyOutput::Nonbranching($bidx, if $bidx.get(qi) { m1 } else { m0 })
                 } else {
-                    Ok(PullApplyOutput::Nonbranching(
-                        $bidx.flip(qi)?,
-                        if $bidx.get(qi)? { m0 } else { m1 },
-                    ))
+                    PullApplyOutput::Nonbranching(
+                        $bidx.flip(qi),
+                        if $bidx.get(qi) { m0 } else { m1 },
+                    )
                 }
             }
             (2, BranchingType::Nonbranching) => {
                 let qi = *touches.iter().next().unwrap();
                 let qj = *touches.iter().next().unwrap();
 
-                let (b00, m00) =
-                    match $self.push_apply(BasisIdx::zeros(), Complex::new(1.0, 0.0))? {
-                        PushApplyOutput::Nonbranching(bidx, multiplier) => (bidx, multiplier),
-                        _ => unreachable!(),
-                    };
+                let (b00, m00) = match $self.push_apply(BasisIdx::zeros(), Complex::new(1.0, 0.0)) {
+                    PushApplyOutput::Nonbranching(bidx, multiplier) => (bidx, multiplier),
+                    _ => unreachable!(),
+                };
 
                 let (b01, m01) =
-                    match $self.push_apply(BasisIdx::zeros().set(qj), Complex::new(1.0, 0.0))? {
+                    match $self.push_apply(BasisIdx::zeros().set(qj), Complex::new(1.0, 0.0)) {
                         PushApplyOutput::Nonbranching(bidx, multiplier) => (bidx, multiplier),
                         _ => unreachable!(),
                     };
 
                 let (b10, m10) =
-                    match $self.push_apply(BasisIdx::zeros().set(qi), Complex::new(1.0, 0.0))? {
+                    match $self.push_apply(BasisIdx::zeros().set(qi), Complex::new(1.0, 0.0)) {
                         PushApplyOutput::Nonbranching(bidx, multiplier) => (bidx, multiplier),
                         _ => unreachable!(),
                     };
 
                 let (b11, m11) = match $self
-                    .push_apply(BasisIdx::zeros().set(qi).set(qj), Complex::new(1.0, 0.0))?
+                    .push_apply(BasisIdx::zeros().set(qi).set(qj), Complex::new(1.0, 0.0))
                 {
                     PushApplyOutput::Nonbranching(bidx, multiplier) => (bidx, multiplier),
                     _ => unreachable!(),
                 };
 
-                let apply_match =
-                    |left: bool, right: bool, bb: &BasisIdx| -> Result<bool, BasisIdxErr> {
-                        Ok(left == bb.get(qi)? && right == bb.get(qj)?)
-                    };
-                let find = |left: bool, right: bool| -> Result<(BasisIdx, Complex), BasisIdxErr> {
-                    if apply_match(left, right, &b00)? {
-                        Ok((b00.clone(), m00.clone()))
-                    } else if apply_match(left, right, &b01)? {
-                        Ok((b01.clone(), m01.clone()))
-                    } else if apply_match(left, right, &b10)? {
-                        Ok((b10.clone(), m10.clone()))
-                    } else if apply_match(left, right, &b11)? {
-                        Ok((b11.clone(), m11.clone()))
+                let apply_match = |left: bool, right: bool, bb: &BasisIdx| -> bool {
+                    left == bb.get(qi) && right == bb.get(qj)
+                };
+                let find = |left: bool, right: bool| -> (BasisIdx, Complex) {
+                    if apply_match(left, right, &b00) {
+                        (b00.clone(), m00.clone())
+                    } else if apply_match(left, right, &b01) {
+                        (b01.clone(), m01.clone())
+                    } else if apply_match(left, right, &b10) {
+                        (b10.clone(), m10.clone())
+                    } else if apply_match(left, right, &b11) {
+                        (b11.clone(), m11.clone())
                     } else {
                         unreachable!()
                     }
                 };
 
-                let align_with =
-                    |bb: &BasisIdx, bidx: &BasisIdx| -> Result<BasisIdx, BasisIdxErr> {
-                        let bidx = if bb.get(qi)? {
-                            bidx.set(qi)
-                        } else {
-                            bidx.unset(qi)
-                        };
-                        let bidx = if bb.get(qj)? {
-                            bidx.set(qj)
-                        } else {
-                            bidx.unset(qj)
-                        };
-                        Ok(bidx)
+                let align_with = |bb: &BasisIdx, bidx: &BasisIdx| -> BasisIdx {
+                    let bidx = if bb.get(qi) {
+                        bidx.set(qi)
+                    } else {
+                        bidx.unset(qi)
                     };
+                    let bidx = if bb.get(qj) {
+                        bidx.set(qj)
+                    } else {
+                        bidx.unset(qj)
+                    };
+                    bidx
+                };
 
-                let (new_b00, new_m00) = find(false, false)?;
-                let (new_b01, new_m01) = find(false, true)?;
-                let (new_b10, new_m10) = find(true, false)?;
-                let (new_b11, new_m11) = find(true, true)?;
+                let (new_b00, new_m00) = find(false, false);
+                let (new_b01, new_m01) = find(false, true);
+                let (new_b10, new_m10) = find(true, false);
+                let (new_b11, new_m11) = find(true, true);
 
-                match ($bidx.get(qi)?, $bidx.get(qj)?) {
-                    (true, true) => Ok(PullApplyOutput::Nonbranching(
-                        align_with(&new_b11, &$bidx)?,
-                        new_m11,
-                    )),
-                    (true, false) => Ok(PullApplyOutput::Nonbranching(
-                        align_with(&new_b10, &$bidx)?,
-                        new_m10,
-                    )),
-                    (false, true) => Ok(PullApplyOutput::Nonbranching(
-                        align_with(&new_b01, &$bidx)?,
-                        new_m01,
-                    )),
-                    (false, false) => Ok(PullApplyOutput::Nonbranching(
-                        align_with(&new_b00, &$bidx)?,
-                        new_m00,
-                    )),
+                match ($bidx.get(qi), $bidx.get(qj)) {
+                    (true, true) => {
+                        PullApplyOutput::Nonbranching(align_with(&new_b11, &$bidx), new_m11)
+                    }
+                    (true, false) => {
+                        PullApplyOutput::Nonbranching(align_with(&new_b10, &$bidx), new_m10)
+                    }
+                    (false, true) => {
+                        PullApplyOutput::Nonbranching(align_with(&new_b01, &$bidx), new_m01)
+                    }
+                    (false, false) => {
+                        PullApplyOutput::Nonbranching(align_with(&new_b00, &$bidx), new_m00)
+                    }
                 }
             }
             (1, BranchingType::Branching) => {
                 let qi = *touches.iter().next().unwrap();
 
                 let PushApplyOutput::Branching((b00, m00), (b01, m01)) =
-                    $self.push_apply(BasisIdx::zeros(), Complex::new(1.0, 0.0))?
+                    $self.push_apply(BasisIdx::zeros(), Complex::new(1.0, 0.0))
                 else {
                     unreachable!()
                 };
 
                 let PushApplyOutput::Branching((b10, m10), (b11, m11)) =
-                    $self.push_apply(BasisIdx::zeros().set(qi), Complex::new(1.0, 0.0))?
+                    $self.push_apply(BasisIdx::zeros().set(qi), Complex::new(1.0, 0.0))
                 else {
                     unreachable!()
                 };
 
-                let ((b00, m00), (b01, m01)) = if b00.get(qi)? {
+                let ((b00, m00), (b01, m01)) = if b00.get(qi) {
                     ((b01.clone(), m01), (b00.clone(), m00))
                 } else {
                     ((b10.clone(), m10), (b11.clone(), m11))
                 };
 
-                let ((b10, m10), (b11, m11)) = if b10.get(qi)? {
+                let ((b10, m10), (b11, m11)) = if b10.get(qi) {
                     ((b11.clone(), m11), (b10.clone(), m10))
                 } else {
                     ((b10.clone(), m10), (b11.clone(), m11))
                 };
 
-                assert!(!b00.get(qi)? && !b10.get(qi)? && !b01.get(qi)? && !b11.get(qi)?);
+                assert!(!b00.get(qi) && !b10.get(qi) && !b01.get(qi) && !b11.get(qi));
 
-                if $bidx.get(qi)? {
-                    Ok(PullApplyOutput::Branching(
-                        ($bidx.unset(qi), m01),
-                        ($bidx, m11),
-                    ))
+                if $bidx.get(qi) {
+                    PullApplyOutput::Branching(($bidx.unset(qi), m01), ($bidx, m11))
                 } else {
                     let bidx2 = $bidx.set(qi);
-                    Ok(PullApplyOutput::Branching(($bidx, m00), (bidx2, m10)))
+                    PullApplyOutput::Branching(($bidx, m00), (bidx2, m10))
                 }
             }
 
@@ -576,7 +535,7 @@ macro_rules! push_to_pull {
 }
 
 impl PullApplicable for Gate {
-    fn pull_apply(&self, bidx: BasisIdx) -> Result<PullApplyOutput, GateApplyErr> {
+    fn pull_apply(&self, bidx: BasisIdx) -> PullApplyOutput {
         match self.defn {
             GateDefn::PauliY(_)
             | GateDefn::PauliZ(_)
@@ -593,81 +552,78 @@ impl PullApplicable for Gate {
             }
 
             GateDefn::CZ { control, target } => {
-                if bidx.get(control)? && bidx.get(target)? {
-                    Ok(PullApplyOutput::Nonbranching(bidx, Complex::new(-1.0, 0.0)))
+                if bidx.get(control) && bidx.get(target) {
+                    PullApplyOutput::Nonbranching(bidx, Complex::new(-1.0, 0.0))
                 } else {
-                    Ok(PullApplyOutput::Nonbranching(bidx, Complex::new(1.0, 0.0)))
+                    PullApplyOutput::Nonbranching(bidx, Complex::new(1.0, 0.0))
                 }
             }
             GateDefn::CX { control, target } => {
-                if bidx.get(control)? {
-                    Ok(PullApplyOutput::Nonbranching(
-                        bidx.flip(target)?,
-                        Complex::new(1.0, 0.0),
-                    ))
+                if bidx.get(control) {
+                    PullApplyOutput::Nonbranching(bidx.flip(target), Complex::new(1.0, 0.0))
                 } else {
-                    Ok(PullApplyOutput::Nonbranching(bidx, Complex::new(1.0, 0.0)))
+                    PullApplyOutput::Nonbranching(bidx, Complex::new(1.0, 0.0))
                 }
             }
             GateDefn::SqrtX(qi) => {
                 let bidx0 = bidx.unset(qi);
                 let bidx1 = bidx.set(qi);
 
-                if bidx.get(qi)? {
-                    Ok(PullApplyOutput::Branching(
+                if bidx.get(qi) {
+                    PullApplyOutput::Branching(
                         (bidx0, Complex::new(0.5, -0.5)),
                         (bidx1, Complex::new(0.5, 0.5)),
-                    ))
+                    )
                 } else {
-                    Ok(PullApplyOutput::Branching(
+                    PullApplyOutput::Branching(
                         (bidx0, Complex::new(0.5, 0.5)),
                         (bidx1, Complex::new(0.5, -0.5)),
-                    ))
+                    )
                 }
             }
             GateDefn::Hadamard(qi) => {
                 let bidx0 = bidx.unset(qi);
                 let bidx1 = bidx.set(qi);
 
-                if bidx.get(qi)? {
-                    Ok(PullApplyOutput::Branching(
+                if bidx.get(qi) {
+                    PullApplyOutput::Branching(
                         (bidx0, Complex::new(constants::RECP_SQRT_2, 0.0)),
                         (bidx1, Complex::new(-constants::RECP_SQRT_2, 0.0)),
-                    ))
+                    )
                 } else {
-                    Ok(PullApplyOutput::Branching(
+                    PullApplyOutput::Branching(
                         (bidx0, Complex::new(constants::RECP_SQRT_2, 0.0)),
                         (bidx1, Complex::new(constants::RECP_SQRT_2, 0.0)),
-                    ))
+                    )
                 }
             }
             GateDefn::RZ { rot, target } => {
-                if bidx.get(target)? {
-                    Ok(PullApplyOutput::Nonbranching(
+                if bidx.get(target) {
+                    PullApplyOutput::Nonbranching(
                         bidx,
                         Complex::new((-rot / 2.0).cos(), (-rot / 2.0).sin()),
-                    ))
+                    )
                 } else {
-                    Ok(PullApplyOutput::Nonbranching(
+                    PullApplyOutput::Nonbranching(
                         bidx,
                         Complex::new((rot / 2.0).cos(), (rot / 2.0).sin()),
-                    ))
+                    )
                 }
             }
             GateDefn::RY { rot, target } => {
                 let bidx0 = bidx.unset(target);
                 let bidx1 = bidx.set(target);
 
-                if bidx.get(target)? {
-                    Ok(PullApplyOutput::Branching(
+                if bidx.get(target) {
+                    PullApplyOutput::Branching(
                         (bidx0, Complex::new((rot / 2.0).cos(), 0.0)),
                         (bidx1, Complex::new(-(rot / 2.0).sin(), 0.0)),
-                    ))
+                    )
                 } else {
-                    Ok(PullApplyOutput::Branching(
+                    PullApplyOutput::Branching(
                         (bidx0, Complex::new((rot / 2.0).sin(), 0.0)),
                         (bidx1, Complex::new((rot / 2.0).cos(), 0.0)),
-                    ))
+                    )
                 }
             }
             GateDefn::U { .. } => todo!(),
