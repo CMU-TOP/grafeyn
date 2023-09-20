@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use crate::parser::{Argument, Expression, OpCode, QasmStatement};
 use crate::types::{QubitIndex, Real};
 pub use gate::{
-    Gate, GateApplyErr, GateDefn, MaybeBranchingOutput, PullApplicable, PushApplicable,
+    Gate, GateApplyErr, GateDefn, PullApplicable, PullApplyOutput, PushApplicable, PushApplyOutput,
 };
 
 #[derive(Debug)]

@@ -34,26 +34,15 @@ pub struct Options {
     )]
     pub gate_schduling_policy: GateSchedulingPolicy,
 
-    #[structopt(
-        name = "dense threshold",
-        long = "dense-threshold",
-        short = "dt",
-        default_value = "0.25"
-    )]
+    #[structopt(long = "dense-threshold", default_value = "0.25")]
     pub dense_threshold: Real,
 
-    #[structopt(
-        name = "pull threshold",
-        long = "pull-threshold",
-        short = "pt",
-        default_value = "0.8"
-    )]
+    #[structopt(long = "pull-threshold", default_value = "0.8")]
     pub pull_threshold: Real,
 
     #[structopt(
         name = "parallelism",
         long = "parallelism",
-        short = "p",
         default_value = "1",
         help = "number of threads to use"
     )]
@@ -62,7 +51,6 @@ pub struct Options {
     #[structopt(
         name = "block size",
         long = "block-size",
-        short = "bs",
         default_value = "10000",
         help = "block size for parallelism"
     )]

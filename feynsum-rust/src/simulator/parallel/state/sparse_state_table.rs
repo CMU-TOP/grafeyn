@@ -146,9 +146,15 @@ impl SparseStateTable {
 
     }
 
+
+    /*
     #[cfg(test)]
     pub fn get(&self, bidx: &BasisIdx) -> Option<&Complex> {
 	self.table.get(&bidx)
+    } */
+
+    pub fn get(&self, bidx: &BasisIdx) -> Option<Complex> {
+        self.table.get(&bidx).map(Clone::clone)
     }
 }
 
