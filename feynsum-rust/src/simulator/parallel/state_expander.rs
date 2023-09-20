@@ -1,6 +1,6 @@
 use std::cmp;
 use std::fmt::{self, Display, Formatter};
-use std::sync::{atomic::Ordering, Arc};
+use std::sync::atomic::Ordering;
 
 use rayon::prelude::*;
 
@@ -241,38 +241,11 @@ unsafe fn apply_gates(
 
     match gates[0].push_apply(bidx, weight)? {
         PushApplyOutput::Nonbranching(new_bidx, new_weight) => {
-            Ok(1 + apply_gates_internal(&gates[1..], table, new_bidx, new_weight)?)
+            Ok(1 + apply_gates(&gates[1..], table, new_bidx, new_weight)?)
         }
         PushApplyOutput::Branching((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
-            let num_gate_apps_1 = apply_gates_internal(&gates[1..], table, new_bidx1, new_weight1)?;
-            let num_gate_apps_2 = apply_gates_internal(&gates[1..], table, new_bidx2, new_weight2)?;
-            Ok(1 + num_gate_apps_1 + num_gate_apps_2)
-        }
-    }
-}
-
-// used to avoid unnecessary Arc::clone() within a thread
-unsafe fn apply_gates_internal(
-    gates: &[&Gate],
-    table: *const DenseStateTable,
-    bidx: BasisIdx,
-    weight: Complex,
-) -> Result<usize, SimulatorError> {
-    if utility::is_zero(weight) {
-        return Ok(0);
-    }
-    if gates.is_empty() {
-        table.as_ref().unwrap().atomic_put(bidx, weight);
-        return Ok(0);
-    }
-
-    match gates[0].push_apply(bidx, weight)? {
-        PushApplyOutput::Nonbranching(new_bidx, new_weight) => {
-            Ok(1 + apply_gates_internal(&gates[1..], table, new_bidx, new_weight)?)
-        }
-        PushApplyOutput::Branching((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
-            let num_gate_apps_1 = apply_gates_internal(&gates[1..], table, new_bidx1, new_weight1)?;
-            let num_gate_apps_2 = apply_gates_internal(&gates[1..], table, new_bidx2, new_weight2)?;
+            let num_gate_apps_1 = apply_gates(&gates[1..], table, new_bidx1, new_weight1)?;
+            let num_gate_apps_2 = apply_gates(&gates[1..], table, new_bidx2, new_weight2)?;
             Ok(1 + num_gate_apps_1 + num_gate_apps_2)
         }
     }
