@@ -121,8 +121,8 @@ unsafe fn expand_push_dense(
                 chunk
                     .iter()
                     .enumerate()
-                    .map(|(idx, v)| {
-                        let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
+                    .map(|(idx, atomic)| unsafe {
+                        let (re, im) = utility::unpack_complex(*atomic.as_ptr());
                         apply_gates(
                             &gates,
                             &table as *const DenseStateTable,
@@ -165,18 +165,18 @@ fn expand_pull_dense(
                 .iter()
                 .fold((0, 0), |(num_gate_apps, num_nonzeros), idx| {
                     let bidx = BasisIdx::from_idx(*idx);
-                    let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, &bidx);
                     unsafe {
+                        let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, &bidx);
                         table.unsafe_put(bidx, weight);
+                        (
+                            num_gate_apps + num_gate_apps_here,
+                            if utility::is_nonzero(weight) {
+                                num_nonzeros + 1
+                            } else {
+                                num_nonzeros
+                            },
+                        )
                     }
-                    (
-                        num_gate_apps + num_gate_apps_here,
-                        if utility::is_nonzero(weight) {
-                            num_nonzeros + 1
-                        } else {
-                            num_nonzeros
-                        },
-                    )
                 })
         })
         .reduce(
@@ -251,9 +251,15 @@ unsafe fn apply_gates(
     }
 }
 
-fn apply_pull_gates(gates: &[&Gate], prev_state: &State, bidx: &BasisIdx) -> (Complex, usize) {
+unsafe fn apply_pull_gates(
+    gates: &[&Gate],
+    prev_state: &State,
+    bidx: &BasisIdx,
+) -> (Complex, usize) {
     if gates.is_empty() {
-        let weight = prev_state.get(bidx).unwrap_or(Complex::new(0.0, 0.0));
+        let weight = prev_state
+            .unsafe_get(bidx)
+            .unwrap_or(Complex::new(0.0, 0.0));
         return (weight, 0);
     }
 
