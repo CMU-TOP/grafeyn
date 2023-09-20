@@ -115,6 +115,7 @@ mod tests {
         assert_eq!(bidx2.bits, 4);
     }
 
+    #[test]
     fn test_unset() {
         let bidx = BasisIdx { bits: 0b1010 };
         let bidx = bidx.unset(0);
