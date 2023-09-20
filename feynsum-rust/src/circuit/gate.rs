@@ -202,16 +202,12 @@ impl PushApplicable for Gate {
                 let bidx1 = bidx.unset(qi);
                 let bidx2 = bidx.set(qi);
 
+                let new_weight = weight * constants::RECP_SQRT_2;
+
                 if bidx.get(qi) {
-                    PushApplyOutput::Branching(
-                        (bidx1, weight * constants::RECP_SQRT_2),
-                        (bidx2, -weight * constants::RECP_SQRT_2),
-                    )
+                    PushApplyOutput::Branching((bidx1, new_weight), (bidx2, -new_weight))
                 } else {
-                    PushApplyOutput::Branching(
-                        (bidx1, weight * constants::RECP_SQRT_2),
-                        (bidx2, weight * constants::RECP_SQRT_2),
-                    )
+                    PushApplyOutput::Branching((bidx1, new_weight), (bidx2, new_weight))
                 }
             }
             GateDefn::T(qi) => {
@@ -614,15 +610,18 @@ impl PullApplicable for Gate {
                 let bidx0 = bidx.unset(target);
                 let bidx1 = bidx.set(target);
 
+                let cos = (rot / 2.0).cos();
+                let sin = (rot / 2.0).sin();
+
                 if bidx.get(target) {
                     PullApplyOutput::Branching(
-                        (bidx0, Complex::new((rot / 2.0).cos(), 0.0)),
-                        (bidx1, Complex::new(-(rot / 2.0).sin(), 0.0)),
+                        (bidx0, Complex::new(cos, 0.0)),
+                        (bidx1, Complex::new(-sin, 0.0)),
                     )
                 } else {
                     PullApplyOutput::Branching(
-                        (bidx0, Complex::new((rot / 2.0).sin(), 0.0)),
-                        (bidx1, Complex::new((rot / 2.0).cos(), 0.0)),
+                        (bidx0, Complex::new(sin, 0.0)),
+                        (bidx1, Complex::new(cos, 0.0)),
                     )
                 }
             }
