@@ -14,7 +14,6 @@ use super::state::{DenseStateTable, SparseStateTable, State, Table};
 pub enum ExpandMethod {
     Sparse,
     PushDense,
-    #[allow(dead_code)]
     PullDense,
 }
 
