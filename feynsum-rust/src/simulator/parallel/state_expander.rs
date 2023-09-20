@@ -1,6 +1,5 @@
 use std::cmp;
 use std::fmt::{self, Display, Formatter};
-use std::sync::atomic::Ordering;
 
 use rayon::prelude::*;
 
@@ -264,7 +263,6 @@ unsafe fn apply_pull_gates(
     }
 
     match gates[0].pull_apply(*bidx) {
-        // FIXME: No clone
         PullApplyOutput::Nonbranching(neighbor, multiplier) => {
             let (weight, num_gate_apps) = apply_pull_gates(&gates[1..], prev_state, &neighbor);
             (weight * multiplier, 1 + num_gate_apps)

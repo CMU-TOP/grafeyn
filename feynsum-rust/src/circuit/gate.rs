@@ -446,13 +446,13 @@ macro_rules! push_to_pull {
                 };
                 let find = |left: bool, right: bool| -> (BasisIdx, Complex) {
                     if apply_match(left, right, &b00) {
-                        (b00.clone(), m00.clone())
+                        (b00, m00.clone())
                     } else if apply_match(left, right, &b01) {
-                        (b01.clone(), m01.clone())
+                        (b01, m01.clone())
                     } else if apply_match(left, right, &b10) {
-                        (b10.clone(), m10.clone())
+                        (b10, m10.clone())
                     } else if apply_match(left, right, &b11) {
-                        (b11.clone(), m11.clone())
+                        (b11, m11.clone())
                     } else {
                         unreachable!()
                     }

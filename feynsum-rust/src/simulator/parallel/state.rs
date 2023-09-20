@@ -29,13 +29,6 @@ impl State {
         }
     }
 
-    pub fn get(&self, bidx: &BasisIdx) -> Option<Complex> {
-        match self {
-            State::Sparse(table) => table.get(bidx),
-            State::Dense(table) => table.get(bidx),
-        }
-    }
-
     pub unsafe fn unsafe_get(&self, bidx: &BasisIdx) -> Option<Complex> {
         match self {
             State::Sparse(table) => table.get(bidx),
