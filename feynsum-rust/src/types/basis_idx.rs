@@ -2,7 +2,7 @@ use std::fmt::{self, Display, Formatter};
 
 pub const MAX_QUBITS: usize = 63;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct BasisIdx {
     bits: u64,
 }
@@ -31,13 +31,13 @@ impl BasisIdx {
         BasisIdx {
             bits: self.bits ^ (1 << qi),
         }
-    }    
+    }
 
     pub fn flip(&self, qi: usize) -> Result<Self, BasisIdxErr> {
         if qi >= MAX_QUBITS {
             Err(BasisIdxErr::IndexOutOfBounds)
         } else {
-	    Ok(self.flip_unsafe(qi))
+            Ok(self.flip_unsafe(qi))
         }
     }
 
@@ -79,11 +79,11 @@ impl BasisIdx {
     }
 
     pub fn into_u64(self) -> u64 {
-	self.bits
+        self.bits
     }
 
     pub const fn from_u64(u: u64) -> Self {
-	Self { bits: u }
+        Self { bits: u }
     }
 
     #[cfg(test)]

@@ -52,7 +52,7 @@ impl DenseStateTable {
     }
 
     pub fn get(&self, bidx: &BasisIdx) -> Option<Complex> {
-        self.array.get(bidx.clone().into_idx()).map(|v| {
+        self.array.get(bidx.into_idx()).map(|v| {
             let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
             Complex::new(re, im)
         })

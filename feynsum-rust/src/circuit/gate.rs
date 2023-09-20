@@ -344,7 +344,7 @@ impl PushApplicable for Gate {
                     weight * Complex::new((-phi).cos(), (-phi).sin()),
                 )),
                 _ => {
-                    let bidx1 = bidx.clone();
+                    let bidx1 = bidx;
                     let bidx2 = bidx.flip(left)?.flip(right)?;
                     let weight1 = weight * Complex::new(theta.cos(), 0.0);
                     let weight2 = weight * Complex::new(0.0, -theta.sin());
@@ -434,7 +434,7 @@ macro_rules! push_to_pull {
 
                 if b0 == BasisIdx::zeros() {
                     Ok(PullApplyOutput::Nonbranching(
-                        $bidx.clone(),
+                        $bidx,
                         if $bidx.get(qi)? { m1 } else { m0 },
                     ))
                 } else {

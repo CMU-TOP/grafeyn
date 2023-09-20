@@ -175,7 +175,7 @@ fn apply_pull_gates(
         return Ok((weight, 0));
     }
 
-    match gates[0].pull_apply(bidx.clone())? {
+    match gates[0].pull_apply(*bidx)? {
         // FIXME: No clone
         PullApplyOutput::Nonbranching(neighbor, multiplier) => {
             let (weight, num_gate_apps) = apply_pull_gates(&gates[1..], prev_state, &neighbor)?;

@@ -25,7 +25,7 @@ impl DenseStateTable {
     }
 
     pub fn get(&self, bidx: &BasisIdx) -> Option<&Complex> {
-        self.array.get(bidx.clone().into_idx())
+        self.array.get(bidx.into_idx())
         // FIXME: No clone
     }
 }
