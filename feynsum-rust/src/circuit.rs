@@ -178,6 +178,7 @@ fn eval(exp: Expression) -> Result<Real, CircuitBuildError> {
                 _ => Err(CircuitBuildError::UnsupportedOpcode),
             }
         }
+        Expression::Minus(exp) => Ok(-eval(*exp)?),
         Expression::Id(_) => Err(CircuitBuildError::UnsupportedIdentifier),
         exp => {
             error!("unsupported expression: {:?}", exp);
