@@ -6,9 +6,11 @@ use log::info;
 
 use crate::types::QubitIndex;
 
+mod greedy_finish_qubit_gate_scheduler;
 mod greedy_nonbranching_gate_scheduler;
 mod naive_gate_scheduler;
 
+pub use greedy_finish_qubit_gate_scheduler::GreedyFinishQubitGateScheduler;
 pub use greedy_nonbranching_gate_scheduler::GreedyNonbranchingGateScheduler;
 pub use naive_gate_scheduler::NaiveGateScheduler;
 
@@ -16,6 +18,7 @@ pub use naive_gate_scheduler::NaiveGateScheduler;
 pub enum GateSchedulingPolicy {
     Naive,
     GreedyNonbranching,
+    GreedyFinishQubit,
 }
 
 impl FromStr for GateSchedulingPolicy {
@@ -25,6 +28,7 @@ impl FromStr for GateSchedulingPolicy {
         match s {
             "naive" => Ok(GateSchedulingPolicy::Naive),
             "greedy-nonbranching" | "gnb" => Ok(GateSchedulingPolicy::GreedyNonbranching),
+            "greedy-finish-qubit" | "gfq" => Ok(GateSchedulingPolicy::GreedyFinishQubit),
             _ => Err(format!(
                 "unknown gate scheduling policy: {}; valid values are: naive, gnb",
                 s
@@ -38,6 +42,7 @@ impl Display for GateSchedulingPolicy {
         match self {
             GateSchedulingPolicy::Naive => write!(f, "naive"),
             GateSchedulingPolicy::GreedyNonbranching => write!(f, "greedy-nonbranching"),
+            GateSchedulingPolicy::GreedyFinishQubit => write!(f, "greedy-finish-qubit"),
         }
     }
 }
@@ -61,6 +66,15 @@ pub fn create_gate_scheduler<'a>(
         GateSchedulingPolicy::GreedyNonbranching => {
             info!("using greedy nonbranching gate scheduler");
             Box::new(GreedyNonbranchingGateScheduler::new(
+                num_gates,
+                num_qubits,
+                gate_touches,
+                gate_is_branching,
+            ))
+        }
+        GateSchedulingPolicy::GreedyFinishQubit => {
+            info!("using greedy nonbranching gate scheduler");
+            Box::new(GreedyFinishQubitGateScheduler::new(
                 num_gates,
                 num_qubits,
                 gate_touches,
