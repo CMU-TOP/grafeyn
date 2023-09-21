@@ -51,9 +51,9 @@ impl DenseStateTable {
         }
     }
 
-    pub unsafe fn unsafe_get(&self, bidx: &BasisIdx) -> Option<Complex> {
-        self.array.get(bidx.into_idx()).map(|atomic| {
-            let (re, im) = utility::unpack_complex(*atomic.as_ptr());
+    pub fn get(&self, bidx: &BasisIdx) -> Option<Complex> {
+        self.array.get(bidx.into_idx()).map(|v| {
+            let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
             Complex::new(re, im)
         })
     }

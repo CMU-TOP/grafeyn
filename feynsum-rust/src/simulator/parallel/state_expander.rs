@@ -251,9 +251,7 @@ unsafe fn apply_pull_gates(
     bidx: &BasisIdx,
 ) -> (Complex, usize) {
     if gates.is_empty() {
-        let weight = prev_state
-            .unsafe_get(bidx)
-            .unwrap_or(Complex::new(0.0, 0.0));
+        let weight = prev_state.get(bidx).unwrap_or(Complex::new(0.0, 0.0));
         return (weight, 0);
     }
 
