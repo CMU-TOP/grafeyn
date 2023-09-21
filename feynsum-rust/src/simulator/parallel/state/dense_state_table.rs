@@ -44,8 +44,7 @@ impl DenseStateTable {
         unsafe {
             let old = *self.array[idx].as_ptr();
             let (old_re, old_im) = utility::unpack_complex(old);
-            let (new_re, new_im) = (old_re + weight.re, old_im + weight.im);
-            let new = utility::pack_complex(new_re, new_im);
+            let new = utility::pack_complex(old_re + weight.re, old_im + weight.im);
 
             *self.array[idx].as_ptr() = new;
         }
