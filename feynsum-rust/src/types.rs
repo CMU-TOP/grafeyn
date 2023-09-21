@@ -12,4 +12,4 @@ pub mod constants {
 
 pub mod basis_idx;
 
-pub use basis_idx::{BasisIdx, BasisIdxErr};
+pub use basis_idx::BasisIdx;

@@ -1,7 +1,6 @@
 pub mod parallel;
 pub mod sequential;
 
-use crate::circuit::GateApplyErr;
 use crate::types::{BasisIdx, Complex};
 
 pub trait Compactifiable {
@@ -11,11 +10,4 @@ pub trait Compactifiable {
 #[derive(Debug)]
 pub enum SimulatorError {
     TooManyQubits,
-    GateApplyErr(GateApplyErr),
-}
-
-impl From<GateApplyErr> for SimulatorError {
-    fn from(err: GateApplyErr) -> Self {
-        SimulatorError::GateApplyErr(err)
-    }
 }

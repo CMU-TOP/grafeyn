@@ -70,7 +70,7 @@ fn expand_sparse(gates: Vec<&Gate>, state: State) -> Result<ExpandResult, Simula
     let num_gate_apps = state
         .compactify()
         .map(|(bidx, weight)| apply_gates(&gates, &mut table, bidx, weight))
-        .sum::<Result<usize, SimulatorError>>()?;
+        .sum();
 
     let num_nonzeros = table.num_nonzeros();
 
@@ -91,10 +91,8 @@ fn expand_push_dense(
 
     let num_gate_apps = state
         .compactify()
-        .map(|(bidx, weight)| -> Result<usize, SimulatorError> {
-            apply_gates(&gates, &mut table, bidx, weight)
-        })
-        .sum::<Result<usize, SimulatorError>>()?;
+        .map(|(bidx, weight)| apply_gates(&gates, &mut table, bidx, weight))
+        .sum();
 
     let num_nonzeros = table.num_nonzeros();
 
@@ -137,28 +135,23 @@ fn expand_pull_dense(
     })
 }
 
-fn apply_gates(
-    gates: &[&Gate],
-    table: &mut impl Table,
-    bidx: BasisIdx,
-    weight: Complex,
-) -> Result<usize, SimulatorError> {
+fn apply_gates(gates: &[&Gate], table: &mut impl Table, bidx: BasisIdx, weight: Complex) -> usize {
     if utility::is_zero(weight) {
-        return Ok(0);
+        return 0;
     }
     if gates.is_empty() {
         table.put(bidx, weight);
-        return Ok(0);
+        return 0;
     }
 
-    match gates[0].push_apply(bidx, weight)? {
+    match gates[0].push_apply(bidx, weight) {
         PushApplyOutput::Nonbranching(new_bidx, new_weight) => {
-            Ok(1 + apply_gates(&gates[1..], table, new_bidx, new_weight)?)
+            1 + apply_gates(&gates[1..], table, new_bidx, new_weight)
         }
         PushApplyOutput::Branching((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
-            let num_gate_apps_1 = apply_gates(&gates[1..], table, new_bidx1, new_weight1)?;
-            let num_gate_apps_2 = apply_gates(&gates[1..], table, new_bidx2, new_weight2)?;
-            Ok(1 + num_gate_apps_1 + num_gate_apps_2)
+            let num_gate_apps_1 = apply_gates(&gates[1..], table, new_bidx1, new_weight1);
+            let num_gate_apps_2 = apply_gates(&gates[1..], table, new_bidx2, new_weight2);
+            1 + num_gate_apps_1 + num_gate_apps_2
         }
     }
 }
@@ -175,7 +168,7 @@ fn apply_pull_gates(
         return Ok((weight, 0));
     }
 
-    match gates[0].pull_apply(bidx.clone())? {
+    match gates[0].pull_apply(*bidx) {
         // FIXME: No clone
         PullApplyOutput::Nonbranching(neighbor, multiplier) => {
             let (weight, num_gate_apps) = apply_pull_gates(&gates[1..], prev_state, &neighbor)?;

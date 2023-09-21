@@ -75,10 +75,10 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
             num_qubits,
             prev_num_nonzeros,
             state
-        )?);
+        ));
 
         let density = {
-            let max_num_states = 1 << num_qubits;
+            let max_num_states: u64 = 1 << num_qubits;
             num_nonzeros as Real / max_num_states as Real
         };
 
@@ -103,8 +103,8 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
     });
 
     let final_density = {
-        let max_num_states = 1 << num_qubits;
-        num_nonzeros as Real / max_num_states as Real
+        let max_num_states: u64 = 1 << num_qubits;
+        num_nonzeros as f64 / max_num_states as f64
     };
 
     println!(

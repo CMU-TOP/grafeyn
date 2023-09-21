@@ -5,9 +5,7 @@ use std::collections::HashMap;
 
 use crate::parser::{Argument, Expression, OpCode, QasmStatement};
 use crate::types::{QubitIndex, Real};
-pub use gate::{
-    Gate, GateApplyErr, GateDefn, PullApplicable, PullApplyOutput, PushApplicable, PushApplyOutput,
-};
+pub use gate::{Gate, GateDefn, PullApplicable, PullApplyOutput, PushApplicable, PushApplyOutput};
 
 #[derive(Debug)]
 pub enum CircuitBuildError {
@@ -180,8 +178,12 @@ fn eval(exp: Expression) -> Result<Real, CircuitBuildError> {
                 _ => Err(CircuitBuildError::UnsupportedOpcode),
             }
         }
+        Expression::Minus(exp) => Ok(-eval(*exp)?),
         Expression::Id(_) => Err(CircuitBuildError::UnsupportedIdentifier),
-        _ => Err(CircuitBuildError::UnsupportedExpression),
+        exp => {
+            error!("unsupported expression: {:?}", exp);
+            Err(CircuitBuildError::UnsupportedExpression)
+        }
     }
 }
 
