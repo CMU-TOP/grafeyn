@@ -1,5 +1,8 @@
 use std::cmp;
 use std::fmt::{self, Display, Formatter};
+use std::ops::Deref;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use rayon::prelude::*;
 
@@ -50,9 +53,9 @@ pub fn expand(
     if expected_cost < config.dense_threshold {
         expand_sparse(gates, state)
     } else if expected_cost >= config.pull_threshold && all_gates_pullable {
-        unsafe { expand_pull_dense(gates, config, num_qubits, state) }
+        expand_pull_dense(gates, config, num_qubits, state)
     } else {
-        unsafe { expand_push_dense(gates, config, num_qubits, state) }
+        expand_push_dense(gates, config, num_qubits, state)
     }
 }
 
@@ -85,14 +88,14 @@ fn expand_sparse(gates: Vec<&Gate>, state: State) -> ExpandResult {
     }
 }
 
-unsafe fn expand_push_dense(
+fn expand_push_dense(
     gates: Vec<&Gate>,
     config: &Config,
     num_qubits: usize,
     state: State,
 ) -> ExpandResult {
     let block_size = config.block_size;
-    let table = DenseStateTable::new(num_qubits);
+    let table = Arc::new(DenseStateTable::new(num_qubits));
 
     let num_gate_apps = match state {
         State::Sparse(prev_table) => prev_table
@@ -104,9 +107,7 @@ unsafe fn expand_push_dense(
                 chunk
                     .iter()
                     .copied()
-                    .map(|(bidx, weight)| {
-                        apply_gates(&gates, &table as *const DenseStateTable, bidx, weight)
-                    })
+                    .map(|(bidx, weight)| apply_gates(&gates, Arc::clone(&table), bidx, weight))
                     .sum::<usize>()
             })
             .sum(),
@@ -118,11 +119,11 @@ unsafe fn expand_push_dense(
                 chunk
                     .iter()
                     .enumerate()
-                    .map(|(idx, atomic)| unsafe {
-                        let (re, im) = utility::unpack_complex(*atomic.as_ptr());
+                    .map(|(idx, v)| {
+                        let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
                         apply_gates(
                             &gates,
-                            &table as *const DenseStateTable,
+                            Arc::clone(&table),
                             BasisIdx::from_idx(block_size * chunk_idx + idx),
                             Complex::new(re, im),
                         )
@@ -135,14 +136,16 @@ unsafe fn expand_push_dense(
     let num_nonzeros = table.num_nonzeros();
 
     ExpandResult {
-        state: State::Dense(table),
+        state: State::Dense(
+            Arc::into_inner(table).expect("all other references to table should have been dropped"),
+        ),
         num_nonzeros,
         num_gate_apps,
         method: ExpandMethod::PushDense,
     }
 }
 
-unsafe fn expand_pull_dense(
+fn expand_pull_dense(
     gates: Vec<&Gate>,
     config: &Config,
     num_qubits: usize,
@@ -163,7 +166,7 @@ unsafe fn expand_pull_dense(
                 .fold((0, 0), |(num_gate_apps, num_nonzeros), idx| {
                     let bidx = BasisIdx::from_idx(*idx);
                     let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, &bidx);
-                    table.unsafe_put(bidx, weight);
+                    table.atomic_put(bidx, weight);
                     (
                         num_gate_apps + num_gate_apps_here,
                         if utility::is_nonzero(weight) {
@@ -219,9 +222,9 @@ fn apply_gates_seq(
     }
 }
 
-unsafe fn apply_gates(
+fn apply_gates(
     gates: &[&Gate],
-    table: *const DenseStateTable,
+    table: Arc<DenseStateTable>,
     bidx: BasisIdx,
     weight: Complex,
 ) -> usize {
@@ -235,21 +238,44 @@ unsafe fn apply_gates(
 
     match gates[0].push_apply(bidx, weight) {
         PushApplyOutput::Nonbranching(new_bidx, new_weight) => {
-            1 + apply_gates(&gates[1..], table, new_bidx, new_weight)
+            1 + apply_gates_internal(&gates[1..], &table, new_bidx, new_weight)
         }
         PushApplyOutput::Branching((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
-            let num_gate_apps_1 = apply_gates(&gates[1..], table, new_bidx1, new_weight1);
-            let num_gate_apps_2 = apply_gates(&gates[1..], table, new_bidx2, new_weight2);
+            let num_gate_apps_1 = apply_gates_internal(&gates[1..], &table, new_bidx1, new_weight1);
+            let num_gate_apps_2 = apply_gates_internal(&gates[1..], &table, new_bidx2, new_weight2);
             1 + num_gate_apps_1 + num_gate_apps_2
         }
     }
 }
 
-unsafe fn apply_pull_gates(
+// We do not need Arc within each thread
+fn apply_gates_internal(
     gates: &[&Gate],
-    prev_state: &State,
-    bidx: &BasisIdx,
-) -> (Complex, usize) {
+    table: &DenseStateTable,
+    bidx: BasisIdx,
+    weight: Complex,
+) -> usize {
+    if utility::is_zero(weight) {
+        return 0;
+    }
+    if gates.is_empty() {
+        (*table).atomic_put(bidx, weight);
+        return 0;
+    }
+
+    match gates[0].push_apply(bidx, weight) {
+        PushApplyOutput::Nonbranching(new_bidx, new_weight) => {
+            1 + apply_gates_internal(&gates[1..], table, new_bidx, new_weight)
+        }
+        PushApplyOutput::Branching((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
+            let num_gate_apps_1 = apply_gates_internal(&gates[1..], table, new_bidx1, new_weight1);
+            let num_gate_apps_2 = apply_gates_internal(&gates[1..], table, new_bidx2, new_weight2);
+            1 + num_gate_apps_1 + num_gate_apps_2
+        }
+    }
+}
+
+fn apply_pull_gates(gates: &[&Gate], prev_state: &State, bidx: &BasisIdx) -> (Complex, usize) {
     if gates.is_empty() {
         let weight = prev_state.get(bidx).unwrap_or(Complex::new(0.0, 0.0));
         return (weight, 0);
