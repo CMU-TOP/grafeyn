@@ -78,7 +78,6 @@ pub fn create_gate_scheduler<'a>(
                 num_gates,
                 num_qubits,
                 gate_touches,
-                gate_is_branching,
             ))
         }
     }
