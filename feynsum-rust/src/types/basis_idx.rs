@@ -9,7 +9,10 @@ pub struct BasisIdx {
 
 impl Display for BasisIdx {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        format!("{:b}", self.bits).fmt(f)
+        match f.width() {
+            Some(width) => format!("{:0width$b}", self.bits, width = width).fmt(f),
+            None => format!("{:b}", self.bits).fmt(f),
+        }
     }
 }
 
