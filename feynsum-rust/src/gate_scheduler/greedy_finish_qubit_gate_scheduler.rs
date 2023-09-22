@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use log::debug;
 
-use super::GateScheduler;
+use super::{utility, GateScheduler};
 use crate::types::{GateIndex, QubitIndex};
 
 pub struct GreedyFinishQubitGateScheduler<'a> {
@@ -38,7 +38,7 @@ impl<'a> GreedyFinishQubitGateScheduler<'a> {
 
         GreedyFinishQubitGateScheduler {
             frontier: (0..num_qubits)
-                .map(|qi| next_touch(num_gates, &gate_touches, qi, 0))
+                .map(|qi| utility::next_touch(num_gates, &gate_touches, qi, 0))
                 .collect(),
             num_gates,
             num_qubits,
@@ -49,8 +49,18 @@ impl<'a> GreedyFinishQubitGateScheduler<'a> {
     fn make_progress_on_qubit(&mut self, qi: QubitIndex) -> Vec<GateIndex> {
         let desired_gate = self.frontier[qi];
 
-        if self.okay_to_visit(desired_gate) {
-            self.visit(desired_gate);
+        if utility::okay_to_visit(
+            self.num_gates,
+            &self.gate_touches,
+            &self.frontier,
+            desired_gate,
+        ) {
+            utility::mark_as_visit(
+                self.num_gates,
+                &self.gate_touches,
+                &mut self.frontier,
+                desired_gate,
+            );
             vec![desired_gate]
         } else {
             let dependency = self.gate_touches[desired_gate]
@@ -61,38 +71,5 @@ impl<'a> GreedyFinishQubitGateScheduler<'a> {
 
             self.make_progress_on_qubit(*dependency)
         }
-    }
-
-    fn okay_to_visit(&self, gi: GateIndex) -> bool {
-        gi < self.num_gates
-            && self.gate_touches[gi]
-                .iter()
-                .all(|qi| self.frontier[*qi] == gi)
-    }
-
-    fn visit(&mut self, gi: GateIndex) {
-        debug!("visiting gate: {}", gi);
-        assert!(self.okay_to_visit(gi));
-        for qi in self.gate_touches[gi] {
-            let next = next_touch(self.num_gates, &self.gate_touches, *qi, gi + 1);
-
-            self.frontier[*qi] = next;
-            debug!("updated frontier[{}] to {}", qi, self.frontier[*qi]);
-        }
-    }
-}
-
-fn next_touch(
-    num_gates: usize,
-    gate_touches: &[&HashSet<QubitIndex>],
-    qi: QubitIndex,
-    gi: GateIndex,
-) -> GateIndex {
-    if gi >= num_gates {
-        num_gates
-    } else if gate_touches[gi].contains(&qi) {
-        gi
-    } else {
-        next_touch(num_gates, gate_touches, qi, gi + 1)
     }
 }
