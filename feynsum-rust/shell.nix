@@ -3,5 +3,5 @@
 }:
 
 pkgs.mkShell {
-  buildInputs = [ pkgs.cargo pkgs.rustc ];
+  buildInputs = [ pkgs.cargo pkgs.rustc pkgs.clippy pkgs.rustfmt ];
 }
