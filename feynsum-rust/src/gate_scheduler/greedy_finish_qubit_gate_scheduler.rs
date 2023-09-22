@@ -7,7 +7,7 @@ use crate::types::{GateIndex, QubitIndex};
 
 pub struct GreedyFinishQubitGateScheduler<'a> {
     frontier: Vec<GateIndex>,
-    pub num_gates: usize,
+    num_gates: usize,
     num_qubits: usize,
     gate_touches: Vec<&'a HashSet<QubitIndex>>,
 }
