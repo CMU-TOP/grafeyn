@@ -130,12 +130,10 @@ impl<'a> GreedyNonbranchingGateScheduler<'a> {
     }
 
     fn okay_to_visit(&self, gi: GateIndex) -> bool {
-        let result = gi < self.num_gates
+        gi < self.num_gates
             && self.gate_touches[gi]
                 .iter()
-                .all(|qi| self.frontier[*qi] == gi);
-
-        result
+                .all(|qi| self.frontier[*qi] == gi)
     }
 }
 
