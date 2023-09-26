@@ -106,9 +106,7 @@ fn expand_push_dense(
             .map(|chunk| {
                 chunk
                     .iter()
-                    .map(|(bidx, weight)| unsafe {
-                        apply_gates(&gates, &table as *const DenseStateTable, *bidx, *weight)
-                    })
+                    .map(|(bidx, weight)| apply_gates(&gates, &table, *bidx, *weight))
                     .sum::<usize>()
             })
             .sum(),
@@ -122,14 +120,12 @@ fn expand_push_dense(
                     .enumerate()
                     .map(|(idx, v)| {
                         let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
-                        unsafe {
-                            apply_gates(
-                                &gates,
-                                &table as *const DenseStateTable,
-                                BasisIdx::from_idx(block_size * chunk_idx + idx),
-                                Complex::new(re, im),
-                            )
-                        }
+                        apply_gates(
+                            &gates,
+                            &table,
+                            BasisIdx::from_idx(block_size * chunk_idx + idx),
+                            Complex::new(re, im),
+                        )
                     })
                     .sum::<usize>()
             })
@@ -207,12 +203,7 @@ fn apply_gates_seq(
     }
 }
 
-unsafe fn apply_gates(
-    gates: &[&Gate],
-    table: *const DenseStateTable,
-    bidx: BasisIdx,
-    weight: Complex,
-) -> usize {
+fn apply_gates(gates: &[&Gate], table: &DenseStateTable, bidx: BasisIdx, weight: Complex) -> usize {
     if utility::is_zero(weight) {
         return 0;
     }
