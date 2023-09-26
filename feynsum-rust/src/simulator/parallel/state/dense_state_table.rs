@@ -57,16 +57,16 @@ impl Table for DenseStateTable {
     }
 }
 
-fn atomic_put(to: &AtomicU64, c: Complex) {
-    let mut old = to.load(Ordering::Relaxed);
-    let (mut old_re, mut old_im) = utility::unpack_complex(old);
-    let (mut new_re, mut new_im) = (old_re + c.re, old_im + c.im);
-    let mut new = utility::pack_complex(new_re, new_im);
-    while let Err(actual) = to.compare_exchange(old, new, Ordering::Relaxed, Ordering::Relaxed) {
-        old = actual;
-        (old_re, old_im) = utility::unpack_complex(old);
-        (new_re, new_im) = (old_re + c.re, old_im + c.im);
-        new = utility::pack_complex(new_re, new_im);
+fn atomic_put(to: &AtomicU64, v: Complex) {
+    loop {
+        let old = to.load(Ordering::Relaxed);
+        let (re, im) = utility::unpack_complex(old);
+        let new = utility::pack_complex(re + v.re, im + v.im);
+
+        match to.compare_exchange(old, new, Ordering::SeqCst, Ordering::Acquire) {
+            Ok(_) => return,
+            Err(_) => (),
+        }
     }
 }
 
