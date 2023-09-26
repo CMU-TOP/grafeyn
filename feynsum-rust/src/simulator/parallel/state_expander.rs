@@ -158,24 +158,19 @@ fn expand_pull_dense(
 
     let (num_gate_apps, num_nonzeros) = (0..capacity)
         .into_par_iter()
-        .chunks(block_size)
-        .map(|chunk| {
-            chunk
-                .iter()
-                .fold((0, 0), |(num_gate_apps, num_nonzeros), idx| {
-                    let bidx = BasisIdx::from_idx(*idx);
-                    let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, &bidx);
-                    table.atomic_put(bidx, weight);
-                    (
-                        num_gate_apps + num_gate_apps_here,
-                        if utility::is_nonzero(weight) {
-                            num_nonzeros + 1
-                        } else {
-                            num_nonzeros
-                        },
-                    )
-                })
-        })
+        .fold_chunks(
+            block_size,
+            || (0, 0),
+            |acc, idx| {
+                let bidx = BasisIdx::from_idx(idx);
+                let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, &bidx);
+                table.atomic_put(bidx, weight);
+                (
+                    acc.0 + num_gate_apps_here,
+                    acc.1 + if utility::is_nonzero(weight) { 1 } else { 0 },
+                )
+            },
+        )
         .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
 
     ExpandResult {
