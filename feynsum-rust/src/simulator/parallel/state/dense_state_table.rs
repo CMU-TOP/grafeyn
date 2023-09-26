@@ -12,11 +12,15 @@ pub struct DenseStateTable {
 }
 
 impl DenseStateTable {
-    pub fn new(num_qubits: usize) -> Self {
+    pub fn new(num_qubits: usize, block_size: usize) -> Self {
         let capacity = 1 << num_qubits;
         // TODO: Check if the initialization is performance bottleneck
         Self {
-            array: (0..capacity).map(|_| AtomicU64::new(0)).collect(),
+            array: (0..capacity)
+                .into_par_iter()
+                .chunks(block_size)
+                .flat_map_iter(|chunk| chunk.iter().map(|_| AtomicU64::new(0)).collect::<Vec<_>>())
+                .collect(),
         }
     }
 

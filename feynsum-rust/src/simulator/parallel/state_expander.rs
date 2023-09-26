@@ -95,7 +95,7 @@ fn expand_push_dense(
     state: State,
 ) -> ExpandResult {
     let block_size = config.block_size;
-    let table = DenseStateTable::new(num_qubits);
+    let table = DenseStateTable::new(num_qubits, block_size);
 
     let num_gate_apps = match state {
         State::Sparse(prev_table) => prev_table
@@ -152,11 +152,9 @@ fn expand_pull_dense(
     num_qubits: usize,
     state: State,
 ) -> ExpandResult {
-    let table = DenseStateTable::new(num_qubits);
-
-    let capacity = 1 << num_qubits;
-
     let block_size = config.block_size;
+    let table = DenseStateTable::new(num_qubits, block_size);
+    let capacity = 1 << num_qubits;
 
     let (num_gate_apps, num_nonzeros) = (0..capacity)
         .into_par_iter()
