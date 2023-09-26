@@ -1,8 +1,6 @@
 use std::cmp;
 use std::fmt::{self, Display, Formatter};
-use std::ops::Deref;
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
 
 use rayon::prelude::*;
 
@@ -12,7 +10,7 @@ use crate::types::{BasisIdx, Complex, Real};
 use crate::utility;
 
 use super::super::Compactifiable;
-use super::state::{DenseStateTable, SparseStateTable, State, Table};
+use super::state::{DenseStateTable, SparseStateTable, State};
 
 pub enum ExpandMethod {
     Sparse,

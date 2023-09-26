@@ -11,10 +11,6 @@ pub use sparse_state_table::SparseStateTable;
 
 use super::super::Compactifiable;
 
-pub trait Table {
-    fn put(&mut self, bidx: BasisIdx, weight: Complex);
-}
-
 #[derive(Debug)]
 pub enum State {
     Sparse(SparseStateTable),

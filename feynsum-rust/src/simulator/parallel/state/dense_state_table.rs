@@ -4,8 +4,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use crate::types::{BasisIdx, Complex};
 use crate::utility;
 
-use super::Table;
-
 #[derive(Debug)]
 pub struct DenseStateTable {
     pub array: Vec<AtomicU64>,
@@ -51,13 +49,6 @@ impl DenseStateTable {
             let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
             Complex::new(re, im)
         })
-    }
-}
-
-impl Table for DenseStateTable {
-    fn put(&mut self, _bidx: BasisIdx, _weight: Complex) {
-        unreachable!()
-        // FIXME
     }
 }
 

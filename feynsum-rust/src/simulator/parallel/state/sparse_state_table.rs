@@ -1,21 +1,21 @@
-use std::collections::HashMap;
 use std::alloc::{alloc, dealloc, Layout};
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 use crate::types::{BasisIdx, Complex};
 use crate::utility;
 
-use std::sync::{atomic::Ordering, atomic::AtomicU64};
+use std::sync::{atomic::AtomicU64, atomic::Ordering};
 
 pub enum SparseStateTableInserion {
     Success,
-    Full
+    Full,
 }
 
 pub struct HeapArray<T> {
     ptr: *mut T,
-    len: usize
+    len: usize,
 }
 
 impl<T> HeapArray<T> {
@@ -69,8 +69,8 @@ impl<T> std::ops::IndexMut<usize> for HeapArray<T> {
 }
 
 pub struct ConcurrentSparseTable {
-    keys : HeapArray<AtomicU64>,
-    packed_weights : HeapArray<AtomicU64>
+    keys: HeapArray<AtomicU64>,
+    packed_weights: HeapArray<AtomicU64>,
 }
 
 const EMPTY_KEY: BasisIdx = BasisIdx::flip_unsafe(&BasisIdx::from_u64(0), 63);
@@ -83,81 +83,91 @@ fn calculate_hash<T: Hash>(t: &T) -> u64 {
 
 impl ConcurrentSparseTable {
     pub fn new() -> Self {
-	let capacity = 100;
-	let mut keys = HeapArray::<AtomicU64>::new(capacity);
-	for i in 0..capacity {
-	    keys[i] = AtomicU64::new(0);
-	};
-	let mut packed_weights = HeapArray::<AtomicU64>::new(2 * capacity);
-	for i in 0..(2 * capacity) {
-	    packed_weights[i] = AtomicU64::new(0);
-	};
-        Self { keys, packed_weights }
+        let capacity = 100;
+        let mut keys = HeapArray::<AtomicU64>::new(capacity);
+        for i in 0..capacity {
+            keys[i] = AtomicU64::new(0);
+        }
+        let mut packed_weights = HeapArray::<AtomicU64>::new(2 * capacity);
+        for i in 0..(2 * capacity) {
+            packed_weights[i] = AtomicU64::new(0);
+        }
+        Self {
+            keys,
+            packed_weights,
+        }
     }
     fn put_value_at(&self, i: usize, v: Complex) {
-	let k = 2 * i;
-	loop {
-	    let old: u64 = self.packed_weights[k].load(Ordering::Relaxed);
-	    let (re, im) = utility::unpack_complex(old);
-	    let new = utility::pack_complex(re + v.re, im + v.im);
-	    match self.packed_weights[k].compare_exchange(old, new, Ordering::SeqCst, Ordering::Acquire) {
-		Ok(_) => return,
-		Err(_) => ()
-	    }
-	}
+        let k = 2 * i;
+        loop {
+            let old: u64 = self.packed_weights[k].load(Ordering::Relaxed);
+            let (re, im) = utility::unpack_complex(old);
+            let new = utility::pack_complex(re + v.re, im + v.im);
+            match self.packed_weights[k].compare_exchange(
+                old,
+                new,
+                Ordering::SeqCst,
+                Ordering::Acquire,
+            ) {
+                Ok(_) => return,
+                Err(_) => (),
+            }
+        }
     }
-    pub fn insertAddWeightsLimitProbes(&self, tolerance: usize, x: BasisIdx, v: Complex) -> SparseStateTableInserion {
-	let n = self.keys.len;
-	let mut probes: usize = 0;
-	let mut i: usize = calculate_hash(&x) as usize;
-	let y = x.into_u64();
-	loop {
-	    if probes >= tolerance {
-		return SparseStateTableInserion::Full
-	    }
-	    if i >= n {
-		i = 0;
-		continue
-	    }
-	    let k = self.keys[i].load(Ordering::Relaxed);
-	    if k == BasisIdx::into_u64(EMPTY_KEY) {
-		match self.keys[i].compare_exchange(k, y, Ordering::SeqCst, Ordering::Acquire) {
-		    Ok(_) => {
-			self.put_value_at(i, v);
-			break
-		    },
-		    Err(_) =>
-			continue
-		}
-	    } else if k == y {
-		self.put_value_at(i, v);
-		break
-	    } else {
-		i = i + 1;
-		probes = probes + 1;
-	    }
-	};
-	SparseStateTableInserion::Success
+    pub fn insertAddWeightsLimitProbes(
+        &self,
+        tolerance: usize,
+        x: BasisIdx,
+        v: Complex,
+    ) -> SparseStateTableInserion {
+        let n = self.keys.len;
+        let mut probes: usize = 0;
+        let mut i: usize = calculate_hash(&x) as usize;
+        let y = x.into_u64();
+        loop {
+            if probes >= tolerance {
+                return SparseStateTableInserion::Full;
+            }
+            if i >= n {
+                i = 0;
+                continue;
+            }
+            let k = self.keys[i].load(Ordering::Relaxed);
+            if k == BasisIdx::into_u64(EMPTY_KEY) {
+                match self.keys[i].compare_exchange(k, y, Ordering::SeqCst, Ordering::Acquire) {
+                    Ok(_) => {
+                        self.put_value_at(i, v);
+                        break;
+                    }
+                    Err(_) => continue,
+                }
+            } else if k == y {
+                self.put_value_at(i, v);
+                break;
+            } else {
+                i = i + 1;
+                probes = probes + 1;
+            }
+        }
+        SparseStateTableInserion::Success
     }
     pub fn lookup(&self, x: BasisIdx) -> Option<Complex> {
-	let n = self.keys.len;
-	let mut i: usize = calculate_hash(&x) as usize;
-	let y = x.into_u64();
-	loop {
-	    let k = self.keys[i].load(Ordering::Relaxed);
-	    if k == BasisIdx::into_u64(EMPTY_KEY) {
-		return None
-	    } else if k == y {
-		let (re, im) = utility::unpack_complex(y);
-		return Some(Complex::new(re, im))
-	    } else {
-		i = i + 1
-	    }
-	}
+        let n = self.keys.len;
+        let mut i: usize = calculate_hash(&x) as usize;
+        let y = x.into_u64();
+        loop {
+            let k = self.keys[i].load(Ordering::Relaxed);
+            if k == BasisIdx::into_u64(EMPTY_KEY) {
+                return None;
+            } else if k == y {
+                let (re, im) = utility::unpack_complex(y);
+                return Some(Complex::new(re, im));
+            } else {
+                i = i + 1
+            }
+        }
     }
 }
-
-use super::Table;
 
 #[derive(Debug)]
 pub struct SparseStateTable {
@@ -167,41 +177,37 @@ pub struct SparseStateTable {
 impl SparseStateTable {
     pub fn singleton(bidx: BasisIdx, weight: Complex) -> Self {
         Self {
-	    table: HashMap::from([(bidx, weight)])
+            table: HashMap::from([(bidx, weight)]),
         }
     }
 
     pub fn new() -> Self {
         Self {
-	    table: HashMap::new()
+            table: HashMap::new(),
         }
     }
 
     pub fn num_nonzeros(&self) -> usize {
-	self.table
+        self.table
             .iter()
             .filter(|(_, w)| utility::is_nonzero(**w))
             .count()
-
     }
 
+    pub fn put(&mut self, bidx: BasisIdx, weight: Complex) {
+        self.table
+            .entry(bidx)
+            .and_modify(|w| *w += weight)
+            .or_insert(weight);
+    }
 
     /*
     #[cfg(test)]
     pub fn get(&self, bidx: &BasisIdx) -> Option<&Complex> {
-	self.table.get(&bidx)
+    self.table.get(&bidx)
     } */
 
     pub fn get(&self, bidx: &BasisIdx) -> Option<Complex> {
         self.table.get(&bidx).map(Clone::clone)
-    }
-}
-
-impl Table for SparseStateTable {
-    fn put(&mut self, bidx: BasisIdx, weight: Complex) {
-	self.table
-            .entry(bidx)
-            .and_modify(|w| *w += weight)
-            .or_insert(weight);
     }
 }
