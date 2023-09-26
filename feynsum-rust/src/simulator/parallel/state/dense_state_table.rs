@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::types::{BasisIdx, Complex};
@@ -19,14 +20,19 @@ impl DenseStateTable {
         }
     }
 
-    pub fn num_nonzeros(&self) -> usize {
+    pub fn num_nonzeros(&self, block_size: usize) -> usize {
         self.array
-            .iter()
-            .filter(|v| {
-                let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
-                utility::is_real_nonzero(re) || utility::is_real_nonzero(im)
+            .par_chunks(block_size)
+            .map(|chunk| {
+                chunk
+                    .iter()
+                    .filter(|v| {
+                        let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
+                        utility::is_real_nonzero(re) || utility::is_real_nonzero(im)
+                    })
+                    .count()
             })
-            .count()
+            .reduce(|| 0, |acc, n| acc + n)
     }
     pub fn atomic_put(&self, bidx: BasisIdx, weight: Complex) {
         // FIXME: We can use `put` method instead of `atomic_put` method if we

@@ -25,7 +25,7 @@ impl State {
     pub fn num_nonzeros(&self) -> usize {
         match self {
             State::Sparse(table) => table.num_nonzeros(),
-            State::Dense(table) => table.num_nonzeros(),
+            State::Dense(table) => table.num_nonzeros(10_000),
         }
     }
 

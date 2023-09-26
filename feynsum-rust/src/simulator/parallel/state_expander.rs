@@ -137,7 +137,7 @@ fn expand_push_dense(
             .sum(),
     };
 
-    let num_nonzeros = table.num_nonzeros();
+    let num_nonzeros = table.num_nonzeros(block_size);
 
     ExpandResult {
         state: State::Dense(table),
