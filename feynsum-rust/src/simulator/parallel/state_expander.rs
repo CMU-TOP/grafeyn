@@ -95,7 +95,7 @@ fn expand_push_dense(
     state: State,
 ) -> ExpandResult {
     let block_size = config.block_size;
-    let table = Arc::new(DenseStateTable::new(num_qubits));
+    let table = DenseStateTable::new(num_qubits);
 
     let num_gate_apps = match state {
         State::Sparse(prev_table) => prev_table
@@ -107,7 +107,9 @@ fn expand_push_dense(
                 chunk
                     .iter()
                     .copied()
-                    .map(|(bidx, weight)| apply_gates(&gates, Arc::clone(&table), bidx, weight))
+                    .map(|(bidx, weight)| unsafe {
+                        apply_gates(&gates, &table as *const DenseStateTable, bidx, weight)
+                    })
                     .sum::<usize>()
             })
             .sum(),
@@ -121,12 +123,14 @@ fn expand_push_dense(
                     .enumerate()
                     .map(|(idx, v)| {
                         let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
-                        apply_gates(
-                            &gates,
-                            Arc::clone(&table),
-                            BasisIdx::from_idx(block_size * chunk_idx + idx),
-                            Complex::new(re, im),
-                        )
+                        unsafe {
+                            apply_gates(
+                                &gates,
+                                &table as *const DenseStateTable,
+                                BasisIdx::from_idx(block_size * chunk_idx + idx),
+                                Complex::new(re, im),
+                            )
+                        }
                     })
                     .sum::<usize>()
             })
@@ -136,9 +140,7 @@ fn expand_push_dense(
     let num_nonzeros = table.num_nonzeros();
 
     ExpandResult {
-        state: State::Dense(
-            Arc::into_inner(table).expect("all other references to table should have been dropped"),
-        ),
+        state: State::Dense(table),
         num_nonzeros,
         num_gate_apps,
         method: ExpandMethod::PushDense,
@@ -222,9 +224,9 @@ fn apply_gates_seq(
     }
 }
 
-fn apply_gates(
+unsafe fn apply_gates(
     gates: &[&Gate],
-    table: Arc<DenseStateTable>,
+    table: *const DenseStateTable,
     bidx: BasisIdx,
     weight: Complex,
 ) -> usize {
@@ -238,11 +240,11 @@ fn apply_gates(
 
     match gates[0].push_apply(bidx, weight) {
         PushApplyOutput::Nonbranching(new_bidx, new_weight) => {
-            1 + apply_gates_internal(&gates[1..], &table, new_bidx, new_weight)
+            1 + apply_gates(&gates[1..], table, new_bidx, new_weight)
         }
         PushApplyOutput::Branching((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
-            let num_gate_apps_1 = apply_gates_internal(&gates[1..], &table, new_bidx1, new_weight1);
-            let num_gate_apps_2 = apply_gates_internal(&gates[1..], &table, new_bidx2, new_weight2);
+            let num_gate_apps_1 = apply_gates(&gates[1..], table, new_bidx1, new_weight1);
+            let num_gate_apps_2 = apply_gates(&gates[1..], table, new_bidx2, new_weight2);
             1 + num_gate_apps_1 + num_gate_apps_2
         }
     }
@@ -259,7 +261,7 @@ fn apply_gates_internal(
         return 0;
     }
     if gates.is_empty() {
-        (*table).atomic_put(bidx, weight);
+        table.atomic_put(bidx, weight);
         return 0;
     }
 
