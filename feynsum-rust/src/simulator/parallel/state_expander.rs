@@ -106,9 +106,8 @@ fn expand_push_dense(
             .map(|chunk| {
                 chunk
                     .iter()
-                    .copied()
                     .map(|(bidx, weight)| unsafe {
-                        apply_gates(&gates, &table as *const DenseStateTable, bidx, weight)
+                        apply_gates(&gates, &table as *const DenseStateTable, *bidx, *weight)
                     })
                     .sum::<usize>()
             })
@@ -179,16 +178,7 @@ fn expand_pull_dense(
                     )
                 })
         })
-        .reduce(
-            || (0, 0),
-            |(num_gate_apps, num_nonzeros), chunk_result| {
-                let (num_gate_apps_in_chunk, num_nonzeros_in_chunk) = chunk_result;
-                (
-                    (num_gate_apps + num_gate_apps_in_chunk),
-                    (num_nonzeros + num_nonzeros_in_chunk),
-                )
-            },
-        );
+        .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
 
     ExpandResult {
         state: State::Dense(table),
@@ -245,33 +235,6 @@ unsafe fn apply_gates(
         PushApplyOutput::Branching((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
             let num_gate_apps_1 = apply_gates(&gates[1..], table, new_bidx1, new_weight1);
             let num_gate_apps_2 = apply_gates(&gates[1..], table, new_bidx2, new_weight2);
-            1 + num_gate_apps_1 + num_gate_apps_2
-        }
-    }
-}
-
-// We do not need Arc within each thread
-fn apply_gates_internal(
-    gates: &[&Gate],
-    table: &DenseStateTable,
-    bidx: BasisIdx,
-    weight: Complex,
-) -> usize {
-    if utility::is_zero(weight) {
-        return 0;
-    }
-    if gates.is_empty() {
-        table.atomic_put(bidx, weight);
-        return 0;
-    }
-
-    match gates[0].push_apply(bidx, weight) {
-        PushApplyOutput::Nonbranching(new_bidx, new_weight) => {
-            1 + apply_gates_internal(&gates[1..], table, new_bidx, new_weight)
-        }
-        PushApplyOutput::Branching((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
-            let num_gate_apps_1 = apply_gates_internal(&gates[1..], table, new_bidx1, new_weight1);
-            let num_gate_apps_2 = apply_gates_internal(&gates[1..], table, new_bidx2, new_weight2);
             1 + num_gate_apps_1 + num_gate_apps_2
         }
     }
