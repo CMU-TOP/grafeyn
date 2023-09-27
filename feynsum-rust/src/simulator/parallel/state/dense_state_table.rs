@@ -58,9 +58,8 @@ fn atomic_put(to: &AtomicU64, v: Complex) {
         let (re, im) = utility::unpack_complex(old);
         let new = utility::pack_complex(re + v.re, im + v.im);
 
-        match to.compare_exchange(old, new, Ordering::SeqCst, Ordering::Acquire) {
-            Ok(_) => return,
-            Err(_) => (),
+        if let Ok(_) = to.compare_exchange(old, new, Ordering::SeqCst, Ordering::Acquire) {
+            return;
         }
     }
 }

@@ -4,19 +4,19 @@ use log::debug;
 
 use crate::types::{GateIndex, QubitIndex};
 
-pub fn okay_to_visit<'a>(
+pub fn okay_to_visit(
     num_gates: usize,
-    gate_touches: &[&'a HashSet<QubitIndex>],
+    gate_touches: &[&HashSet<QubitIndex>],
     frontier: &[GateIndex],
     gi: GateIndex,
 ) -> bool {
     gi < num_gates && gate_touches[gi].iter().all(|qi| frontier[*qi] == gi)
 }
 
-pub fn mark_as_visit<'a>(
+pub fn mark_as_visit(
     num_gates: usize,
-    gate_touches: &[&'a HashSet<QubitIndex>],
-    frontier: &mut Vec<GateIndex>,
+    gate_touches: &[&HashSet<QubitIndex>],
+    frontier: &mut [GateIndex],
     gi: GateIndex,
 ) {
     debug!("visiting gate: {}", gi);

@@ -14,9 +14,7 @@ pub struct GreedyFinishQubitGateScheduler<'a> {
 
 impl<'a> GateScheduler for GreedyFinishQubitGateScheduler<'a> {
     fn pick_next_gates(&mut self) -> Vec<GateIndex> {
-        let unfinished_qubit = (0..self.num_qubits)
-            .filter(|qi| self.frontier[*qi] < self.num_gates)
-            .next();
+        let unfinished_qubit = (0..self.num_qubits).find(|qi| self.frontier[*qi] < self.num_gates);
 
         match unfinished_qubit {
             Some(qi) => self.make_progress_on_qubit(qi),
@@ -65,8 +63,7 @@ impl<'a> GreedyFinishQubitGateScheduler<'a> {
         } else {
             let dependency = self.gate_touches[desired_gate]
                 .iter()
-                .filter(|qj| self.frontier[**qj] < desired_gate)
-                .next()
+                .find(|qj| self.frontier[**qj] < desired_gate)
                 .expect("since desired_gate is not okay to visit, there must be a dependency");
 
             self.make_progress_on_qubit(*dependency)
