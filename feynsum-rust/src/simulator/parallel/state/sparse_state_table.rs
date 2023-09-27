@@ -8,10 +8,7 @@ use crate::utility;
 
 use std::sync::{atomic::Ordering, atomic::AtomicU64};
 
-pub enum SparseStateTableInserion {
-    Success,
-    Full
-}
+use super::SparseStateTableInserion;
 
 pub struct HeapArray<T> {
     ptr: *mut T,
@@ -68,7 +65,7 @@ impl<T> std::ops::IndexMut<usize> for HeapArray<T> {
     }
 }
 
-pub struct ConcurrentSparseTable {
+pub struct ConcurrentSparseStateTable {
     keys : HeapArray<AtomicU64>,
     packed_weights : HeapArray<AtomicU64>
 }
@@ -81,7 +78,7 @@ fn calculate_hash<T: Hash>(t: &T) -> u64 {
     s.finish()
 }
 
-impl ConcurrentSparseTable {
+impl ConcurrentSparseStateTable {
     pub fn new() -> Self {
 	let capacity = 100;
 	let mut keys = HeapArray::<AtomicU64>::new(capacity);
@@ -93,6 +90,9 @@ impl ConcurrentSparseTable {
 	    packed_weights[i] = AtomicU64::new(0);
 	};
         Self { keys, packed_weights }
+    }
+    pub fn capacity(&self) -> usize {
+	self.keys.len
     }
     fn put_value_at(&self, i: usize, v: Complex) {
 	let k = 2 * i;

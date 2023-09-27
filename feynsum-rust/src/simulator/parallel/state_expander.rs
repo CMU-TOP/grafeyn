@@ -1,7 +1,7 @@
 use std::cmp;
 use std::fmt::{self, Display, Formatter};
-use std::ops::Deref;
-use std::sync::atomic::Ordering;
+//use std::ops::Deref;
+use std::sync::{atomic::Ordering, atomic::AtomicBool};
 use std::sync::Arc;
 
 use rayon::prelude::*;
@@ -12,7 +12,7 @@ use crate::types::{BasisIdx, Complex, Real};
 use crate::utility;
 
 use super::super::Compactifiable;
-use super::state::{DenseStateTable, SparseStateTable, State, Table};
+use super::state::{DenseStateTable, SparseStateTable, ConcurrentSparseStateTable, SparseStateTableInserion, State, Table};
 
 pub enum ExpandMethod {
     Sparse,
@@ -66,6 +66,110 @@ fn expected_cost(num_qubits: usize, num_nonzeros: usize, prev_num_nonzeros: usiz
     let expected_density = expected as Real / max_num_states as Real;
     let current_density = num_nonzeros as Real / max_num_states as Real;
     expected_density.max(current_density)
+}
+
+fn try_put(table: &mut ConcurrentSparseStateTable, bidx: BasisIdx, weight: Complex) -> SparseStateTableInserion {
+    let max_load: Real = 123.0;
+    let n = table.capacity();
+    let probably_longest_probe = ((n as Real).log2() / (max_load - 1.0 - max_load.log2())).ceil() as usize;
+    let tolerance = 4 * std::cmp::max(10, probably_longest_probe);
+    let tolerance = std::cmp::min(tolerance, n);
+    table.insertAddWeightsLimitProbes(tolerance, bidx, weight)
+}
+
+pub enum SuccessorsResult {
+    AllSucceeded,
+    SomeFailed(Vec<(BasisIdx,Complex,usize)>),
+}
+
+fn apply_gates1(
+    gatenum: usize,
+    gates: &[&Gate],
+    table: &mut ConcurrentSparseStateTable,
+    bidx: BasisIdx,
+    weight: Complex,
+    full: &mut AtomicBool,
+    apps: usize,
+) -> (usize, SuccessorsResult) {
+    if utility::is_zero(weight) {
+	return (apps, SuccessorsResult::AllSucceeded);
+    }
+    if gatenum >= gates.len() {
+	match (full.load(Ordering::Relaxed), try_put(table, bidx, weight)) {
+	    (false, SparseStateTableInserion::Success) => { return (apps, SuccessorsResult::AllSucceeded); }
+	    _ => {
+		if !full.load(Ordering::Relaxed) {
+		    full.store(true, Ordering::SeqCst);
+		}
+		let mut v = vec![(bidx, weight, gatenum)];
+		return (apps, SuccessorsResult::SomeFailed(v));
+	    }
+	}
+    }
+    match gates[gatenum].push_apply(bidx, weight) {
+        PushApplyOutput::Nonbranching(new_bidx, new_weight) => {
+            return apply_gates1(gatenum + 1, gates, table, new_bidx, new_weight, full, apps + 1)
+        }
+        PushApplyOutput::Branching((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
+            return apply_gates2(gatenum + 1, gates, table, new_bidx1, new_weight1, new_bidx2, new_weight2, full, apps + 1)
+        }
+    }
+}
+
+fn apply_gates2(
+    gatenum: usize,
+    gates: &[&Gate],
+    table: &mut ConcurrentSparseStateTable,
+    bidx1: BasisIdx,
+    weight1: Complex,
+    bidx2: BasisIdx,
+    weight2: Complex,
+    full: &mut AtomicBool,
+    apps: usize,
+) -> (usize, SuccessorsResult) {
+    match apply_gates1(gatenum, gates, table, bidx1, weight1, full, apps) {
+	(apps2, SuccessorsResult::AllSucceeded) => {
+	    apply_gates1(gatenum, gates, table, bidx2, weight2, full, apps)
+	}
+	(apps2, SuccessorsResult::SomeFailed(v)) => {
+	    let mut v2 = v.clone(); // probably we can do something more efficient here
+	    v2.push((bidx1, weight1, gatenum));
+	    (apps2, SuccessorsResult::SomeFailed(v2))
+	}
+    }
+}
+
+fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> usize {
+    let mut table = ConcurrentSparseStateTable::new();
+    let n : usize = 0; // todo: size of state sequence
+    let block_size = std::cmp::min(n / 1000, config.block_size);
+    let block_size = std::cmp::max(100, block_size);
+    let num_blocks = n / block_size; // TODO: need ceiling division
+    let block_start = |b: usize| block_size * b;
+    let block_stop = |b: usize| std::cmp::min(n, block_size + block_start(b));
+    let mut block_remaining_starts: Vec<usize> = (0..num_blocks).map(|b| block_start(b)).collect();
+    let mut remaining_blocks: Vec<usize> = (0..n).map(|b| b).collect();
+    
+    while !remaining_blocks.is_empty() {
+	let mut full: AtomicBool = AtomicBool::new(false);
+	for i in 0..remaining_blocks.len() {
+	    let b = remaining_blocks[i];
+	    let start = block_remaining_starts[b];
+	    let stop = block_stop(b);
+	    let mut apps = 0; // TODO: find the correct value
+	    let mut j = start;
+	    loop {
+		if j >= stop {
+		    block_remaining_starts[b] = stop;
+		    break
+		}
+		// TODO: how to get the jth item from state
+		let n1 = apply_gates1(0, &gates, &mut table, BasisIdx::from_idx(1), Complex::new(1.1,2.2), &mut full, 0);
+		j = j + 1;
+	    }
+	}
+    }
+    0
 }
 
 fn expand_sparse(gates: Vec<&Gate>, state: State) -> ExpandResult {
