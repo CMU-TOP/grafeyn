@@ -124,6 +124,10 @@ impl Circuit {
                             target1: args[1],
                             target2: args[2],
                         },
+                        ("swap", 0, 2) => GateDefn::Swap {
+                            target1: args[1],
+                            target2: args[2],
+                        },
                         ("u", 3, 1) => GateDefn::U {
                             target: args[0],
                             theta: params[0],

@@ -69,6 +69,10 @@ pub enum GateDefn {
         target1: QubitIndex,
         target2: QubitIndex,
     },
+    Swap {
+        target1: QubitIndex,
+        target2: QubitIndex,
+    },
     U {
         target: QubitIndex,
         theta: Real,
@@ -124,6 +128,7 @@ impl Gate {
                 target1,
                 target2,
             } => HashSet::from([control, target1, target2]),
+            &GateDefn::Swap { target1, target2 } => HashSet::from([target1, target2]),
             &GateDefn::U { target, .. } => HashSet::from([target]),
             &GateDefn::Other { .. } => HashSet::new(),
         };
@@ -141,7 +146,8 @@ impl Gate {
             | GateDefn::X(_)
             | GateDefn::CPhase { .. }
             | GateDefn::RZ { .. }
-            | GateDefn::CSwap { .. } => BranchingType::Nonbranching,
+            | GateDefn::CSwap { .. }
+            | GateDefn::Swap { .. } => BranchingType::Nonbranching,
             GateDefn::SqrtY(_)
             | GateDefn::SqrtX(_)
             | GateDefn::SqrtW(_)
@@ -169,6 +175,7 @@ impl Gate {
             | GateDefn::CPhase { .. }
             | GateDefn::FSim { .. }
             | GateDefn::CSwap { .. }
+            | GateDefn::Swap { .. }
             | GateDefn::CZ { .. }
             | GateDefn::CX { .. }
             | GateDefn::SqrtX(_)
@@ -370,6 +377,10 @@ impl PushApplicable for Gate {
 
                 PushApplyOutput::Nonbranching(new_bidx, weight)
             }
+            GateDefn::Swap { target1, target2 } => {
+                let new_bidx = bidx.swap(target1, target2);
+                PushApplyOutput::Nonbranching(new_bidx, weight)
+            }
             GateDefn::U {
                 target: _,
                 theta: _,
@@ -542,7 +553,8 @@ impl PullApplicable for Gate {
             | GateDefn::X(_)
             | GateDefn::CPhase { .. }
             | GateDefn::FSim { .. }
-            | GateDefn::CSwap { .. } => {
+            | GateDefn::CSwap { .. }
+            | GateDefn::Swap { .. } => {
                 assert!(self.is_pullable());
                 push_to_pull!(self, bidx)
             }
