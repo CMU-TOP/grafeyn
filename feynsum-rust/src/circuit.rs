@@ -128,7 +128,8 @@ impl Circuit {
                             target1: args[1],
                             target2: args[2],
                         },
-                        ("u", 3, 1) => GateDefn::U {
+                        // NOTE: U3 gate is deprecated
+                        ("u", 3, 1) | ("u3", 3, 1) => GateDefn::U {
                             target: args[0],
                             theta: params[0],
                             phi: params[1],
