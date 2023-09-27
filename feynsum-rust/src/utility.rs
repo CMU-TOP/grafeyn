@@ -15,7 +15,7 @@ macro_rules! profile {
     }
 }
 
-fn is_real_zero(x: Real) -> bool {
+pub fn is_real_zero(x: Real) -> bool {
     x.abs() < constants::ZERO_THRESHOLD
 }
 

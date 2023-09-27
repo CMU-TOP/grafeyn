@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 
-use crate::types::{constants, BasisIdx, Complex, QubitIndex, Real};
+use crate::{
+    types::{constants, BasisIdx, Complex, QubitIndex, Real},
+    utility,
+};
 
 #[derive(Debug)]
 pub enum PushApplyOutput {
@@ -382,13 +385,58 @@ impl PushApplicable for Gate {
                 PushApplyOutput::Nonbranching(new_bidx, weight)
             }
             GateDefn::U {
-                target: _,
-                theta: _,
-                phi: _,
-                lambda: _,
-            } => todo!(), // TODO
+                target,
+                theta,
+                phi,
+                lambda,
+            } => {
+                let cos = Complex::new((theta / 2.0).cos(), 0.0);
+                let sin = Complex::new((theta / 2.0).sin(), 0.0);
+
+                let a = cos;
+                let b = -sin * Complex::new(lambda.cos(), lambda.sin());
+                let c = sin * Complex::new(phi.cos(), phi.sin());
+                let d = cos * Complex::new((phi + lambda).cos(), (phi + lambda).sin());
+
+                single_qubit_unitary(bidx, weight, target, a, b, c, d)
+            }
             GateDefn::Other { .. } => unimplemented!(),
         }
+    }
+}
+
+fn single_qubit_unitary(
+    bidx: BasisIdx,
+    weight: Complex,
+    target: QubitIndex,
+    a: Complex,
+    b: Complex,
+    c: Complex,
+    d: Complex,
+) -> PushApplyOutput {
+    assert!(!(utility::is_zero(a) && utility::is_zero(b)));
+    assert!(!(utility::is_zero(c) && utility::is_zero(d)));
+
+    if utility::is_zero(a) && utility::is_zero(d) {
+        let new_bidx = bidx.flip(target);
+        let new_weight = if bidx.get(target) {
+            b * weight
+        } else {
+            c * weight
+        };
+        PushApplyOutput::Nonbranching(new_bidx, new_weight)
+    } else if utility::is_zero(c) && utility::is_zero(b) {
+        let new_weight = if bidx.get(target) {
+            d * weight
+        } else {
+            a * weight
+        };
+        PushApplyOutput::Nonbranching(bidx, new_weight)
+    } else {
+        let bidx0 = bidx.unset(target);
+        let bidx1 = bidx.set(target);
+        let (mult0, mult1) = if bidx.get(target) { (b, d) } else { (a, c) };
+        PushApplyOutput::Branching((bidx0, mult0 * weight), (bidx1, mult1 * weight))
     }
 }
 
@@ -637,7 +685,41 @@ impl PullApplicable for Gate {
                     )
                 }
             }
-            GateDefn::U { .. } => todo!(),
+            GateDefn::U {
+                target,
+                theta,
+                phi,
+                lambda,
+            } => {
+                let cos = Complex::new((theta / 2.0).cos(), 0.0);
+                let sin = Complex::new((theta / 2.0).sin(), 0.0);
+
+                let a = cos;
+                let b = -sin * Complex::new(lambda.cos(), lambda.sin());
+                let c = sin * Complex::new(phi.cos(), phi.sin());
+                let d = cos * Complex::new((phi + lambda).cos(), (phi + lambda).sin());
+
+                assert!(!(utility::is_zero(a) && utility::is_zero(b)));
+                assert!(!(utility::is_zero(c) && utility::is_zero(d)));
+
+                if utility::is_zero(a) && utility::is_zero(d) {
+                    let neighbor = bidx.flip(target);
+                    let multiplier = if bidx.get(target) { c } else { b };
+                    PullApplyOutput::Nonbranching(neighbor, multiplier)
+                } else if utility::is_zero(c) && utility::is_zero(b) {
+                    let multiplier = if bidx.get(target) { d } else { a };
+                    PullApplyOutput::Nonbranching(bidx, multiplier)
+                } else {
+                    let bidx0 = bidx.unset(target);
+                    let bidx1 = bidx.set(target);
+
+                    if bidx.get(target) {
+                        PullApplyOutput::Branching((bidx0, c), (bidx1, d))
+                    } else {
+                        PullApplyOutput::Branching((bidx0, a), (bidx1, b))
+                    }
+                }
+            }
             _ => {
                 unimplemented!()
             }
