@@ -12,10 +12,6 @@ pub use sparse_state_table::ConcurrentSparseStateTable;
 
 use super::super::Compactifiable;
 
-pub trait Table {
-    fn put(&mut self, bidx: BasisIdx, weight: Complex);
-}
-
 #[derive(Debug)]
 pub enum State {
     Sparse(SparseStateTable),
@@ -26,7 +22,7 @@ impl State {
     pub fn num_nonzeros(&self) -> usize {
         match self {
             State::Sparse(table) => table.num_nonzeros(),
-            State::Dense(table) => table.num_nonzeros(),
+            State::Dense(table) => table.num_nonzeros(10_000),
         }
     }
 

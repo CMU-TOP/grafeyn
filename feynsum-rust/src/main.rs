@@ -57,6 +57,8 @@ fn main() -> io::Result<()> {
 
     info!("circuit construction complete. starting simulation");
 
+    let num_qubits = circuit.num_qubits;
+
     ThreadPoolBuilder::new()
         .num_threads(options.parallelism)
         .build_global()
@@ -72,7 +74,7 @@ fn main() -> io::Result<()> {
         };
         if let Some(output) = options.output {
             info!("dumping densities to: {}", output.display());
-            dump_densities(&output, result)?;
+            dump_densities(&output, result, num_qubits)?;
             info!("output written to: {}", output.display());
         };
     } else {
@@ -85,7 +87,7 @@ fn main() -> io::Result<()> {
         };
         if let Some(output) = options.output {
             info!("dumping densities to: {}", output.display());
-            dump_densities(&output, result)?;
+            dump_densities(&output, result, num_qubits)?;
             info!("output written to: {}", output.display());
         };
     };
@@ -95,10 +97,15 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-fn dump_densities(path: &PathBuf, state: impl Compactifiable) -> io::Result<()> {
+fn dump_densities(path: &PathBuf, state: impl Compactifiable, bidx_width: usize) -> io::Result<()> {
     let mut file = fs::File::create(path)?;
     for (bidx, weight) in state.compactify() {
-        file.write_fmt(format_args!("{} {:.4}\n", bidx, weight))?;
+        file.write_fmt(format_args!(
+            "{:0width$} {:.4}\n",
+            bidx,
+            weight,
+            width = bidx_width,
+        ))?;
     }
     Ok(())
 }

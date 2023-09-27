@@ -1,8 +1,8 @@
 use super::GateScheduler;
 
 pub struct NaiveGateScheduler {
-    pub next: usize,
-    pub num_gates: usize,
+    next: usize,
+    num_gates: usize,
 }
 
 impl GateScheduler for NaiveGateScheduler {

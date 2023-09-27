@@ -2,12 +2,12 @@ use std::collections::HashSet;
 
 use log::debug;
 
-use super::GateScheduler;
+use super::{utility, GateScheduler};
 use crate::types::{GateIndex, QubitIndex};
 
 pub struct GreedyNonbranchingGateScheduler<'a> {
     frontier: Vec<GateIndex>,
-    pub num_gates: usize,
+    num_gates: usize,
     num_qubits: usize,
     gate_touches: Vec<&'a HashSet<QubitIndex>>,
     gate_is_branching: Vec<bool>,
@@ -31,7 +31,12 @@ impl<'a> GateScheduler for GreedyNonbranchingGateScheduler<'a> {
         }
 
         // each gate in next_gates should be marked as already visited
-        assert!(next_gates.iter().all(|gi| !self.okay_to_visit(*gi)));
+        assert!(next_gates.iter().all(|gi| !utility::okay_to_visit(
+            self.num_gates,
+            &self.gate_touches,
+            &self.frontier,
+            *gi
+        )));
 
         debug!("next gates: {:?}", next_gates);
 
@@ -81,12 +86,27 @@ impl<'a> GreedyNonbranchingGateScheduler<'a> {
                     let next_gi = self.frontier[qi];
                     if next_gi >= self.num_gates
                         || self.gate_is_branching[next_gi]
-                        || !self.okay_to_visit(next_gi)
+                        || !utility::okay_to_visit(
+                            self.num_gates,
+                            &self.gate_touches,
+                            &self.frontier,
+                            next_gi,
+                        )
                     {
                         break;
                     } else {
-                        assert!(self.okay_to_visit(next_gi));
-                        self.visit(next_gi);
+                        assert!(utility::okay_to_visit(
+                            self.num_gates,
+                            &self.gate_touches,
+                            &self.frontier,
+                            next_gi
+                        ));
+                        utility::mark_as_visit(
+                            self.num_gates,
+                            &self.gate_touches,
+                            &mut self.frontier,
+                            next_gi,
+                        );
                         selection.push(next_gi);
                     }
                 }
@@ -106,34 +126,21 @@ impl<'a> GreedyNonbranchingGateScheduler<'a> {
             .frontier
             .iter()
             .filter(|gi| {
-                *gi < &self.num_gates && self.gate_is_branching[**gi] && self.okay_to_visit(**gi)
+                *gi < &self.num_gates
+                    && self.gate_is_branching[**gi]
+                    && utility::okay_to_visit(
+                        self.num_gates,
+                        &self.gate_touches,
+                        &self.frontier,
+                        **gi,
+                    )
             })
             .nth(0)
             .copied();
 
         if let Some(gi) = result {
-            self.visit(gi);
+            utility::mark_as_visit(self.num_gates, &self.gate_touches, &mut self.frontier, gi);
         }
-
-        result
-    }
-
-    fn visit(&mut self, gi: GateIndex) {
-        debug!("visiting gate: {}", gi);
-        assert!(self.okay_to_visit(gi));
-        for qi in self.gate_touches[gi] {
-            let next = next_touch(self.num_gates, &self.gate_touches, *qi, gi + 1);
-
-            self.frontier[*qi] = next;
-            debug!("updated frontier[{}] to {}", qi, self.frontier[*qi]);
-        }
-    }
-
-    fn okay_to_visit(&self, gi: GateIndex) -> bool {
-        let result = gi < self.num_gates
-            && self.gate_touches[gi]
-                .iter()
-                .all(|qi| self.frontier[*qi] == gi);
 
         result
     }

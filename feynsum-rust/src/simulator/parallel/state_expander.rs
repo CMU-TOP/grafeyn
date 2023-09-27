@@ -12,7 +12,7 @@ use crate::types::{BasisIdx, Complex, Real};
 use crate::utility;
 
 use super::super::Compactifiable;
-use super::state::{DenseStateTable, SparseStateTable, ConcurrentSparseStateTable, SparseStateTableInserion, State, Table};
+use super::state::{DenseStateTable, SparseStateTable, ConcurrentSparseStateTable, SparseStateTableInserion, State};
 
 pub enum ExpandMethod {
     Sparse,
@@ -199,7 +199,7 @@ fn expand_push_dense(
     state: State,
 ) -> ExpandResult {
     let block_size = config.block_size;
-    let table = Arc::new(DenseStateTable::new(num_qubits));
+    let table = DenseStateTable::new(num_qubits, block_size);
 
     let num_gate_apps = match state {
         State::Sparse(prev_table) => prev_table
@@ -210,8 +210,7 @@ fn expand_push_dense(
             .map(|chunk| {
                 chunk
                     .iter()
-                    .copied()
-                    .map(|(bidx, weight)| apply_gates(&gates, Arc::clone(&table), bidx, weight))
+                    .map(|(bidx, weight)| apply_gates(&gates, &table, *bidx, *weight))
                     .sum::<usize>()
             })
             .sum(),
@@ -227,7 +226,7 @@ fn expand_push_dense(
                         let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
                         apply_gates(
                             &gates,
-                            Arc::clone(&table),
+                            &table,
                             BasisIdx::from_idx(block_size * chunk_idx + idx),
                             Complex::new(re, im),
                         )
@@ -237,12 +236,10 @@ fn expand_push_dense(
             .sum(),
     };
 
-    let num_nonzeros = table.num_nonzeros();
+    let num_nonzeros = table.num_nonzeros(block_size);
 
     ExpandResult {
-        state: State::Dense(
-            Arc::into_inner(table).expect("all other references to table should have been dropped"),
-        ),
+        state: State::Dense(table),
         num_nonzeros,
         num_gate_apps,
         method: ExpandMethod::PushDense,
@@ -255,42 +252,26 @@ fn expand_pull_dense(
     num_qubits: usize,
     state: State,
 ) -> ExpandResult {
-    let table = DenseStateTable::new(num_qubits);
-
-    let capacity = 1 << num_qubits;
-
     let block_size = config.block_size;
+    let table = DenseStateTable::new(num_qubits, block_size);
+    let capacity = 1 << num_qubits;
 
     let (num_gate_apps, num_nonzeros) = (0..capacity)
         .into_par_iter()
-        .chunks(block_size)
-        .map(|chunk| {
-            chunk
-                .iter()
-                .fold((0, 0), |(num_gate_apps, num_nonzeros), idx| {
-                    let bidx = BasisIdx::from_idx(*idx);
-                    let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, &bidx);
-                    table.atomic_put(bidx, weight);
-                    (
-                        num_gate_apps + num_gate_apps_here,
-                        if utility::is_nonzero(weight) {
-                            num_nonzeros + 1
-                        } else {
-                            num_nonzeros
-                        },
-                    )
-                })
-        })
-        .reduce(
+        .fold_chunks(
+            block_size,
             || (0, 0),
-            |(num_gate_apps, num_nonzeros), chunk_result| {
-                let (num_gate_apps_in_chunk, num_nonzeros_in_chunk) = chunk_result;
+            |acc, idx| {
+                let bidx = BasisIdx::from_idx(idx);
+                let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, &bidx);
+                table.atomic_put(bidx, weight);
                 (
-                    (num_gate_apps + num_gate_apps_in_chunk),
-                    (num_nonzeros + num_nonzeros_in_chunk),
+                    acc.0 + num_gate_apps_here,
+                    acc.1 + if utility::is_nonzero(weight) { 1 } else { 0 },
                 )
             },
-        );
+        )
+        .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
 
     ExpandResult {
         state: State::Dense(table),
@@ -326,12 +307,7 @@ fn apply_gates_seq(
     }
 }
 
-fn apply_gates(
-    gates: &[&Gate],
-    table: Arc<DenseStateTable>,
-    bidx: BasisIdx,
-    weight: Complex,
-) -> usize {
+fn apply_gates(gates: &[&Gate], table: &DenseStateTable, bidx: BasisIdx, weight: Complex) -> usize {
     if utility::is_zero(weight) {
         return 0;
     }
@@ -342,38 +318,11 @@ fn apply_gates(
 
     match gates[0].push_apply(bidx, weight) {
         PushApplyOutput::Nonbranching(new_bidx, new_weight) => {
-            1 + apply_gates_internal(&gates[1..], &table, new_bidx, new_weight)
+            1 + apply_gates(&gates[1..], table, new_bidx, new_weight)
         }
         PushApplyOutput::Branching((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
-            let num_gate_apps_1 = apply_gates_internal(&gates[1..], &table, new_bidx1, new_weight1);
-            let num_gate_apps_2 = apply_gates_internal(&gates[1..], &table, new_bidx2, new_weight2);
-            1 + num_gate_apps_1 + num_gate_apps_2
-        }
-    }
-}
-
-// We do not need Arc within each thread
-fn apply_gates_internal(
-    gates: &[&Gate],
-    table: &DenseStateTable,
-    bidx: BasisIdx,
-    weight: Complex,
-) -> usize {
-    if utility::is_zero(weight) {
-        return 0;
-    }
-    if gates.is_empty() {
-        (*table).atomic_put(bidx, weight);
-        return 0;
-    }
-
-    match gates[0].push_apply(bidx, weight) {
-        PushApplyOutput::Nonbranching(new_bidx, new_weight) => {
-            1 + apply_gates_internal(&gates[1..], table, new_bidx, new_weight)
-        }
-        PushApplyOutput::Branching((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
-            let num_gate_apps_1 = apply_gates_internal(&gates[1..], table, new_bidx1, new_weight1);
-            let num_gate_apps_2 = apply_gates_internal(&gates[1..], table, new_bidx2, new_weight2);
+            let num_gate_apps_1 = apply_gates(&gates[1..], table, new_bidx1, new_weight1);
+            let num_gate_apps_2 = apply_gates(&gates[1..], table, new_bidx2, new_weight2);
             1 + num_gate_apps_1 + num_gate_apps_2
         }
     }

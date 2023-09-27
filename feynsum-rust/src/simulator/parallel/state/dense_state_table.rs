@@ -1,9 +1,8 @@
+use rayon::prelude::*;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::types::{BasisIdx, Complex};
 use crate::utility;
-
-use super::Table;
 
 #[derive(Debug)]
 pub struct DenseStateTable {
@@ -11,22 +10,31 @@ pub struct DenseStateTable {
 }
 
 impl DenseStateTable {
-    pub fn new(num_qubits: usize) -> Self {
+    pub fn new(num_qubits: usize, block_size: usize) -> Self {
         let capacity = 1 << num_qubits;
         // TODO: Check if the initialization is performance bottleneck
         Self {
-            array: (0..capacity).map(|_| AtomicU64::new(0)).collect(),
+            array: (0..capacity)
+                .into_par_iter()
+                .chunks(block_size)
+                .flat_map_iter(|chunk| chunk.iter().map(|_| AtomicU64::new(0)).collect::<Vec<_>>())
+                .collect(),
         }
     }
 
-    pub fn num_nonzeros(&self) -> usize {
+    pub fn num_nonzeros(&self, block_size: usize) -> usize {
         self.array
-            .iter()
-            .filter(|v| {
-                let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
-                utility::is_real_nonzero(re) || utility::is_real_nonzero(im)
+            .par_chunks(block_size)
+            .map(|chunk| {
+                chunk
+                    .iter()
+                    .filter(|v| {
+                        let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
+                        utility::is_real_nonzero(re) || utility::is_real_nonzero(im)
+                    })
+                    .count()
             })
-            .count()
+            .reduce(|| 0, |acc, n| acc + n)
     }
     pub fn atomic_put(&self, bidx: BasisIdx, weight: Complex) {
         // FIXME: We can use `put` method instead of `atomic_put` method if we
@@ -44,23 +52,15 @@ impl DenseStateTable {
     }
 }
 
-impl Table for DenseStateTable {
-    fn put(&mut self, _bidx: BasisIdx, _weight: Complex) {
-        unreachable!()
-        // FIXME
-    }
-}
+fn atomic_put(to: &AtomicU64, v: Complex) {
+    loop {
+        let old = to.load(Ordering::Relaxed);
+        let (re, im) = utility::unpack_complex(old);
+        let new = utility::pack_complex(re + v.re, im + v.im);
 
-fn atomic_put(to: &AtomicU64, c: Complex) {
-    let mut old = to.load(Ordering::Relaxed);
-    let (mut old_re, mut old_im) = utility::unpack_complex(old);
-    let (mut new_re, mut new_im) = (old_re + c.re, old_im + c.im);
-    let mut new = utility::pack_complex(new_re, new_im);
-    while let Err(actual) = to.compare_exchange(old, new, Ordering::Relaxed, Ordering::Relaxed) {
-        old = actual;
-        (old_re, old_im) = utility::unpack_complex(old);
-        (new_re, new_im) = (old_re + c.re, old_im + c.im);
-        new = utility::pack_complex(new_re, new_im);
+        if let Ok(_) = to.compare_exchange(old, new, Ordering::SeqCst, Ordering::Acquire) {
+            return;
+        }
     }
 }
 

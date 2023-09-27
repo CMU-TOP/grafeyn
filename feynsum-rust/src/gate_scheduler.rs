@@ -9,6 +9,7 @@ use crate::types::QubitIndex;
 mod greedy_finish_qubit_gate_scheduler;
 mod greedy_nonbranching_gate_scheduler;
 mod naive_gate_scheduler;
+mod utility;
 
 pub use greedy_finish_qubit_gate_scheduler::GreedyFinishQubitGateScheduler;
 pub use greedy_nonbranching_gate_scheduler::GreedyNonbranchingGateScheduler;
@@ -78,7 +79,6 @@ pub fn create_gate_scheduler<'a>(
                 num_gates,
                 num_qubits,
                 gate_touches,
-                gate_is_branching,
             ))
         }
     }
