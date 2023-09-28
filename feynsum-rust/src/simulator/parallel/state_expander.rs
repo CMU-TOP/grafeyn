@@ -141,32 +141,76 @@ fn apply_gates2(
 
 fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> usize {
     let mut table = ConcurrentSparseStateTable::new();
-    let n : usize = 0; // todo: size of state sequence
+    let n : usize = state.num_nonzeros();
     let block_size = std::cmp::min(n / 1000, config.block_size);
     let block_size = std::cmp::max(100, block_size);
     let num_blocks = n / block_size; // TODO: need ceiling division
     let block_start = |b: usize| block_size * b;
     let block_stop = |b: usize| std::cmp::min(n, block_size + block_start(b));
     let mut block_remaining_starts: Vec<usize> = (0..num_blocks).map(|b| block_start(b)).collect();
+    let mut block_pending: Vec<Vec<(BasisIdx, Complex, usize)>> = vec![vec![]; num_blocks];
+    let block_has_pending = |b: usize| !block_pending[b].is_empty();
     let mut remaining_blocks: Vec<usize> = (0..n).map(|b| b).collect();
-    
+    let mut apps = 0;
+
     while !remaining_blocks.is_empty() {
 	let mut full: AtomicBool = AtomicBool::new(false);
-	for i in 0..remaining_blocks.len() {
+	for i in 0..remaining_blocks.len() { // workOnBlock()
 	    let b = remaining_blocks[i];
-	    let start = block_remaining_starts[b];
-	    let stop = block_stop(b);
-	    let mut apps = 0; // TODO: find the correct value
-	    let mut j = start;
+	    let mut clear_pending = |apps0: usize, block_pending0: Vec<(BasisIdx, Complex, usize)>| {
+		let mut apps = apps0;
+		let mut block_pending1 = block_pending0.clone();
+		let mut block_pending2: Vec<(BasisIdx, Complex, usize)> = vec![];
+		while !block_pending1.is_empty() {
+		    if let Some((idx, weight, gatenum)) = block_pending1.pop() {
+			match apply_gates1(gatenum, &gates, &mut table, idx, weight, &mut full, apps) {
+			    (apps2, SuccessorsResult::AllSucceeded) => {
+				apps = apps2;
+			    }
+			    (apps2, SuccessorsResult::SomeFailed(vfs)) => {
+				block_pending2.extend(vfs);
+				apps = apps2;
+				break;
+			    }
+			}
+		    }
+		}
+		block_pending2.extend(block_pending1);
+		(apps, block_pending2)
+	    };
+	    let (apps0, pending_cleared) = clear_pending(0, block_pending.swap_remove(b));
+	    let mut appsb = apps0;
+	    if !pending_cleared.is_empty() {
+		block_pending[b].extend(pending_cleared);
+		break;
+	    }
+	    let mut j = block_remaining_starts[b];
 	    loop {
-		if j >= stop {
-		    block_remaining_starts[b] = stop;
+		if j >= block_stop(b) {
+		    block_remaining_starts[b] = block_stop(b);
 		    break
 		}
-		// TODO: how to get the jth item from state
-		let n1 = apply_gates1(0, &gates, &mut table, BasisIdx::from_idx(1), Complex::new(1.1,2.2), &mut full, 0);
-		j = j + 1;
+		let idx = BasisIdx::from_idx(j);
+		match State::get(&state, &idx) {
+		    Some(weight) => {
+			match apply_gates1(0, &gates, &mut table, idx, weight, &mut full, appsb) {
+			    (apps2, SuccessorsResult::AllSucceeded) => {
+				j = j + 1;
+				appsb = apps2;
+			    }
+			    (apps2, SuccessorsResult::SomeFailed(vfs)) => {
+				block_remaining_starts[b] = j + 1;
+				block_pending[b].extend(vfs);
+				appsb = apps2;
+			    }
+			}
+		    }
+		    None => {
+			j = j + 1;
+		    }
+		}
 	    }
+	    apps = apps + appsb;
 	}
     }
     0
