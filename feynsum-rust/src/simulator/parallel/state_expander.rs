@@ -150,9 +150,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> usize {
     let block_start = |b: usize| block_size * b;
     let block_stop = |b: usize| std::cmp::min(n, block_size + block_start(b));
     let mut block_remaining_starts: Vec<usize> = (0..num_blocks).map(|b| block_start(b)).collect();
-    let block_has_remaining = |b: usize| block_remaining_starts[b] < block_stop(b);
     let mut block_pending: Vec<Vec<(BasisIdx, Complex, usize)>> = vec![vec![]; num_blocks];
-    let block_has_pending = |b: usize| !block_pending[b].is_empty();
     let mut remaining_blocks: Vec<usize> = (0..n).map(|b| b).collect();
     let mut apps = 0;
 
@@ -215,9 +213,9 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> usize {
 	    }
 	    apps = apps + appsb;
 	}
-	// TODO: instead we instead should be using the commented-out line below, but I've temporarily used the alternative two lines below, which inlines the two predicates...
-	//let remaining_blocks_next: Vec<usize> = remaining_blocks.iter().filter(|&&b| block_has_pending(b) || block_has_remaining(b)).cloned().collect();
-	let mut remaining_blocks_next: Vec<usize> = remaining_blocks.iter().filter(|&&b| !block_pending[b].is_empty() || block_remaining_starts[b] < block_stop(b)).cloned().collect();
+	let block_has_remaining = |b: usize| block_remaining_starts[b] < block_stop(b);
+	let block_has_pending = |b: usize| !block_pending[b].is_empty();
+	let mut remaining_blocks_next: Vec<usize> = remaining_blocks.iter().filter(|&&b| block_has_pending(b) || block_has_remaining(b)).cloned().collect();
 	std::mem::swap(&mut remaining_blocks, &mut remaining_blocks_next);
 	if !remaining_blocks.is_empty() {
 	    let mut table2 = table.increase_capacity_by_factor(1.5);
