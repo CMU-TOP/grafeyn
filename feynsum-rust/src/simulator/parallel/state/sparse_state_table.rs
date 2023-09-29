@@ -79,8 +79,7 @@ pub struct ConcurrentSparseStateTable {
 }
 
 impl ConcurrentSparseStateTable {
-    pub fn new() -> Self {
-        let capacity = 100;
+    pub fn new2(capacity: usize) -> Self {
         let mut keys = HeapArray::<AtomicU64>::new(capacity);
         for i in 0..capacity {
             keys[i] = AtomicU64::new(0);
@@ -93,6 +92,10 @@ impl ConcurrentSparseStateTable {
             keys,
             packed_weights,
         }
+    }
+    pub fn new() -> Self {
+	let capacity = 100;
+	Self::new2(capacity)
     }
     pub fn capacity(&self) -> usize {
 	self.keys.len
@@ -114,7 +117,7 @@ impl ConcurrentSparseStateTable {
             }
         }
     }
-    pub fn insertAddWeightsLimitProbes(
+    pub fn insert_add_weights_limit_probes(
         &self,
         tolerance: usize,
         x: BasisIdx,
@@ -160,12 +163,24 @@ impl ConcurrentSparseStateTable {
             if k == BasisIdx::into_u64(EMPTY_KEY) {
                 return None;
             } else if k == y {
-                let (re, im) = utility::unpack_complex(y);
+		let old: u64 = self.packed_weights[2 * i].load(Ordering::Relaxed);
+		let (re, im) = utility::unpack_complex(old);
                 return Some(Complex::new(re, im));
             } else {
                 i = i + 1
             }
         }
+    }
+    pub fn increase_capacity_by_factor(&self, alpha: f32) -> Self {
+	let new_capacity = (alpha * self.keys.len as f32).ceil() as usize;
+	let mut new_table = Self::new2(new_capacity);
+	for i in 0..self.keys.len {
+	    let k = BasisIdx::from_u64(new_table.keys[i].load(Ordering::Relaxed));
+	    let (re, im) = utility::unpack_complex(self.packed_weights[2 * i].load(Ordering::Relaxed));
+	    let c = Complex::new(re, im);
+	    self.insert_add_weights_limit_probes(1, k, c);
+	}
+	new_table
     }
 }
 

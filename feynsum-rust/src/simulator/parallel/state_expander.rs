@@ -74,7 +74,7 @@ fn try_put(table: &mut ConcurrentSparseStateTable, bidx: BasisIdx, weight: Compl
     let probably_longest_probe = ((n as Real).log2() / (max_load - 1.0 - max_load.log2())).ceil() as usize;
     let tolerance = 4 * std::cmp::max(10, probably_longest_probe);
     let tolerance = std::cmp::min(tolerance, n);
-    table.insertAddWeightsLimitProbes(tolerance, bidx, weight)
+    table.insert_add_weights_limit_probes(tolerance, bidx, weight)
 }
 
 pub enum SuccessorsResult {
@@ -215,7 +215,15 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> usize {
 	    }
 	    apps = apps + appsb;
 	}
+	// TODO: instead we instead should be using the commented-out line below, but I've temporarily used the alternative two lines below, which inlines the two predicates...
 	//let remaining_blocks_next: Vec<usize> = remaining_blocks.iter().filter(|&&b| block_has_pending(b) || block_has_remaining(b)).cloned().collect();
+	let mut remaining_blocks_next: Vec<usize> = remaining_blocks.iter().filter(|&&b| !block_pending[b].is_empty() || block_remaining_starts[b] < block_stop(b)).cloned().collect();
+	std::mem::swap(&mut remaining_blocks, &mut remaining_blocks_next);
+	if !remaining_blocks.is_empty() {
+	    let mut table2 = table.increase_capacity_by_factor(1.5);
+	    std::mem::swap(&mut table, &mut table2);
+	}
+	
     }
     0
 }
