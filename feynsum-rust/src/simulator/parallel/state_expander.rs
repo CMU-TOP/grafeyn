@@ -96,7 +96,9 @@ fn apply_gates1(
     }
     if gatenum >= gates.len() {
 	match (full.load(Ordering::Relaxed), try_put(table, bidx, weight)) {
-	    (false, SparseStateTableInserion::Success) => { return (apps, SuccessorsResult::AllSucceeded); }
+	    (false, SparseStateTableInserion::Success) => {
+		return (apps, SuccessorsResult::AllSucceeded);
+	    }
 	    _ => {
 		if !full.load(Ordering::Relaxed) {
 		    full.store(true, Ordering::SeqCst);
@@ -148,6 +150,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> usize {
     let block_start = |b: usize| block_size * b;
     let block_stop = |b: usize| std::cmp::min(n, block_size + block_start(b));
     let mut block_remaining_starts: Vec<usize> = (0..num_blocks).map(|b| block_start(b)).collect();
+    let block_has_remaining = |b: usize| block_remaining_starts[b] < block_stop(b);
     let mut block_pending: Vec<Vec<(BasisIdx, Complex, usize)>> = vec![vec![]; num_blocks];
     let block_has_pending = |b: usize| !block_pending[b].is_empty();
     let mut remaining_blocks: Vec<usize> = (0..n).map(|b| b).collect();
@@ -155,7 +158,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> usize {
 
     while !remaining_blocks.is_empty() {
 	let mut full: AtomicBool = AtomicBool::new(false);
-	for i in 0..remaining_blocks.len() { // workOnBlock()
+	for i in 0..remaining_blocks.len() { // process each block b, i.e., workOnBlock()
 	    let b = remaining_blocks[i];
 	    let mut clear_pending = |apps0: usize, block_pending0: Vec<(BasisIdx, Complex, usize)>| {
 		let mut apps = apps0;
@@ -185,7 +188,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> usize {
 		break;
 	    }
 	    let mut j = block_remaining_starts[b];
-	    loop {
+	    loop { // process each item j in block b
 		if j >= block_stop(b) {
 		    block_remaining_starts[b] = block_stop(b);
 		    break
@@ -212,6 +215,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> usize {
 	    }
 	    apps = apps + appsb;
 	}
+	//let remaining_blocks_next: Vec<usize> = remaining_blocks.iter().filter(|&&b| block_has_pending(b) || block_has_remaining(b)).cloned().collect();
     }
     0
 }
