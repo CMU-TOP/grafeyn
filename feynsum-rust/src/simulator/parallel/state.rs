@@ -7,8 +7,8 @@ mod dense_state_table;
 mod sparse_state_table;
 
 pub use dense_state_table::DenseStateTable;
-pub use sparse_state_table::SparseStateTable;
 pub use sparse_state_table::ConcurrentSparseStateTable;
+pub use sparse_state_table::SparseStateTable;
 
 use super::super::Compactifiable;
 
@@ -22,7 +22,7 @@ impl State {
     pub fn num_nonzeros(&self) -> usize {
         match self {
             State::Sparse(table) => table.num_nonzeros(),
-            State::Dense(table) => table.num_nonzeros(10_000),
+            State::Dense(table) => table.num_nonzeros(),
         }
     }
 
@@ -48,5 +48,5 @@ impl Compactifiable for State {
 
 pub enum SparseStateTableInserion {
     Success,
-    Full
+    Full,
 }
