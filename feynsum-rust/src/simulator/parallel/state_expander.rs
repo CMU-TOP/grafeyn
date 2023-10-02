@@ -27,7 +27,7 @@ impl Display for ExpandMethod {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             ExpandMethod::Sparse => write!(f, "push sparse"),
-	    ExpandMethod::ConcurrentSparse => write!(f, "push (concurrent) sparse"),
+            ExpandMethod::ConcurrentSparse => write!(f, "push (concurrent) sparse"),
             ExpandMethod::PushDense => write!(f, "push dense"),
             ExpandMethod::PullDense => write!(f, "pull dense"),
         }
@@ -55,7 +55,7 @@ pub fn expand(
     assert!(config.dense_threshold <= config.pull_threshold);
 
     if expected_cost < config.dense_threshold {
-        expand_sparse(gates, state)
+        expand_sparse2(gates, config, state)
     } else if expected_cost >= config.pull_threshold && all_gates_pullable {
         expand_pull_dense(gates, num_qubits, state)
     } else {
@@ -181,16 +181,15 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> ExpandRes
     let mut remaining_blocks: Vec<usize> = (0..n).map(|b| b).collect();
     let mut apps = 0;
 
+    log::info!("expand_sparse2 started");
+
     while !remaining_blocks.is_empty() {
         let mut full: AtomicBool = AtomicBool::new(false);
-        for i in 0..remaining_blocks.len() {
+        for &b in &remaining_blocks {
             // process each block b, i.e., workOnBlock()
-            let b = remaining_blocks[i];
             let mut clear_pending =
-                |apps0: usize, block_pending0: Vec<(BasisIdx, Complex, usize)>| {
+                |apps0: usize, block_pending1: &mut Vec<(BasisIdx, Complex, usize)>| {
                     let mut apps = apps0;
-                    let mut block_pending1 = block_pending0.clone();
-                    let mut block_pending2: Vec<(BasisIdx, Complex, usize)> = vec![];
                     while !block_pending1.is_empty() {
                         if let Some((idx, weight, gatenum)) = block_pending1.pop() {
                             match apply_gates1(
@@ -200,20 +199,18 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> ExpandRes
                                     apps = apps2;
                                 }
                                 (apps2, SuccessorsResult::SomeFailed(vfs)) => {
-                                    block_pending2.extend(vfs);
+                                    block_pending1.extend(vfs);
                                     apps = apps2;
                                     break;
                                 }
                             }
                         }
                     }
-                    block_pending2.extend(block_pending1);
-                    (apps, block_pending2)
+                    apps
                 };
-            let (apps0, pending_cleared) = clear_pending(0, block_pending.swap_remove(b));
+            let apps0 = clear_pending(0, &mut block_pending[b]);
             let mut appsb = apps0;
-            if !pending_cleared.is_empty() {
-                block_pending[b].extend(pending_cleared);
+            if !block_pending[b].is_empty() {
                 break;
             }
             let mut j = block_remaining_starts[b];
@@ -266,7 +263,6 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> ExpandRes
         num_gate_apps,
         method: ExpandMethod::ConcurrentSparse,
     }
-
 }
 
 fn expand_sparse(gates: Vec<&Gate>, state: State) -> ExpandResult {
@@ -312,6 +308,7 @@ fn expand_push_dense(gates: Vec<&Gate>, num_qubits: usize, state: State) -> Expa
                 )
             })
             .sum(),
+        State::ConcurrentSparse(_) => unimplemented!(),
     };
 
     let num_nonzeros = table.num_nonzeros();
@@ -383,7 +380,7 @@ fn apply_gates(gates: &[&Gate], table: &DenseStateTable, bidx: BasisIdx, weight:
         return 0;
     }
     if gates.is_empty() {
-        (*table).atomic_put/(bidx, weight);
+        (*table).atomic_put(bidx, weight);
         return 0;
     }
 

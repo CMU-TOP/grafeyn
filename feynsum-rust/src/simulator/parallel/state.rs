@@ -24,6 +24,7 @@ impl State {
         match self {
             State::Sparse(table) => table.num_nonzeros(),
             State::Dense(table) => table.num_nonzeros(),
+            State::ConcurrentSparse(_) => unimplemented!(),
         }
     }
 
@@ -31,6 +32,7 @@ impl State {
         match self {
             State::Sparse(table) => table.get(bidx),
             State::Dense(table) => table.get(bidx),
+            State::ConcurrentSparse(_) => unimplemented!(),
         }
     }
 }
@@ -43,6 +45,7 @@ impl Compactifiable for State {
                 let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
                 (BasisIdx::from_idx(idx), Complex::new(re, im))
             })),
+            State::ConcurrentSparse(_) => unimplemented!(),
         }
     }
 }

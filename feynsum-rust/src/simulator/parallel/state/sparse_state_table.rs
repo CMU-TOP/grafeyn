@@ -78,6 +78,8 @@ pub struct ConcurrentSparseStateTable {
     packed_weights: HeapArray<AtomicU64>,
 }
 
+unsafe impl Sync for ConcurrentSparseStateTable {}
+
 impl ConcurrentSparseStateTable {
     pub fn new2(capacity: usize) -> Self {
         let mut keys = HeapArray::<AtomicU64>::new(capacity);
@@ -94,11 +96,11 @@ impl ConcurrentSparseStateTable {
         }
     }
     pub fn new() -> Self {
-	let capacity = 100;
-	Self::new2(capacity)
+        let capacity = 1000;
+        Self::new2(capacity)
     }
     pub fn capacity(&self) -> usize {
-	self.keys.len
+        self.keys.len
     }
     fn put_value_at(&self, i: usize, v: Complex) {
         let k = 2 * i;
@@ -163,8 +165,8 @@ impl ConcurrentSparseStateTable {
             if k == BasisIdx::into_u64(EMPTY_KEY) {
                 return None;
             } else if k == y {
-		let old: u64 = self.packed_weights[2 * i].load(Ordering::Relaxed);
-		let (re, im) = utility::unpack_complex(old);
+                let old: u64 = self.packed_weights[2 * i].load(Ordering::Relaxed);
+                let (re, im) = utility::unpack_complex(old);
                 return Some(Complex::new(re, im));
             } else {
                 i = i + 1
@@ -172,15 +174,16 @@ impl ConcurrentSparseStateTable {
         }
     }
     pub fn increase_capacity_by_factor(&self, alpha: f32) -> Self {
-	let new_capacity = (alpha * self.keys.len as f32).ceil() as usize;
-	let mut new_table = Self::new2(new_capacity);
-	for i in 0..self.keys.len {
-	    let k = BasisIdx::from_u64(new_table.keys[i].load(Ordering::Relaxed));
-	    let (re, im) = utility::unpack_complex(self.packed_weights[2 * i].load(Ordering::Relaxed));
-	    let c = Complex::new(re, im);
-	    self.insert_add_weights_limit_probes(1, k, c);
-	}
-	new_table
+        let new_capacity = (alpha * self.keys.len as f32).ceil() as usize;
+        let mut new_table = Self::new2(new_capacity);
+        for i in 0..self.keys.len {
+            let k = BasisIdx::from_u64(new_table.keys[i].load(Ordering::Relaxed));
+            let (re, im) =
+                utility::unpack_complex(self.packed_weights[2 * i].load(Ordering::Relaxed));
+            let c = Complex::new(re, im);
+            self.insert_add_weights_limit_probes(1, k, c);
+        }
+        new_table
     }
 }
 
