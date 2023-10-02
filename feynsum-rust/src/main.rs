@@ -19,6 +19,9 @@ use config::Config;
 use options::Options;
 use simulator::Compactifiable;
 
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 fn main() -> io::Result<()> {
     env_logger::init();
 

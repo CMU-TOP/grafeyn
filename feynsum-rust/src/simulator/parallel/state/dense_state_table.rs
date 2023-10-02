@@ -10,31 +10,24 @@ pub struct DenseStateTable {
 }
 
 impl DenseStateTable {
-    pub fn new(num_qubits: usize, block_size: usize) -> Self {
+    pub fn new(num_qubits: usize) -> Self {
         let capacity = 1 << num_qubits;
-        // TODO: Check if the initialization is performance bottleneck
-        Self {
-            array: (0..capacity)
-                .into_par_iter()
-                .chunks(block_size)
-                .flat_map_iter(|chunk| chunk.iter().map(|_| AtomicU64::new(0)).collect::<Vec<_>>())
-                .collect(),
-        }
+        let mut array = Vec::with_capacity(capacity);
+        (0..capacity)
+            .into_par_iter()
+            .map(|_| AtomicU64::new(0))
+            .collect_into_vec(&mut array);
+        Self { array }
     }
 
-    pub fn num_nonzeros(&self, block_size: usize) -> usize {
+    pub fn num_nonzeros(&self) -> usize {
         self.array
-            .par_chunks(block_size)
-            .map(|chunk| {
-                chunk
-                    .iter()
-                    .filter(|v| {
-                        let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
-                        utility::is_real_nonzero(re) || utility::is_real_nonzero(im)
-                    })
-                    .count()
+            .par_iter()
+            .filter(|v| {
+                let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
+                utility::is_real_nonzero(re) || utility::is_real_nonzero(im)
             })
-            .reduce(|| 0, |acc, n| acc + n)
+            .count()
     }
     pub fn atomic_put(&self, bidx: BasisIdx, weight: Complex) {
         // FIXME: We can use `put` method instead of `atomic_put` method if we
