@@ -226,7 +226,7 @@ h q0[28];
 
         let state = run(&config, circuit).unwrap();
 
-        println!("{:?}", state);
+//        println!("{:?}", state);
 
         assert!(matches!(state, State::Sparse(SparseStateTable { .. })));
 

@@ -181,6 +181,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> ExpandRes
     let mut remaining_blocks: Vec<usize> = (0..n).map(|b| b).collect();
     let mut apps = 0;
 
+    println!("testing");
     log::info!("expand_sparse2 started");
 
     while !remaining_blocks.is_empty() {
