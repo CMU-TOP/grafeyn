@@ -67,7 +67,7 @@ fn expected_cost(num_qubits: usize, num_nonzeros: usize, prev_num_nonzeros: usiz
     let expected = cmp::min(max_num_states, (rate * num_nonzeros as Real) as i64);
     let expected_density = expected as Real / max_num_states as Real;
     let current_density = num_nonzeros as Real / max_num_states as Real;
-    expected_density.max(current_density)
+    Real::max(expected_density, current_density)
 }
 
 fn try_put(
