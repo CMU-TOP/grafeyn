@@ -330,7 +330,7 @@ fn expand_pull_dense(gates: Vec<&Gate>, num_qubits: usize, state: State) -> Expa
             || (0, 0),
             |acc, idx| {
                 let bidx = BasisIdx::from_idx(idx);
-                let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, &bidx);
+                let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, bidx);
                 table.atomic_put(bidx, weight);
                 (
                     acc.0 + num_gate_apps_here,
@@ -395,20 +395,20 @@ fn apply_gates(gates: &[&Gate], table: &DenseStateTable, bidx: BasisIdx, weight:
     }
 }
 
-fn apply_pull_gates(gates: &[&Gate], prev_state: &State, bidx: &BasisIdx) -> (Complex, usize) {
+fn apply_pull_gates(gates: &[&Gate], prev_state: &State, bidx: BasisIdx) -> (Complex, usize) {
     if gates.is_empty() {
-        let weight = prev_state.get(bidx).unwrap_or(Complex::new(0.0, 0.0));
+        let weight = prev_state.get(&bidx).unwrap_or(Complex::new(0.0, 0.0));
         return (weight, 0);
     }
 
-    match gates[0].pull_apply(*bidx) {
+    match gates[0].pull_apply(bidx) {
         PullApplyOutput::Nonbranching(neighbor, multiplier) => {
-            let (weight, num_gate_apps) = apply_pull_gates(&gates[1..], prev_state, &neighbor);
+            let (weight, num_gate_apps) = apply_pull_gates(&gates[1..], prev_state, neighbor);
             (weight * multiplier, 1 + num_gate_apps)
         }
         PullApplyOutput::Branching((neighbor1, multiplier1), (neighbor2, multiplier2)) => {
-            let (weight1, num_gate_apps_1) = apply_pull_gates(&gates[1..], prev_state, &neighbor1);
-            let (weight2, num_gate_apps_2) = apply_pull_gates(&gates[1..], prev_state, &neighbor2);
+            let (weight1, num_gate_apps_1) = apply_pull_gates(&gates[1..], prev_state, neighbor1);
+            let (weight2, num_gate_apps_2) = apply_pull_gates(&gates[1..], prev_state, neighbor2);
 
             (
                 weight1 * multiplier1 + weight2 * multiplier2,
