@@ -1,7 +1,5 @@
 use std::cmp;
 use std::fmt::{self, Display, Formatter};
-//use std::ops::Deref;
-use std::sync::Arc;
 use std::sync::{atomic::AtomicBool, atomic::Ordering};
 
 use rayon::prelude::*;
@@ -381,7 +379,7 @@ fn apply_gates(gates: &[&Gate], table: &DenseStateTable, bidx: BasisIdx, weight:
         return 0;
     }
     if gates.is_empty() {
-        (*table).atomic_put(bidx, weight);
+        table.atomic_put(bidx, weight);
         return 0;
     }
 
