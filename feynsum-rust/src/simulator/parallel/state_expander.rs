@@ -173,7 +173,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> ExpandRes
     let n: usize = state.num_nonzeros();
     let block_size = std::cmp::min(n / 1000, config.block_size);
     let block_size = std::cmp::max(100, block_size);
-    let num_blocks = n / block_size; // TODO: need ceiling division
+    let num_blocks = (n as f64 / block_size as f64).ceil() as usize;
     let block_start = |b: usize| block_size * b;
     let block_stop = |b: usize| std::cmp::min(n, block_size + block_start(b));
     let mut block_remaining_starts: Vec<usize> = (0..num_blocks).map(|b| block_start(b)).collect();
