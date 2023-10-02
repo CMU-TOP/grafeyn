@@ -12,9 +12,10 @@ pub use sparse_state_table::ConcurrentSparseStateTable;
 
 use super::super::Compactifiable;
 
-#[derive(Debug)]
+//#[derive(Debug)]
 pub enum State {
     Sparse(SparseStateTable),
+    ConcurrentSparse(ConcurrentSparseStateTable),
     Dense(DenseStateTable),
 }
 

@@ -16,6 +16,7 @@ use super::state::{DenseStateTable, SparseStateTable, ConcurrentSparseStateTable
 
 pub enum ExpandMethod {
     Sparse,
+    ConcurrentSparse,
     PushDense,
     PullDense,
 }
@@ -24,6 +25,7 @@ impl Display for ExpandMethod {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             ExpandMethod::Sparse => write!(f, "push sparse"),
+	    ExpandMethod::ConcurrentSparse => write!(f, "push (concurrent) sparse"),
             ExpandMethod::PushDense => write!(f, "push dense"),
             ExpandMethod::PullDense => write!(f, "pull dense"),
         }
@@ -141,7 +143,7 @@ fn apply_gates2(
     }
 }
 
-fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> usize {
+fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> ExpandResult {
     let mut table = ConcurrentSparseStateTable::new();
     let n : usize = state.num_nonzeros();
     let block_size = std::cmp::min(n / 1000, config.block_size);
@@ -156,8 +158,8 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> usize {
 
     while !remaining_blocks.is_empty() {
 	let mut full: AtomicBool = AtomicBool::new(false);
-	for i in 0..remaining_blocks.len() { // process each block b, i.e., workOnBlock()
-	    let b = remaining_blocks[i];
+	for b in &remaining_blocks { // in 0..remaining_blocks.len() { // process each block b, i.e., workOnBlock()
+	    let b = *b;
 	    let mut clear_pending = |apps0: usize, block_pending0: Vec<(BasisIdx, Complex, usize)>| {
 		let mut apps = apps0;
 		let mut block_pending1 = block_pending0.clone();
@@ -185,29 +187,29 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> usize {
 		block_pending[b].extend(pending_cleared);
 		break;
 	    }
-	    let mut j = block_remaining_starts[b];
-	    loop { // process each item j in block b
-		if j >= block_stop(b) {
+	    let mut i = block_remaining_starts[b];
+	    loop { // process each item i in block b
+		if i >= block_stop(b) {
 		    block_remaining_starts[b] = block_stop(b);
 		    break
 		}
-		let idx = BasisIdx::from_idx(j);
+		let idx = BasisIdx::from_idx(i);
 		match State::get(&state, &idx) {
 		    Some(weight) => {
 			match apply_gates1(0, &gates, &mut table, idx, weight, &mut full, appsb) {
 			    (apps2, SuccessorsResult::AllSucceeded) => {
-				j = j + 1;
+				i = i + 1;
 				appsb = apps2;
 			    }
 			    (apps2, SuccessorsResult::SomeFailed(vfs)) => {
-				block_remaining_starts[b] = j + 1;
+				block_remaining_starts[b] = i + 1;
 				block_pending[b].extend(vfs);
 				appsb = apps2;
 			    }
 			}
 		    }
 		    None => {
-			j = j + 1;
+			i = i + 1;
 		    }
 		}
 	    }
@@ -223,7 +225,15 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> usize {
 	}
 	
     }
-    0
+    let num_nonzeros = table.capacity();
+    let num_gate_apps = 0;
+    ExpandResult {
+        state: State::ConcurrentSparse(table),
+        num_nonzeros,
+        num_gate_apps,
+        method: ExpandMethod::ConcurrentSparse,
+    }
+
 }
 
 fn expand_sparse(gates: Vec<&Gate>, state: State) -> ExpandResult {
