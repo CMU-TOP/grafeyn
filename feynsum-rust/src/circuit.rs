@@ -125,8 +125,8 @@ impl Circuit {
                             target2: args[2],
                         },
                         ("swap", 0, 2) => GateDefn::Swap {
-                            target1: args[1],
-                            target2: args[2],
+                            target1: args[0],
+                            target2: args[1],
                         },
                         // NOTE: U3 gate is deprecated
                         ("u", 3, 1) | ("u3", 3, 1) => GateDefn::U {
