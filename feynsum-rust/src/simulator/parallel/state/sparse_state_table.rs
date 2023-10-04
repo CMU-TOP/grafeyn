@@ -71,12 +71,11 @@ impl ConcurrentSparseStateTable {
             .count()
     }
     fn put_value_at(&self, i: usize, v: Complex) {
-        let k = i;
         loop {
-            let old: u64 = self.packed_weights[k].load(Ordering::Relaxed);
+            let old: u64 = self.packed_weights[i].load(Ordering::Relaxed);
             let (re, im) = utility::unpack_complex(old);
             let new = utility::pack_complex(re + v.re, im + v.im);
-            match self.packed_weights[k].compare_exchange(
+            match self.packed_weights[i].compare_exchange(
                 old,
                 new,
                 Ordering::SeqCst,
