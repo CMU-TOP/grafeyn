@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use log::debug;
+
 use crate::{
     types::{constants, BasisIdx, Complex, QubitIndex, Real},
     utility,
@@ -453,6 +455,12 @@ fn single_qubit_unitary(
 macro_rules! push_to_pull {
     ($self:ident, $bidx:ident) => {{
         let touches = &$self.touches;
+        debug!(
+            "pulling touches: {}, {:?} gate: {:?}",
+            touches.len(),
+            $self.branching_type(),
+            $self
+        );
         match (touches.len(), $self.branching_type()) {
             (1, BranchingType::Nonbranching) => {
                 let qi = *touches.iter().next().unwrap();
@@ -574,7 +582,7 @@ macro_rules! push_to_pull {
                 let ((b00, m00), (b01, m01)) = if b00.get(qi) {
                     ((b01, m01), (b00, m00))
                 } else {
-                    ((b10, m10), (b11, m11))
+                    ((b00, m00), (b01, m01))
                 };
 
                 let ((b10, m10), (b11, m11)) = if b10.get(qi) {
@@ -583,7 +591,7 @@ macro_rules! push_to_pull {
                     ((b10, m10), (b11, m11))
                 };
 
-                assert!(!b00.get(qi) && !b10.get(qi) && !b01.get(qi) && !b11.get(qi));
+                assert!(!b00.get(qi) && !b10.get(qi) && b01.get(qi) && b11.get(qi));
 
                 if $bidx.get(qi) {
                     PullApplyOutput::Branching(($bidx.unset(qi), m01), ($bidx, m11))
