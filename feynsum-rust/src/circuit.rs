@@ -83,6 +83,7 @@ impl Circuit {
                         ("y", 0, 1) => GateDefn::PauliY(args[0]),
                         ("z", 0, 1) => GateDefn::PauliZ(args[0]),
                         ("t", 0, 1) => GateDefn::T(args[0]),
+                        ("tdg", 0, 1) => GateDefn::Tdg(args[0]),
                         ("x", 0, 1) => GateDefn::X(args[0]),
                         ("sx", 0, 1) => GateDefn::SqrtX(args[0]),
                         ("sy", 0, 1) => GateDefn::SqrtY(args[0]),

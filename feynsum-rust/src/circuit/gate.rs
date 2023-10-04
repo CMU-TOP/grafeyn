@@ -33,6 +33,7 @@ pub enum GateDefn {
     PauliZ(QubitIndex),
     Hadamard(QubitIndex),
     T(QubitIndex),
+    Tdg(QubitIndex),
     SqrtX(QubitIndex),
     SqrtY(QubitIndex),
     SqrtW(QubitIndex),
@@ -115,6 +116,7 @@ impl Gate {
             | &GateDefn::SqrtW(qi)
             | &GateDefn::Hadamard(qi)
             | &GateDefn::T(qi)
+            | &GateDefn::Tdg(qi)
             | &GateDefn::X(qi) => HashSet::from([qi]),
             &GateDefn::CX { control, target }
             | &GateDefn::CZ { control, target }
@@ -148,6 +150,7 @@ impl Gate {
             | GateDefn::CX { .. }
             | GateDefn::CCX { .. }
             | GateDefn::T(_)
+            | GateDefn::Tdg(_)
             | GateDefn::X(_)
             | GateDefn::CPhase { .. }
             | GateDefn::RZ { .. }
@@ -184,6 +187,7 @@ impl Gate {
             | GateDefn::SqrtW(_)
             | GateDefn::CCX { .. }
             | GateDefn::T(_)
+            | GateDefn::Tdg(_)
             | GateDefn::X(_)
             | GateDefn::CPhase { .. }
             | GateDefn::FSim { .. }
@@ -233,6 +237,13 @@ impl PushApplicable for Gate {
             }
             GateDefn::T(qi) => {
                 let mult = Complex::new(constants::RECP_SQRT_2, constants::RECP_SQRT_2);
+
+                let new_weight = if bidx.get(qi) { weight * mult } else { weight };
+
+                PushApplyOutput::Nonbranching(bidx, new_weight)
+            }
+            GateDefn::Tdg(qi) => {
+                let mult = Complex::new(constants::RECP_SQRT_2, -constants::RECP_SQRT_2);
 
                 let new_weight = if bidx.get(qi) { weight * mult } else { weight };
 
@@ -615,6 +626,7 @@ impl PullApplicable for Gate {
             | GateDefn::SqrtW(_)
             | GateDefn::CCX { .. }
             | GateDefn::T(_)
+            | GateDefn::Tdg(_)
             | GateDefn::X(_)
             | GateDefn::CPhase { .. }
             | GateDefn::FSim { .. }
