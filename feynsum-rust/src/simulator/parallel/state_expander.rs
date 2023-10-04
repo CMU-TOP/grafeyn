@@ -101,7 +101,7 @@ fn apply_gates1(
     if utility::is_zero(weight) {
         return (apps, SuccessorsResult::AllSucceeded);
     }
-//    println!("testing123 {} {}", gatenum, gates.len());
+    //    println!("testing123 {} {}", gatenum, gates.len());
     if gatenum >= gates.len() {
         match (full.load(Ordering::Relaxed), try_put(table, bidx, weight)) {
             (false, SparseStateTableInserion::Success) => {
@@ -184,7 +184,8 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> ExpandRes
 
     while !remaining_blocks.is_empty() {
         let mut full: AtomicBool = AtomicBool::new(false);
-        for &b in &remaining_blocks { // process each block b, i.e., workOnBlock()
+        for &b in &remaining_blocks {
+            // process each block b, i.e., workOnBlock()
             let mut clear_pending =
                 |apps0: usize, block_pending1: &mut Vec<(BasisIdx, Complex, usize)>| {
                     let mut apps = apps0;
@@ -193,7 +194,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> ExpandRes
                             match apply_gates1(
                                 gatenum, &gates, &mut table, idx, weight, &mut full, apps,
                             ) {
-                                (apps, SuccessorsResult::AllSucceeded) => { }
+                                (apps, SuccessorsResult::AllSucceeded) => {}
                                 (apps, SuccessorsResult::SomeFailed(vfs)) => {
                                     block_pending1.extend(vfs);
                                     break;
@@ -243,6 +244,8 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> ExpandRes
             .collect();
         std::mem::swap(&mut remaining_blocks, &mut remaining_blocks_next);
         if !remaining_blocks.is_empty() {
+            log::debug!("resize");
+            println!("resize");
             let mut table2 = table.increase_capacity_by_factor(1.5);
             std::mem::swap(&mut table, &mut table2);
         }

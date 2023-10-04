@@ -591,16 +591,16 @@ macro_rules! push_to_pull {
                 let qi = *touches.iter().next().unwrap();
 
                 let PushApplyOutput::Branching((b00, m00), (b01, m01)) =
-                    $self.push_apply(BasisIdx::zeros(), Complex::new(1.0, 0.0))
-                else {
-                    unreachable!()
-                };
+                        $self.push_apply(BasisIdx::zeros(), Complex::new(1.0, 0.0))
+                    else {
+                        unreachable!()
+                    };
 
                 let PushApplyOutput::Branching((b10, m10), (b11, m11)) =
-                    $self.push_apply(BasisIdx::zeros().set(qi), Complex::new(1.0, 0.0))
-                else {
-                    unreachable!()
-                };
+                        $self.push_apply(BasisIdx::zeros().set(qi), Complex::new(1.0, 0.0))
+                    else {
+                        unreachable!()
+                    };
 
                 let ((b00, m00), (b01, m01)) = if b00.get(qi) {
                     ((b01, m01), (b00, m00))

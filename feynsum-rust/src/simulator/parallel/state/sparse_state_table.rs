@@ -49,14 +49,26 @@ impl ConcurrentSparseStateTable {
     pub fn capacity(&self) -> usize {
         self.keys.len()
     }
+    pub fn size(&self) -> usize {
+        self.keys
+            .iter()
+            .filter(|k| k.load(Ordering::Relaxed) != BasisIdx::into_u64(EMPTY_KEY))
+            .count()
+    }
     pub fn num_nonzeros(&self) -> usize {
-	let mut sz = 0;
-        for i in 0..self.keys.len() {
-	    if self.keys[i].load(Ordering::Relaxed) != BasisIdx::into_u64(EMPTY_KEY) {
-		sz = sz + 1;
-	    }
-	}
-	sz
+        self.keys
+            .iter()
+            .enumerate()
+            .filter(|(i, k)| {
+                if k.load(Ordering::Relaxed) != BasisIdx::into_u64(EMPTY_KEY) {
+                    let (re, im) =
+                        utility::unpack_complex(self.packed_weights[*i].load(Ordering::Relaxed));
+                    utility::is_real_nonzero(re) || utility::is_real_nonzero(im)
+                } else {
+                    false
+                }
+            })
+            .count()
     }
     fn put_value_at(&self, i: usize, v: Complex) {
         let k = i;

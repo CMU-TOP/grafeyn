@@ -1,2 +1,2 @@
 [env]
-RUST_LOG = "warn"
+RUST_LOG = "debug"
