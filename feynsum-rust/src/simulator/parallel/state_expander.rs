@@ -55,7 +55,7 @@ pub fn expand(
     assert!(config.dense_threshold <= config.pull_threshold);
 
     if expected_cost < config.dense_threshold {
-        expand_sparse(gates, state)
+        expand_sparse2(gates, config, state)
     } else if expected_cost >= config.pull_threshold && all_gates_pullable {
         expand_pull_dense(gates, num_qubits, state)
     } else {
@@ -77,7 +77,7 @@ fn try_put(
     bidx: BasisIdx,
     weight: Complex,
 ) -> SparseStateTableInserion {
-    let max_load: Real = 123.0;
+    let max_load: Real = 0.9;
     let n = table.capacity();
     let probably_longest_probe =
         ((n as Real).log2() / (max_load - 1.0 - max_load.log2())).ceil() as usize;
@@ -103,6 +103,7 @@ fn apply_gates1(
     if utility::is_zero(weight) {
         return (apps, SuccessorsResult::AllSucceeded);
     }
+//    println!("testing123 {} {}", gatenum, gates.len());
     if gatenum >= gates.len() {
         match (full.load(Ordering::Relaxed), try_put(table, bidx, weight)) {
             (false, SparseStateTableInserion::Success) => {
@@ -157,13 +158,13 @@ fn apply_gates2(
     apps: usize,
 ) -> (usize, SuccessorsResult) {
     match apply_gates1(gatenum, gates, table, bidx1, weight1, full, apps) {
-        (apps2, SuccessorsResult::AllSucceeded) => {
+        (apps, SuccessorsResult::AllSucceeded) => {
             apply_gates1(gatenum, gates, table, bidx2, weight2, full, apps)
         }
-        (apps2, SuccessorsResult::SomeFailed(v)) => {
-            let mut v2 = v.clone(); // probably we can do something more efficient here
+        (apps, SuccessorsResult::SomeFailed(v)) => {
+            let mut v2 = v.clone();
             v2.push((bidx1, weight1, gatenum));
-            (apps2, SuccessorsResult::SomeFailed(v2))
+            (apps, SuccessorsResult::SomeFailed(v2))
         }
     }
 }
@@ -178,16 +179,14 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> ExpandRes
     let block_stop = |b: usize| std::cmp::min(n, block_size + block_start(b));
     let mut block_remaining_starts: Vec<usize> = (0..num_blocks).map(|b| block_start(b)).collect();
     let mut block_pending: Vec<Vec<(BasisIdx, Complex, usize)>> = vec![vec![]; num_blocks];
-    let mut remaining_blocks: Vec<usize> = (0..n).map(|b| b).collect();
+    let mut remaining_blocks: Vec<usize> = (0..num_blocks).map(|b| b).collect();
     let mut apps = 0;
 
-    println!("testing");
     log::info!("expand_sparse2 started");
 
     while !remaining_blocks.is_empty() {
         let mut full: AtomicBool = AtomicBool::new(false);
-        for &b in &remaining_blocks {
-            // process each block b, i.e., workOnBlock()
+        for &b in &remaining_blocks { // process each block b, i.e., workOnBlock()
             let mut clear_pending =
                 |apps0: usize, block_pending1: &mut Vec<(BasisIdx, Complex, usize)>| {
                     let mut apps = apps0;
@@ -196,12 +195,9 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> ExpandRes
                             match apply_gates1(
                                 gatenum, &gates, &mut table, idx, weight, &mut full, apps,
                             ) {
-                                (apps2, SuccessorsResult::AllSucceeded) => {
-                                    apps = apps2;
-                                }
-                                (apps2, SuccessorsResult::SomeFailed(vfs)) => {
+                                (apps, SuccessorsResult::AllSucceeded) => { }
+                                (apps, SuccessorsResult::SomeFailed(vfs)) => {
                                     block_pending1.extend(vfs);
-                                    apps = apps2;
                                     break;
                                 }
                             }
@@ -209,35 +205,32 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> ExpandRes
                     }
                     apps
                 };
-            let apps0 = clear_pending(0, &mut block_pending[b]);
-            let mut appsb = apps0;
+            let mut appsb = clear_pending(0, &mut block_pending[b]);
             if !block_pending[b].is_empty() {
                 break;
             }
-            let mut j = block_remaining_starts[b];
+            let mut i = block_remaining_starts[b];
             loop {
-                // process each item j in block b
-                if j >= block_stop(b) {
+                // process each item i in block b
+                if i >= block_stop(b) {
                     block_remaining_starts[b] = block_stop(b);
                     break;
                 }
-                let idx = BasisIdx::from_idx(j);
+                let idx = BasisIdx::from_idx(i);
                 match State::get(&state, &idx) {
                     Some(weight) => {
                         match apply_gates1(0, &gates, &mut table, idx, weight, &mut full, appsb) {
-                            (apps2, SuccessorsResult::AllSucceeded) => {
-                                j = j + 1;
-                                appsb = apps2;
+                            (appsb, SuccessorsResult::AllSucceeded) => {
+                                i = i + 1;
                             }
-                            (apps2, SuccessorsResult::SomeFailed(vfs)) => {
-                                block_remaining_starts[b] = j + 1;
+                            (appsb, SuccessorsResult::SomeFailed(vfs)) => {
+                                block_remaining_starts[b] = i + 1;
                                 block_pending[b].extend(vfs);
-                                appsb = apps2;
                             }
                         }
                     }
                     None => {
-                        j = j + 1;
+                        i = i + 1;
                     }
                 }
             }
@@ -256,7 +249,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> ExpandRes
             std::mem::swap(&mut table, &mut table2);
         }
     }
-    let num_nonzeros = table.capacity();
+    let num_nonzeros = table.num_nonzeros();
     let num_gate_apps = 0;
     ExpandResult {
         state: State::ConcurrentSparse(table),

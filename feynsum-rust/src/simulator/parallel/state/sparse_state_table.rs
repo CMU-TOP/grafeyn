@@ -29,7 +29,7 @@ impl ConcurrentSparseStateTable {
     pub fn new2(capacity: usize) -> Self {
         let mut keys = Vec::with_capacity(capacity);
         for i in 0..capacity {
-            keys.push(AtomicU64::new(0));
+            keys.push(AtomicU64::new(BasisIdx::into_u64(EMPTY_KEY)));
         }
         let mut packed_weights = Vec::with_capacity(capacity);
         for i in 0..capacity {
@@ -43,11 +43,20 @@ impl ConcurrentSparseStateTable {
         }
     }
     pub fn new() -> Self {
-        let capacity = 1000;
+        let capacity = 100000;
         Self::new2(capacity)
     }
     pub fn capacity(&self) -> usize {
         self.keys.len()
+    }
+    pub fn num_nonzeros(&self) -> usize {
+	let mut sz = 0;
+        for i in 0..self.keys.len() {
+	    if self.keys[i].load(Ordering::Relaxed) != BasisIdx::into_u64(EMPTY_KEY) {
+		sz = sz + 1;
+	    }
+	}
+	sz
     }
     fn put_value_at(&self, i: usize, v: Complex) {
         let k = i;
@@ -74,7 +83,7 @@ impl ConcurrentSparseStateTable {
     ) -> SparseStateTableInserion {
         let n = self.keys.len();
         let mut probes: usize = 0;
-        let mut i: usize = calculate_hash(&x) as usize;
+        let mut i: usize = calculate_hash(&x) as usize % n;
         let y = x.into_u64();
         loop {
             if probes >= tolerance {
@@ -103,9 +112,9 @@ impl ConcurrentSparseStateTable {
         }
         SparseStateTableInserion::Success
     }
-    pub fn lookup(&self, x: BasisIdx) -> Option<Complex> {
+    pub fn get(&self, x: &BasisIdx) -> Option<Complex> {
         let n = self.keys.len();
-        let mut i: usize = calculate_hash(&x) as usize;
+        let mut i: usize = calculate_hash(&x) as usize % n;
         let y = x.into_u64();
         loop {
             let k = self.keys[i].load(Ordering::Relaxed);

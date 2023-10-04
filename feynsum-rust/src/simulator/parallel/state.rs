@@ -24,7 +24,7 @@ impl State {
         match self {
             State::Sparse(table) => table.num_nonzeros(),
             State::Dense(table) => table.num_nonzeros(),
-            State::ConcurrentSparse(_) => unimplemented!(),
+            State::ConcurrentSparse(table) => table.num_nonzeros()
         }
     }
 
@@ -32,7 +32,7 @@ impl State {
         match self {
             State::Sparse(table) => table.get(bidx),
             State::Dense(table) => table.get(bidx),
-            State::ConcurrentSparse(_) => unimplemented!(),
+            State::ConcurrentSparse(table) => table.get(bidx)
         }
     }
 }
