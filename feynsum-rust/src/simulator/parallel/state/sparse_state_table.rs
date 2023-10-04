@@ -33,10 +33,10 @@ impl ConcurrentSparseStateTable {
         }
         let mut packed_weights = Vec::with_capacity(capacity);
         for i in 0..capacity {
-	    packed_weights.push(AtomicU64::new(0));
+            packed_weights.push(AtomicU64::new(0));
         }
-	assert!(keys.len() == capacity);
-	assert!(packed_weights.len() == capacity);
+        assert!(keys.len() == capacity);
+        assert!(packed_weights.len() == capacity);
         Self {
             keys,
             packed_weights,
@@ -134,8 +134,7 @@ impl ConcurrentSparseStateTable {
         let mut new_table = Self::new2(new_capacity);
         for i in 0..self.keys.len() {
             let k = BasisIdx::from_u64(new_table.keys[i].load(Ordering::Relaxed));
-            let (re, im) =
-                utility::unpack_complex(self.packed_weights[i].load(Ordering::Relaxed));
+            let (re, im) = utility::unpack_complex(self.packed_weights[i].load(Ordering::Relaxed));
             let c = Complex::new(re, im);
             self.insert_add_weights_limit_probes(1, k, c);
         }
@@ -174,12 +173,6 @@ impl SparseStateTable {
             .and_modify(|w| *w += weight)
             .or_insert(weight);
     }
-
-    /*
-    #[cfg(test)]
-    pub fn get(&self, bidx: &BasisIdx) -> Option<&Complex> {
-    self.table.get(&bidx)
-    } */
 
     pub fn get(&self, bidx: &BasisIdx) -> Option<Complex> {
         self.table.get(&bidx).map(Clone::clone)

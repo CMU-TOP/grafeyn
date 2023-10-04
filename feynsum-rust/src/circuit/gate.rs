@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use log::debug;
+
 use crate::{
     types::{constants, BasisIdx, Complex, QubitIndex, Real},
     utility,
@@ -27,22 +29,6 @@ enum BranchingType {
 #[derive(Debug)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum GateDefn {
-    PauliY(QubitIndex),
-    PauliZ(QubitIndex),
-    Hadamard(QubitIndex),
-    T(QubitIndex),
-    SqrtX(QubitIndex),
-    SqrtY(QubitIndex),
-    SqrtW(QubitIndex),
-    X(QubitIndex),
-    CX {
-        control: QubitIndex,
-        target: QubitIndex,
-    },
-    CZ {
-        control: QubitIndex,
-        target: QubitIndex,
-    },
     CCX {
         control1: QubitIndex,
         control2: QubitIndex,
@@ -53,35 +39,53 @@ pub enum GateDefn {
         target: QubitIndex,
         rot: Real,
     },
+    CSwap {
+        control: QubitIndex,
+        target1: QubitIndex,
+        target2: QubitIndex,
+    },
+    CX {
+        control: QubitIndex,
+        target: QubitIndex,
+    },
+    CZ {
+        control: QubitIndex,
+        target: QubitIndex,
+    },
     FSim {
         left: QubitIndex,
         right: QubitIndex,
         theta: Real,
         phi: Real,
     },
-    RZ {
-        rot: Real,
-        target: QubitIndex,
-    },
+    Hadamard(QubitIndex),
+    PauliY(QubitIndex),
+    PauliZ(QubitIndex),
     RY {
         rot: Real,
         target: QubitIndex,
     },
-    CSwap {
-        control: QubitIndex,
-        target1: QubitIndex,
-        target2: QubitIndex,
+    RZ {
+        rot: Real,
+        target: QubitIndex,
     },
+    S(QubitIndex),
+    SqrtW(QubitIndex),
+    SqrtX(QubitIndex),
+    SqrtY(QubitIndex),
     Swap {
         target1: QubitIndex,
         target2: QubitIndex,
     },
+    T(QubitIndex),
+    Tdg(QubitIndex),
     U {
         target: QubitIndex,
         theta: Real,
         phi: Real,
         lambda: Real,
     },
+    X(QubitIndex),
     Other {
         name: String,
         params: Vec<Real>,
@@ -106,19 +110,21 @@ pub struct Gate {
 impl Gate {
     pub fn new(defn: GateDefn) -> Self {
         let touches = match &defn {
-            &GateDefn::PauliY(qi)
+            &GateDefn::Hadamard(qi)
+            | &GateDefn::PauliY(qi)
             | &GateDefn::PauliZ(qi)
-            | &GateDefn::SqrtY(qi)
-            | &GateDefn::SqrtX(qi)
+            | &GateDefn::S(qi)
             | &GateDefn::SqrtW(qi)
-            | &GateDefn::Hadamard(qi)
+            | &GateDefn::SqrtX(qi)
+            | &GateDefn::SqrtY(qi)
             | &GateDefn::T(qi)
+            | &GateDefn::Tdg(qi)
             | &GateDefn::X(qi) => HashSet::from([qi]),
-            &GateDefn::CX { control, target }
-            | &GateDefn::CZ { control, target }
-            | &GateDefn::CPhase {
+            &GateDefn::CPhase {
                 control, target, ..
-            } => HashSet::from([control, target]),
+            }
+            | &GateDefn::CZ { control, target }
+            | &GateDefn::CX { control, target } => HashSet::from([control, target]),
             &GateDefn::CCX {
                 control1,
                 control2,
@@ -140,22 +146,24 @@ impl Gate {
 
     fn branching_type(&self) -> BranchingType {
         match self.defn {
-            GateDefn::PauliY(_)
-            | GateDefn::PauliZ(_)
-            | GateDefn::CZ { .. }
-            | GateDefn::CX { .. }
-            | GateDefn::CCX { .. }
-            | GateDefn::T(_)
-            | GateDefn::X(_)
+            GateDefn::CCX { .. }
             | GateDefn::CPhase { .. }
-            | GateDefn::RZ { .. }
             | GateDefn::CSwap { .. }
-            | GateDefn::Swap { .. } => BranchingType::Nonbranching,
-            GateDefn::SqrtY(_)
-            | GateDefn::SqrtX(_)
+            | GateDefn::CX { .. }
+            | GateDefn::CZ { .. }
+            | GateDefn::PauliY(_)
+            | GateDefn::PauliZ(_)
+            | GateDefn::RZ { .. }
+            | GateDefn::S(_)
+            | GateDefn::Swap { .. }
+            | GateDefn::T(_)
+            | GateDefn::Tdg(_)
+            | GateDefn::X(_) => BranchingType::Nonbranching,
+            GateDefn::Hadamard(_)
+            | GateDefn::RY { .. }
             | GateDefn::SqrtW(_)
-            | GateDefn::Hadamard(_)
-            | GateDefn::RY { .. } => BranchingType::Branching,
+            | GateDefn::SqrtX(_)
+            | GateDefn::SqrtY(_) => BranchingType::Branching,
             GateDefn::FSim { .. } | GateDefn::U { .. } => BranchingType::MaybeBranching,
             GateDefn::Other { .. } => unimplemented!(),
         }
@@ -166,26 +174,37 @@ impl Gate {
         // NOTE: We assume MaybeBranching as Branching
     }
 
+    // TODO: refactor to make this always consistent with pull_apply
     pub fn is_pullable(&self) -> bool {
         match self.defn {
-            GateDefn::PauliY(_)
-            | GateDefn::PauliZ(_)
-            | GateDefn::SqrtY(_)
-            | GateDefn::SqrtW(_)
-            | GateDefn::CCX { .. }
-            | GateDefn::T(_)
-            | GateDefn::X(_)
-            | GateDefn::CPhase { .. }
-            | GateDefn::FSim { .. }
-            | GateDefn::CSwap { .. }
-            | GateDefn::Swap { .. }
+            GateDefn::CX { .. }
             | GateDefn::CZ { .. }
-            | GateDefn::CX { .. }
-            | GateDefn::SqrtX(_)
             | GateDefn::Hadamard(_)
-            | GateDefn::RZ { .. }
             | GateDefn::RY { .. }
+            | GateDefn::RZ { .. }
+            | GateDefn::SqrtX(_)
             | GateDefn::U { .. } => true,
+            GateDefn::CCX { .. }
+            | GateDefn::CPhase { .. }
+            | GateDefn::CSwap { .. }
+            | GateDefn::FSim { .. }
+            | GateDefn::PauliY(_)
+            | GateDefn::PauliZ(_)
+            | GateDefn::S(_)
+            | GateDefn::SqrtW(_)
+            | GateDefn::SqrtY(_)
+            | GateDefn::Swap { .. }
+            | GateDefn::T(_)
+            | GateDefn::Tdg(_)
+            | GateDefn::X(_) => {
+                matches!(
+                    (self.touches.len(), self.branching_type()),
+                    // We have not yet implemented pull action for other gates
+                    (1, BranchingType::Nonbranching)
+                        | (2, BranchingType::Nonbranching)
+                        | (1, BranchingType::Branching)
+                )
+            }
             GateDefn::Other { .. } => false,
         }
     }
@@ -194,20 +213,86 @@ impl Gate {
 impl PushApplicable for Gate {
     fn push_apply(&self, bidx: BasisIdx, weight: Complex) -> PushApplyOutput {
         match self.defn {
-            GateDefn::PauliY(qi) => {
-                let new_bidx = bidx.flip(qi);
-                let multipler = if bidx.get(qi) {
-                    Complex::new(0.0, -1.0)
+            GateDefn::CCX {
+                control1,
+                control2,
+                target,
+            } => {
+                let new_bidx = if bidx.get(control1) && bidx.get(control2) {
+                    bidx.flip(target)
                 } else {
-                    Complex::new(0.0, 1.0)
+                    bidx
                 };
-                let new_weight = weight * multipler;
-                PushApplyOutput::Nonbranching(new_bidx, new_weight)
+
+                PushApplyOutput::Nonbranching(new_bidx, weight)
             }
-            GateDefn::PauliZ(qi) => {
-                let new_weight = if bidx.get(qi) { -weight } else { weight };
+            GateDefn::CPhase {
+                control,
+                target,
+                rot,
+            } => {
+                let new_weight = if !bidx.get(control) || !bidx.get(target) {
+                    weight
+                } else {
+                    weight * Complex::new(rot.cos(), rot.sin())
+                };
+
                 PushApplyOutput::Nonbranching(bidx, new_weight)
             }
+            GateDefn::CSwap {
+                control,
+                target1,
+                target2,
+            } => {
+                let new_bidx = if bidx.get(control) {
+                    bidx.swap(target1, target2)
+                } else {
+                    bidx
+                };
+
+                PushApplyOutput::Nonbranching(new_bidx, weight)
+            }
+            GateDefn::CX { control, target } => {
+                let new_bidx = if bidx.get(control) {
+                    bidx.flip(target)
+                } else {
+                    bidx
+                };
+                PushApplyOutput::Nonbranching(new_bidx, weight)
+            }
+            GateDefn::CZ { control, target } => {
+                let new_weight = if bidx.get(control) && bidx.get(target) {
+                    -weight
+                } else {
+                    weight
+                };
+
+                PushApplyOutput::Nonbranching(bidx, new_weight)
+            }
+            GateDefn::FSim {
+                left,
+                right,
+                theta,
+                phi,
+            } => match (bidx.get(left), bidx.get(right)) {
+                (false, false) => PushApplyOutput::Nonbranching(bidx, weight),
+                (true, true) => PushApplyOutput::Nonbranching(
+                    bidx,
+                    weight * Complex::new((-phi).cos(), (-phi).sin()),
+                ),
+                _ => {
+                    let bidx1 = bidx;
+                    let bidx2 = bidx.flip(left).flip(right);
+                    let weight1 = weight * Complex::new(theta.cos(), 0.0);
+                    let weight2 = weight * Complex::new(0.0, -theta.sin());
+
+                    if bidx.get(left) {
+                        PushApplyOutput::Branching((bidx1, weight2), (bidx2, weight1))
+                    } else {
+                        PushApplyOutput::Branching((bidx1, weight1), (bidx2, weight2))
+                    }
+                }
+            },
             GateDefn::Hadamard(qi) => {
                 let bidx1 = bidx.unset(qi);
                 let bidx2 = bidx.set(qi);
@@ -220,12 +305,57 @@ impl PushApplicable for Gate {
                     PushApplyOutput::Branching((bidx1, new_weight), (bidx2, new_weight))
                 }
             }
-            GateDefn::T(qi) => {
-                let mult = Complex::new(constants::RECP_SQRT_2, constants::RECP_SQRT_2);
+            GateDefn::RY { rot, target } => {
+                let x = rot / 2.0;
 
-                let new_weight = if bidx.get(qi) { weight * mult } else { weight };
+                let bidx1 = bidx.unset(target);
+                let bidx2 = bidx.set(target);
+
+                if bidx.get(target) {
+                    PushApplyOutput::Branching(
+                        (bidx1, weight * -x.sin()),
+                        (bidx2, weight * x.cos()),
+                    )
+                } else {
+                    PushApplyOutput::Branching((bidx1, weight * x.cos()), (bidx2, weight * x.sin()))
+                }
+            }
+            GateDefn::RZ { rot, target } => {
+                let new_weight = if bidx.get(target) {
+                    weight * Complex::new((rot / 2.0).cos(), (rot / 2.0).sin())
+                } else {
+                    weight * Complex::new((rot / 2.0).cos(), -(rot / 2.0).sin())
+                };
 
                 PushApplyOutput::Nonbranching(bidx, new_weight)
+            }
+            GateDefn::S(qi) => {
+                let new_weight = if bidx.get(qi) {
+                    weight * Complex::new(0.0, 1.0)
+                } else {
+                    weight
+                };
+                PushApplyOutput::Nonbranching(bidx, new_weight)
+            }
+            GateDefn::SqrtW(qi) => {
+                let bidx1 = bidx.unset(qi);
+                let bidx2 = bidx.set(qi);
+
+                if bidx.get(qi) {
+                    PushApplyOutput::Branching(
+                        (bidx1, weight * Complex::new(0.0, constants::RECP_SQRT_2)),
+                        (bidx2, weight * Complex::new(-0.5, -0.5)),
+                    )
+                } else {
+                    PushApplyOutput::Branching(
+                        (bidx1, weight * Complex::new(-0.5, -0.5)),
+                        (bidx2, weight * Complex::new(-constants::RECP_SQRT_2, 0.0)),
+                    )
+                }
+            }
+            GateDefn::Swap { target1, target2 } => {
+                let new_bidx = bidx.swap(target1, target2);
+                PushApplyOutput::Nonbranching(new_bidx, weight)
             }
             GateDefn::SqrtX(qi) => {
                 let bidx1 = bidx.unset(qi);
@@ -256,133 +386,19 @@ impl PushApplicable for Gate {
                     )
                 }
             }
-            GateDefn::SqrtW(qi) => {
-                let bidx1 = bidx.unset(qi);
-                let bidx2 = bidx.set(qi);
+            GateDefn::T(qi) => {
+                let mult = Complex::new(constants::RECP_SQRT_2, constants::RECP_SQRT_2);
 
-                if bidx.get(qi) {
-                    PushApplyOutput::Branching(
-                        (bidx1, weight * Complex::new(0.0, constants::RECP_SQRT_2)),
-                        (bidx2, weight * Complex::new(-0.5, -0.5)),
-                    )
-                } else {
-                    PushApplyOutput::Branching(
-                        (bidx1, weight * Complex::new(-0.5, -0.5)),
-                        (bidx2, weight * Complex::new(-constants::RECP_SQRT_2, 0.0)),
-                    )
-                }
-            }
-            GateDefn::X(qi) => {
-                let new_bidx = bidx.flip(qi);
-                PushApplyOutput::Nonbranching(new_bidx, weight)
-            }
-            GateDefn::CX { control, target } => {
-                let new_bidx = if bidx.get(control) {
-                    bidx.flip(target)
-                } else {
-                    bidx
-                };
-                PushApplyOutput::Nonbranching(new_bidx, weight)
-            }
-            GateDefn::CZ { control, target } => {
-                let new_weight = if bidx.get(control) && bidx.get(target) {
-                    -weight
-                } else {
-                    weight
-                };
+                let new_weight = if bidx.get(qi) { weight * mult } else { weight };
 
                 PushApplyOutput::Nonbranching(bidx, new_weight)
             }
-            GateDefn::CCX {
-                control1,
-                control2,
-                target,
-            } => {
-                let new_bidx = if bidx.get(control1) && bidx.get(control2) {
-                    bidx.flip(target)
-                } else {
-                    bidx
-                };
+            GateDefn::Tdg(qi) => {
+                let mult = Complex::new(constants::RECP_SQRT_2, -constants::RECP_SQRT_2);
 
-                PushApplyOutput::Nonbranching(new_bidx, weight)
-            }
-            GateDefn::CPhase {
-                control,
-                target,
-                rot,
-            } => {
-                let new_weight = if !bidx.get(control) || !bidx.get(target) {
-                    weight
-                } else {
-                    weight * Complex::new(rot.cos(), rot.sin())
-                };
+                let new_weight = if bidx.get(qi) { weight * mult } else { weight };
 
                 PushApplyOutput::Nonbranching(bidx, new_weight)
-            }
-            GateDefn::FSim {
-                left,
-                right,
-                theta,
-                phi,
-            } => match (bidx.get(left), bidx.get(right)) {
-                (false, false) => PushApplyOutput::Nonbranching(bidx, weight),
-                (true, true) => PushApplyOutput::Nonbranching(
-                    bidx,
-                    weight * Complex::new((-phi).cos(), (-phi).sin()),
-                ),
-                _ => {
-                    let bidx1 = bidx;
-                    let bidx2 = bidx.flip(left).flip(right);
-                    let weight1 = weight * Complex::new(theta.cos(), 0.0);
-                    let weight2 = weight * Complex::new(0.0, -theta.sin());
-
-                    if bidx.get(left) {
-                        PushApplyOutput::Branching((bidx1, weight2), (bidx2, weight1))
-                    } else {
-                        PushApplyOutput::Branching((bidx1, weight1), (bidx2, weight2))
-                    }
-                }
-            },
-            GateDefn::RZ { rot, target } => {
-                let new_weight = if bidx.get(target) {
-                    weight * Complex::new((rot / 2.0).cos(), (rot / 2.0).sin())
-                } else {
-                    weight * Complex::new((rot / 2.0).cos(), -(rot / 2.0).sin())
-                };
-
-                PushApplyOutput::Nonbranching(bidx, new_weight)
-            }
-            GateDefn::RY { rot, target } => {
-                let x = rot / 2.0;
-
-                let bidx1 = bidx.unset(target);
-                let bidx2 = bidx.set(target);
-
-                if bidx.get(target) {
-                    PushApplyOutput::Branching(
-                        (bidx1, weight * -x.sin()),
-                        (bidx2, weight * x.cos()),
-                    )
-                } else {
-                    PushApplyOutput::Branching((bidx1, weight * x.cos()), (bidx2, weight * x.sin()))
-                }
-            }
-            GateDefn::CSwap {
-                control,
-                target1,
-                target2,
-            } => {
-                let new_bidx = if bidx.get(control) {
-                    bidx.swap(target1, target2)
-                } else {
-                    bidx
-                };
-
-                PushApplyOutput::Nonbranching(new_bidx, weight)
-            }
-            GateDefn::Swap { target1, target2 } => {
-                let new_bidx = bidx.swap(target1, target2);
-                PushApplyOutput::Nonbranching(new_bidx, weight)
             }
             GateDefn::U {
                 target,
@@ -399,6 +415,24 @@ impl PushApplicable for Gate {
                 let d = cos * Complex::new((phi + lambda).cos(), (phi + lambda).sin());
 
                 single_qubit_unitary(bidx, weight, target, a, b, c, d)
+            }
+            GateDefn::PauliY(qi) => {
+                let new_bidx = bidx.flip(qi);
+                let multipler = if bidx.get(qi) {
+                    Complex::new(0.0, -1.0)
+                } else {
+                    Complex::new(0.0, 1.0)
+                };
+                let new_weight = weight * multipler;
+                PushApplyOutput::Nonbranching(new_bidx, new_weight)
+            }
+            GateDefn::PauliZ(qi) => {
+                let new_weight = if bidx.get(qi) { -weight } else { weight };
+                PushApplyOutput::Nonbranching(bidx, new_weight)
+            }
+            GateDefn::X(qi) => {
+                let new_bidx = bidx.flip(qi);
+                PushApplyOutput::Nonbranching(new_bidx, weight)
             }
             GateDefn::Other { .. } => unimplemented!(),
         }
@@ -444,6 +478,12 @@ fn single_qubit_unitary(
 macro_rules! push_to_pull {
     ($self:ident, $bidx:ident) => {{
         let touches = &$self.touches;
+        debug!(
+            "pulling touches: {}, {:?} gate: {:?}",
+            touches.len(),
+            $self.branching_type(),
+            $self
+        );
         match (touches.len(), $self.branching_type()) {
             (1, BranchingType::Nonbranching) => {
                 let qi = *touches.iter().next().unwrap();
@@ -565,7 +605,7 @@ macro_rules! push_to_pull {
                 let ((b00, m00), (b01, m01)) = if b00.get(qi) {
                     ((b01, m01), (b00, m00))
                 } else {
-                    ((b10, m10), (b11, m11))
+                    ((b00, m00), (b01, m01))
                 };
 
                 let ((b10, m10), (b11, m11)) = if b10.get(qi) {
@@ -574,7 +614,7 @@ macro_rules! push_to_pull {
                     ((b10, m10), (b11, m11))
                 };
 
-                assert!(!b00.get(qi) && !b10.get(qi) && !b01.get(qi) && !b11.get(qi));
+                assert!(!b00.get(qi) && !b10.get(qi) && b01.get(qi) && b11.get(qi));
 
                 if $bidx.get(qi) {
                     PullApplyOutput::Branching(($bidx.unset(qi), m01), ($bidx, m11))
@@ -584,7 +624,7 @@ macro_rules! push_to_pull {
                 }
             }
 
-            _ => panic!(),
+            _ => unimplemented!("pull action for {:?} not supported at this moment", $self),
         }
     }};
 }
@@ -592,28 +632,23 @@ macro_rules! push_to_pull {
 impl PullApplicable for Gate {
     fn pull_apply(&self, bidx: BasisIdx) -> PullApplyOutput {
         match self.defn {
-            GateDefn::PauliY(_)
-            | GateDefn::PauliZ(_)
-            | GateDefn::SqrtY(_)
-            | GateDefn::SqrtW(_)
-            | GateDefn::CCX { .. }
-            | GateDefn::T(_)
-            | GateDefn::X(_)
+            GateDefn::CCX { .. }
             | GateDefn::CPhase { .. }
-            | GateDefn::FSim { .. }
             | GateDefn::CSwap { .. }
-            | GateDefn::Swap { .. } => {
+            | GateDefn::FSim { .. }
+            | GateDefn::PauliY(_)
+            | GateDefn::PauliZ(_)
+            | GateDefn::S(_)
+            | GateDefn::SqrtW(_)
+            | GateDefn::SqrtY(_)
+            | GateDefn::Swap { .. }
+            | GateDefn::T(_)
+            | GateDefn::Tdg(_)
+            | GateDefn::X(_) => {
                 assert!(self.is_pullable());
                 push_to_pull!(self, bidx)
             }
 
-            GateDefn::CZ { control, target } => {
-                if bidx.get(control) && bidx.get(target) {
-                    PullApplyOutput::Nonbranching(bidx, Complex::new(-1.0, 0.0))
-                } else {
-                    PullApplyOutput::Nonbranching(bidx, Complex::new(1.0, 0.0))
-                }
-            }
             GateDefn::CX { control, target } => {
                 if bidx.get(control) {
                     PullApplyOutput::Nonbranching(bidx.flip(target), Complex::new(1.0, 0.0))
@@ -621,20 +656,11 @@ impl PullApplicable for Gate {
                     PullApplyOutput::Nonbranching(bidx, Complex::new(1.0, 0.0))
                 }
             }
-            GateDefn::SqrtX(qi) => {
-                let bidx0 = bidx.unset(qi);
-                let bidx1 = bidx.set(qi);
-
-                if bidx.get(qi) {
-                    PullApplyOutput::Branching(
-                        (bidx0, Complex::new(0.5, -0.5)),
-                        (bidx1, Complex::new(0.5, 0.5)),
-                    )
+            GateDefn::CZ { control, target } => {
+                if bidx.get(control) && bidx.get(target) {
+                    PullApplyOutput::Nonbranching(bidx, Complex::new(-1.0, 0.0))
                 } else {
-                    PullApplyOutput::Branching(
-                        (bidx0, Complex::new(0.5, 0.5)),
-                        (bidx1, Complex::new(0.5, -0.5)),
-                    )
+                    PullApplyOutput::Nonbranching(bidx, Complex::new(1.0, 0.0))
                 }
             }
             GateDefn::Hadamard(qi) => {
@@ -650,19 +676,6 @@ impl PullApplicable for Gate {
                     PullApplyOutput::Branching(
                         (bidx0, Complex::new(constants::RECP_SQRT_2, 0.0)),
                         (bidx1, Complex::new(constants::RECP_SQRT_2, 0.0)),
-                    )
-                }
-            }
-            GateDefn::RZ { rot, target } => {
-                if bidx.get(target) {
-                    PullApplyOutput::Nonbranching(
-                        bidx,
-                        Complex::new((-rot / 2.0).cos(), (-rot / 2.0).sin()),
-                    )
-                } else {
-                    PullApplyOutput::Nonbranching(
-                        bidx,
-                        Complex::new((rot / 2.0).cos(), (rot / 2.0).sin()),
                     )
                 }
             }
@@ -682,6 +695,35 @@ impl PullApplicable for Gate {
                     PullApplyOutput::Branching(
                         (bidx0, Complex::new(sin, 0.0)),
                         (bidx1, Complex::new(cos, 0.0)),
+                    )
+                }
+            }
+            GateDefn::RZ { rot, target } => {
+                if bidx.get(target) {
+                    PullApplyOutput::Nonbranching(
+                        bidx,
+                        Complex::new((-rot / 2.0).cos(), (-rot / 2.0).sin()),
+                    )
+                } else {
+                    PullApplyOutput::Nonbranching(
+                        bidx,
+                        Complex::new((rot / 2.0).cos(), (rot / 2.0).sin()),
+                    )
+                }
+            }
+            GateDefn::SqrtX(qi) => {
+                let bidx0 = bidx.unset(qi);
+                let bidx1 = bidx.set(qi);
+
+                if bidx.get(qi) {
+                    PullApplyOutput::Branching(
+                        (bidx0, Complex::new(0.5, -0.5)),
+                        (bidx1, Complex::new(0.5, 0.5)),
+                    )
+                } else {
+                    PullApplyOutput::Branching(
+                        (bidx0, Complex::new(0.5, 0.5)),
+                        (bidx1, Complex::new(0.5, -0.5)),
                     )
                 }
             }
@@ -720,7 +762,7 @@ impl PullApplicable for Gate {
                     }
                 }
             }
-            _ => {
+            GateDefn::Other { .. } => {
                 unimplemented!()
             }
         }
