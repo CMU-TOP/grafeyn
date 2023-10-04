@@ -166,8 +166,16 @@ impl Gate {
         // NOTE: We assume MaybeBranching as Branching
     }
 
+    // TODO: refactor to make this always consistent with pull_apply
     pub fn is_pullable(&self) -> bool {
         match self.defn {
+            GateDefn::CZ { .. }
+            | GateDefn::CX { .. }
+            | GateDefn::SqrtX(_)
+            | GateDefn::Hadamard(_)
+            | GateDefn::RZ { .. }
+            | GateDefn::RY { .. }
+            | GateDefn::U { .. } => true,
             GateDefn::PauliY(_)
             | GateDefn::PauliZ(_)
             | GateDefn::SqrtY(_)
@@ -178,14 +186,15 @@ impl Gate {
             | GateDefn::CPhase { .. }
             | GateDefn::FSim { .. }
             | GateDefn::CSwap { .. }
-            | GateDefn::Swap { .. }
-            | GateDefn::CZ { .. }
-            | GateDefn::CX { .. }
-            | GateDefn::SqrtX(_)
-            | GateDefn::Hadamard(_)
-            | GateDefn::RZ { .. }
-            | GateDefn::RY { .. }
-            | GateDefn::U { .. } => true,
+            | GateDefn::Swap { .. } => {
+                matches!(
+                    (self.touches.len(), self.branching_type()),
+                    // We have not yet implemented pull action for other gates
+                    (1, BranchingType::Nonbranching)
+                        | (2, BranchingType::Nonbranching)
+                        | (1, BranchingType::Branching)
+                )
+            }
             GateDefn::Other { .. } => false,
         }
     }
@@ -584,7 +593,7 @@ macro_rules! push_to_pull {
                 }
             }
 
-            _ => panic!(),
+            _ => unimplemented!("pull action for {:?} not supported at this moment", $self),
         }
     }};
 }
