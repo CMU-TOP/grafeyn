@@ -749,7 +749,7 @@ impl PullApplicable for Gate {
                     }
                 }
             }
-            _ => {
+            GateDefn::Other { .. } => {
                 unimplemented!()
             }
         }
