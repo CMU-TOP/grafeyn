@@ -79,24 +79,6 @@ impl Circuit {
                         .collect::<Result<Vec<_>, _>>()?;
 
                     let gate_defn = match (name.as_str(), param_arity, arg_arity) {
-                        ("h", 0, 1) => GateDefn::Hadamard(args[0]),
-                        ("y", 0, 1) => GateDefn::PauliY(args[0]),
-                        ("z", 0, 1) => GateDefn::PauliZ(args[0]),
-                        ("s", 0, 1) => GateDefn::S(args[0]),
-                        ("t", 0, 1) => GateDefn::T(args[0]),
-                        ("tdg", 0, 1) => GateDefn::Tdg(args[0]),
-                        ("x", 0, 1) => GateDefn::X(args[0]),
-                        ("sx", 0, 1) => GateDefn::SqrtX(args[0]),
-                        ("sy", 0, 1) => GateDefn::SqrtY(args[0]),
-                        ("sw", 0, 1) => GateDefn::SqrtW(args[0]),
-                        ("cx", 0, 2) => GateDefn::CX {
-                            control: args[0],
-                            target: args[1],
-                        },
-                        ("cz", 0, 2) => GateDefn::CZ {
-                            control: args[0],
-                            target: args[1],
-                        },
                         ("ccx", 0, 3) => GateDefn::CCX {
                             control1: args[0],
                             control2: args[1],
@@ -107,12 +89,26 @@ impl Circuit {
                             target: args[1],
                             rot: params[0],
                         },
+                        ("cswap", 0, 3) => GateDefn::CSwap {
+                            control: args[0],
+                            target1: args[1],
+                            target2: args[2],
+                        },
+                        ("cx", 0, 2) => GateDefn::CX {
+                            control: args[0],
+                            target: args[1],
+                        },
+                        ("cz", 0, 2) => GateDefn::CZ {
+                            control: args[0],
+                            target: args[1],
+                        },
                         ("fsim", 2, 2) => GateDefn::FSim {
                             left: args[0],
                             right: args[1],
                             theta: params[0],
                             phi: params[1],
                         },
+                        ("h", 0, 1) => GateDefn::Hadamard(args[0]),
                         ("ry", 1, 1) => GateDefn::RY {
                             rot: params[0],
                             target: args[0],
@@ -121,27 +117,21 @@ impl Circuit {
                             rot: params[0],
                             target: args[0],
                         },
-                        ("cswap", 0, 3) => GateDefn::CSwap {
-                            control: args[0],
-                            target1: args[1],
-                            target2: args[2],
-                        },
+                        ("s", 0, 1) => GateDefn::S(args[0]),
+                        ("sw", 0, 1) => GateDefn::SqrtW(args[0]),
                         ("swap", 0, 2) => GateDefn::Swap {
                             target1: args[0],
                             target2: args[1],
-                        },
-                        // NOTE: U3 gate is deprecated
+                        }, // NOTE: U3 gate is deprecated
+                        ("sx", 0, 1) => GateDefn::SqrtX(args[0]),
+                        ("sy", 0, 1) => GateDefn::SqrtY(args[0]),
+                        ("t", 0, 1) => GateDefn::T(args[0]),
+                        ("tdg", 0, 1) => GateDefn::Tdg(args[0]),
                         ("u", 3, 1) | ("u3", 3, 1) => GateDefn::U {
                             target: args[0],
                             theta: params[0],
                             phi: params[1],
                             lambda: params[2],
-                        },
-                        ("u2", 2, 1) => GateDefn::U {
-                            target: args[0],
-                            theta: std::f32::consts::PI / 2.0,
-                            phi: params[0],
-                            lambda: params[1],
                         },
                         ("u1", 1, 1) => GateDefn::U {
                             target: args[0],
@@ -149,6 +139,15 @@ impl Circuit {
                             phi: 0.0,
                             lambda: params[0],
                         },
+                        ("u2", 2, 1) => GateDefn::U {
+                            target: args[0],
+                            theta: std::f32::consts::PI / 2.0,
+                            phi: params[0],
+                            lambda: params[1],
+                        },
+                        ("x", 0, 1) => GateDefn::X(args[0]),
+                        ("y", 0, 1) => GateDefn::PauliY(args[0]),
+                        ("z", 0, 1) => GateDefn::PauliZ(args[0]),
                         _ => {
                             log::warn!("unknown gate: {}", name);
                             GateDefn::Other { name, params, args }
