@@ -31,6 +31,7 @@ enum BranchingType {
 pub enum GateDefn {
     PauliY(QubitIndex),
     PauliZ(QubitIndex),
+    S(QubitIndex),
     Hadamard(QubitIndex),
     T(QubitIndex),
     Tdg(QubitIndex),
@@ -111,6 +112,7 @@ impl Gate {
         let touches = match &defn {
             &GateDefn::PauliY(qi)
             | &GateDefn::PauliZ(qi)
+            | &GateDefn::S(qi)
             | &GateDefn::SqrtY(qi)
             | &GateDefn::SqrtX(qi)
             | &GateDefn::SqrtW(qi)
@@ -146,6 +148,7 @@ impl Gate {
         match self.defn {
             GateDefn::PauliY(_)
             | GateDefn::PauliZ(_)
+            | GateDefn::S(_)
             | GateDefn::CZ { .. }
             | GateDefn::CX { .. }
             | GateDefn::CCX { .. }
@@ -183,6 +186,7 @@ impl Gate {
             | GateDefn::U { .. } => true,
             GateDefn::PauliY(_)
             | GateDefn::PauliZ(_)
+            | GateDefn::S(_)
             | GateDefn::SqrtY(_)
             | GateDefn::SqrtW(_)
             | GateDefn::CCX { .. }
@@ -221,6 +225,14 @@ impl PushApplicable for Gate {
             }
             GateDefn::PauliZ(qi) => {
                 let new_weight = if bidx.get(qi) { -weight } else { weight };
+                PushApplyOutput::Nonbranching(bidx, new_weight)
+            }
+            GateDefn::S(qi) => {
+                let new_weight = if bidx.get(qi) {
+                    weight * Complex::new(0.0, 1.0)
+                } else {
+                    weight
+                };
                 PushApplyOutput::Nonbranching(bidx, new_weight)
             }
             GateDefn::Hadamard(qi) => {
@@ -622,6 +634,7 @@ impl PullApplicable for Gate {
         match self.defn {
             GateDefn::PauliY(_)
             | GateDefn::PauliZ(_)
+            | GateDefn::S(_)
             | GateDefn::SqrtY(_)
             | GateDefn::SqrtW(_)
             | GateDefn::CCX { .. }

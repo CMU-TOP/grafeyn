@@ -82,6 +82,7 @@ impl Circuit {
                         ("h", 0, 1) => GateDefn::Hadamard(args[0]),
                         ("y", 0, 1) => GateDefn::PauliY(args[0]),
                         ("z", 0, 1) => GateDefn::PauliZ(args[0]),
+                        ("s", 0, 1) => GateDefn::S(args[0]),
                         ("t", 0, 1) => GateDefn::T(args[0]),
                         ("tdg", 0, 1) => GateDefn::Tdg(args[0]),
                         ("x", 0, 1) => GateDefn::X(args[0]),
@@ -148,7 +149,10 @@ impl Circuit {
                             phi: 0.0,
                             lambda: params[0],
                         },
-                        _ => GateDefn::Other { name, params, args },
+                        _ => {
+                            log::warn!("unknown gate: {}", name);
+                            GateDefn::Other { name, params, args }
+                        }
                     };
 
                     gates.push(Gate::new(gate_defn));
