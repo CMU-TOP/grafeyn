@@ -163,6 +163,15 @@ struct
       val {result, densities} = Benchmark.run "full-sim-bfs" (fn _ =>
         sim circuit)
 
+      val avgDensity =
+        (Seq.reduce op+ 0.0 densities) / Real.fromInt (Seq.length densities)
+      val maxDensity = Seq.reduce Real.max 0.0 densities
+
+      val _ = print
+        ("avg-density " ^ Real.fmt (StringCvt.FIX (SOME 12)) avgDensity ^ "\n")
+      val _ = print
+        ("max-density " ^ Real.fmt (StringCvt.FIX (SOME 12)) maxDensity ^ "\n")
+
       val _ =
         if output = "" then
           print ("use -output FILE to see output state vector\n")
@@ -204,8 +213,17 @@ struct
             TextIO.closeOut outstream;
             print ("output densities written to " ^ outputDensities ^ "\n")
           end
+
+      val name = (OS.Path.base (OS.Path.file inputName)) handle _ => inputName
     in
-      ()
+      print
+        (String.concatWith ","
+           [ name
+           , Int.toString (Circuit.numQubits circuit)
+           , Int.toString (Circuit.numGates circuit)
+           , Real.fmt (StringCvt.FIX (SOME 12)) maxDensity
+           , Real.fmt (StringCvt.FIX (SOME 12)) avgDensity
+           ] ^ "\n")
     end
 
 end

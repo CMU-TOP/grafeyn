@@ -814,6 +814,21 @@ struct
     end
   *)
 
+
+  fun rx {rot = theta, target} =
+    let
+      val theta = R.fromLarge theta
+      val cos = C.real (R.Math.cos (R./ (theta, R.fromLarge 2.0)))
+      val sin = C.real (R.Math.sin (R./ (theta, R.fromLarge 2.0)))
+      val a = cos
+      val b = C.* (C.~ C.i, sin)
+      val c = b
+      val d = a
+    in
+      singleQubitUnitary {target = target, mat = (a, b, c, d)}
+    end
+
+
   fun expectBranching (gate: gate) =
     case #action gate of
       Branching _ => true
@@ -836,6 +851,7 @@ struct
     | GateDefn.CCX xx => ccx xx
     | GateDefn.CPhase xx => cphase xx
     | GateDefn.FSim xx => fsim xx
+    | GateDefn.RX xx => rx xx
     | GateDefn.RZ xx => rz xx
     | GateDefn.RY xx => ry xx
     | GateDefn.CSwap xx => cswap xx

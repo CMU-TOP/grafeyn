@@ -30,6 +30,7 @@ struct
   | FSim of {left: qubit_idx, right: qubit_idx, theta: real, phi: real}
   | RZ of {rot: real, target: qubit_idx}
   | RY of {rot: real, target: qubit_idx}
+  | RX of {rot: real, target: qubit_idx}
   | CSwap of {control: qubit_idx, target1: qubit_idx, target2: qubit_idx}
   | U of {target: qubit_idx, theta: real, phi: real, lambda: real}
   | Other of {name: string, params: real Seq.t, args: qubit_idx Seq.t}

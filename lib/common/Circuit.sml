@@ -137,6 +137,9 @@ struct
                   {control = getArg 0, target = getArg 1, rot = rot}
               end
 
+          | ("rx", 1, 1) =>
+              GateDefn.RX {rot = evalExp (getParam 0), target = getArg 0}
+
           | ("ry", 1, 1) =>
               GateDefn.RY {rot = evalExp (getParam 0), target = getArg 0}
 
@@ -148,6 +151,14 @@ struct
                 {control = getArg 0, target1 = getArg 1, target2 = getArg 2}
 
           | ("u", 3, 1) =>
+              GateDefn.U
+                { target = getArg 0
+                , theta = evalExp (getParam 0)
+                , phi = evalExp (getParam 1)
+                , lambda = evalExp (getParam 2)
+                }
+
+          | ("u3", 3, 1) =>
               GateDefn.U
                 { target = getArg 0
                 , theta = evalExp (getParam 0)

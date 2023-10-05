@@ -156,6 +156,11 @@ struct
             (* val _ = dumpState numQubits state *)
 
             val theseGates = gateSchedulerPickNextGates ()
+            val _ =
+              if Seq.length theseGates > 0 then
+                ()
+              else
+                raise Fail "FullSimBFS: gate scheduler returned empty sequence"
 
             (* val _ = print
               ("visiting: " ^ Seq.toString Int.toString theseGates ^ "\n") *)
