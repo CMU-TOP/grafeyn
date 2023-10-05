@@ -1,0 +1,23 @@
+local
+  $(SML_LIB)/basis/basis.mlb
+  ../lib/github.com/mpllang/mpllib/sources.$(COMPILER).mlb
+  ../common/sources.mlb
+  ../full-strong-sim/sources.mlb
+  QuerySimSequential.sml
+  QuerySimNaivePar.sml
+  QuerySimBFS.sml
+
+  wave-bfs/Wave.sml
+  wave-bfs/WaveSet.sml
+  wave-bfs/SimAccumulator.sml
+  wave-bfs/QuerySimWaveBFS.sml
+  wave-bfs/QuerySimSingleGoalWaveBFS.sml
+  wave-bfs/QuerySimTwoWaveBFS.sml
+in
+  structure QuerySimSequential
+  structure QuerySimNaivePar
+  structure QuerySimBFS
+  structure QuerySimWaveBFS
+  structure QuerySimSingleGoalWaveBFS
+  structure QuerySimTwoWaveBFS
+end

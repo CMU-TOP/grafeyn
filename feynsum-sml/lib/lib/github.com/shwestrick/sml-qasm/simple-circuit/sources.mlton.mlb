@@ -1,0 +1,9 @@
+local
+  $(SML_LIB)/basis/basis.mlb
+  ../base/sources.mlton.mlb
+  ../lex/sources.mlton.mlb
+  ../ast/sources.mlton.mlb
+  SimpleCircuit.sml
+in
+  structure SimpleCircuit
+end

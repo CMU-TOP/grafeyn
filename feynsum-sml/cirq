@@ -1,0 +1,3 @@
+source ~/env/bin/activate
+
+python google-qsim-cirq/main.py inputs/$1 $2 | tee $TIMER_OUTFILE

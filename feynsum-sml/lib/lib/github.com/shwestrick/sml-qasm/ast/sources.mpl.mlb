@@ -1,0 +1,9 @@
+local
+  $(SML_LIB)/basis/basis.mlb
+  ../base/sources.mpl.mlb
+  ../lex/sources.mpl.mlb
+  AstType.sml
+  Ast.sml
+in
+  structure Ast
+end

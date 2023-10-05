@@ -1,0 +1,12 @@
+$(SML_LIB)/basis/basis.mlb
+
+local
+  lib/lib/github.com/mpllang/mpllib/sources.mlton.mlb
+in
+  structure Seq
+  structure CommandLineArgs
+end
+
+lib/sources.mlton.mlb
+
+test.sml

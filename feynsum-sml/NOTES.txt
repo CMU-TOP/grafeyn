@@ -1,0 +1,63 @@
+=============================================================================
+=== 2/15/2023
+=============================================================================
+
+(i, alpha |000>)
+(i, beta  |000>)
+-----deduplicate---->
+(i, alpha + beta |000>)
+
+
+Idea:
+  - flip coin after each gate (deterministically w.r.t. state)
+  - counting sketch
+  - count how much duplication there is
+Note:
+  - duplication <=> interference
+  - we expect a "good" quantum algorithm to have lots of interference!
+  - intuition: we expect "good" algorithm to have high branching in
+  the middle, and lots of constructive/deconstructive interference at
+  the end.
+  - e.g. QFT at the beginning, inverse QFT at the end
+  - so, algorithm idea is: estimate how much interference there is,
+  and do deduplication whenever the interference is high?
+
+Algorithm:
+  - sequence of rounds
+  - each round is parallel DFS
+  - each round proceeds for as long as possible with low interference
+  - end round as soon as interference exceeds threshold
+      - at end of round, deduplicate, remove zeros, and then resume (next round)
+
+NOTE:
+  - we should support measurement at any point in circuit
+  - measurement requires deduplication + synchronization
+
+FOR OUR INITIAL WORK, maybe we ignore measurement
+(and we can add this later.)
+
+
+  measurement
+    paths:
+      alpha |000>
+      beta  |000>
+      gamma |001>
+      delta |100>
+    measure qubit[rightmost]
+      alpha |000>
+      beta  |000>   ==>  |alpha + beta + delta|^2
+      delta |100>
+      -----------
+      gamma |001>   ==>  |gamma|^2
+
+      these are probabilities of measuring 0/1
+
+      rest of the circuit "only has 2 qubits"
+      (because measured qubit is fixed now)
+
+      for simulation: might be best to measure and then
+      "reinitialize" to the measured value.
+
+
+Think of quantum as probability distribution with "negative" values
+  Wigner quasi probability distribution
