@@ -1,0 +1,1 @@
+./main.mpl @mpl procs $2 megablock-threshold 18 max-cc-depth 1 -- -input inputs/$1  | tee $TIMER_OUTFILE

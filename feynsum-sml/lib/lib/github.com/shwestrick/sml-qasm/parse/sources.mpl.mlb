@@ -1,0 +1,15 @@
+local
+  $(SML_LIB)/basis/basis.mlb
+  ../base/sources.mpl.mlb
+  ../lex/sources.mpl.mlb
+  ../ast/sources.mpl.mlb
+  ParserCombinators.sml
+  ParserUtils.sml
+  ParseSimple.sml
+  Parser.sml
+in
+  structure ParserUtils
+  structure ParserCombinators
+  structure ParseSimple
+  structure Parser
+end

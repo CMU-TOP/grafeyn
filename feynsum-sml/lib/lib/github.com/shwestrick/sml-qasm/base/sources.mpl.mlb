@@ -1,0 +1,45 @@
+local
+  $(SML_LIB)/basis/basis.mlb
+  $(SML_LIB)/basis/mlton.mlb
+  ../../../mpllang/mpllib/sources.mpl.mlb
+
+  ExnHistory.mlton.sml
+
+  TerminalColors.sml
+
+  TextFormat.sml
+  FilePath.sml
+
+  FindInPath.sml
+  RunProcess.mlton.sml
+  Terminal.sml
+
+  Source.sml
+  WithSource.sml
+
+  StripEffectiveWhitespace.sml
+  Palette.sml
+  TerminalColorString.sml
+  Error.sml
+in
+  structure Util
+  structure SeqBasis
+  structure ReadFile
+  structure BinarySearch
+  structure CommandLineArgs
+  structure Seq
+
+  structure ExnHistory
+  structure TerminalColors
+  structure TextFormat
+  structure FilePath
+  structure FindInPath
+  structure RunProcess
+  structure Terminal
+  structure Source
+  structure WithSource
+  structure StripEffectiveWhitespace
+  structure Palette
+  structure TerminalColorString
+  structure Error
+end
