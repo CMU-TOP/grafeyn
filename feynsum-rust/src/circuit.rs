@@ -84,7 +84,7 @@ impl Circuit {
                             control2: args[1],
                             target: args[2],
                         },
-                        ("cphase", 1, 2) => GateDefn::CPhase {
+                        ("cphase", 1, 2) | ("cp", 1, 2) => GateDefn::CPhase {
                             control: args[0],
                             target: args[1],
                             rot: params[0],
