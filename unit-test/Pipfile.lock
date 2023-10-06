@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "3a76900acdf4415bfa3d033bc81e390ac991f959d62d5f99e29cbb9f98538bc2"
+            "sha256": "0355c7cc24a726c0b815f62e7fc0eb27c83623e9e89c42d72d726f8e5fa2c543"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -108,31 +108,10 @@
             "markers": "python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'",
             "version": "==2.8.2"
         },
-        "qiskit": {
-            "hashes": [
-                "sha256:2d394f75621df6f99b2f9045b858a69d363ffc4fd4e0cf7b555c6428a2fbd68c",
-                "sha256:cc25f4dd1ef4b93966167a73e93fce417e5245c0fe2fd54cd1ac8da1faeafd89"
-            ],
-            "index": "pypi",
-            "markers": "python_version >= '3.8'",
-            "version": "==0.44.2"
-        },
         "qiskit-terra": {
-            "hashes": [
-                "sha256:134a1ce47a3c7ccdaf04b684bbbda1eee72cb9d6df0d18b5229483fb4fa8474e",
-                "sha256:2189449214aeba383536785160a5b3fdf9680c145483d8a6e88a561aae9da0fb",
-                "sha256:25f790f8e23a019fd71299d3f1126ebaf513692fb233f12371cb21aaea675ce7",
-                "sha256:307b1f8fc66565feb2b7f03bd81edb1f816ef410f0a70c6befa7a5b272678876",
-                "sha256:4e2c975981d96599531d06728afe377d23b36d5af9d42ec30a2064af06593c39",
-                "sha256:78cd859fd9879e954fc9b07dcc51df6d6efdc3ef12ae0b1b74bf292b0c0b2a32",
-                "sha256:85e0995f12f7f985a3e8bff8b459a18b6d679f7271a3502e381af93760fea8c1",
-                "sha256:d3af3e01a4a58996fd065a7aa59bc46c4ea3559acd2164bf8725b58522fbafc4",
-                "sha256:e1854cf97dcc0eb7cd3c4fc25c0627728d852b2776518cce6a5d2a295380acca",
-                "sha256:e87a57bb79160fcf0743c99f6966c98083737d395dc1a49f8b9bb63b5a9fb1e7",
-                "sha256:eaa81d563310977e3e1d6598c338597d365adfaf58e10bc3e30feb4bd8dc4848"
-            ],
+            "git": "git+https://github.com/byeongjee/qiskit.git",
             "markers": "python_version >= '3.8'",
-            "version": "==0.25.2.1"
+            "ref": "82966966c7dd10e6c2e90c15c40f5b09059b7886"
         },
         "rustworkx": {
             "hashes": [

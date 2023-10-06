@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-qiskit = "==0.44.2"
+qiskit-terra = {ref = "feynsum-unit-test", git = "git+https://github.com/byeongjee/qiskit.git"}
 
 [dev-packages]
 black = "==23.9.1"
