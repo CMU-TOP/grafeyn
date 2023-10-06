@@ -67,8 +67,10 @@ class FsimGate(Gate):
             qc._append(instr, qargs, cargs)
 
         self.definition = qc
+
     def inverse(self):
         return FsimGate(-self.params[0], -self.params[1])
+
 
 class SYGate(Gate):
     def __init__(self, label: Optional[str] = None):
@@ -81,8 +83,10 @@ class SYGate(Gate):
         for operation, qubits, clbits in rules:
             qc._append(operation, qubits, clbits)
         self.definition = qc
+
     def inverse(self):
         return SYdgGate()
+
 
 class SYdgGate(Gate):
     def __init__(self, label: Optional[str] = None):
@@ -95,8 +99,10 @@ class SYdgGate(Gate):
         for operation, qubits, clbits in rules:
             qc._append(operation, qubits, clbits)
         self.definition = qc
+
     def inverse(self):
         return SYGate()
+
 
 def compare():
     with open("random_test_state_qiskit.pkl", "rb") as f:
@@ -112,13 +118,15 @@ def compare():
         idx = eval("0b" + idx)
         amp = eval(amp.replace("i", "j"))
         feynsum_state[idx] = amp
-    print(f"The distance between two results are: {np.linalg.norm(statevector - feynsum_state)}")
+    print(
+        f"The distance between two results are: {np.linalg.norm(statevector - feynsum_state)}"
+    )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--compare", action="store_true")
-    parser.add_argument("-r", "--reverse", action="store_true") # test U U^\dagger
+    parser.add_argument("-r", "--reverse", action="store_true")  # test U U^\dagger
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--n_qubits", type=int, default=5)
     parser.add_argument("--n_gates", type=int, default=100)
@@ -149,7 +157,7 @@ if __name__ == "__main__":
             "u": (1, 3, UGate),
             "u2": (1, 2, U2Gate),
             "u1": (1, 1, U1Gate),
-            "fsim": (2, 2, FsimGate), #!not implemented by qiskit
+            "fsim": (2, 2, FsimGate),  #!not implemented by qiskit
         }
 
         circ = QuantumCircuit(n_qubits)
@@ -164,9 +172,9 @@ if __name__ == "__main__":
             circ.append(gate, used_qubits)
         if args.reverse:
             new_circ = QuantumCircuit(n_qubits)
-            new_circ=new_circ.compose(circ)
+            new_circ = new_circ.compose(circ)
             new_circ.barrier()
-            new_circ=new_circ.compose(circ.inverse())
+            new_circ = new_circ.compose(circ.inverse())
             circ = new_circ
         qasm = circ.qasm()
         print(qasm)
