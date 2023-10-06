@@ -61,6 +61,10 @@ pub enum GateDefn {
     Hadamard(QubitIndex),
     PauliY(QubitIndex),
     PauliZ(QubitIndex),
+    Phase {
+        rot: Real,
+        target: QubitIndex,
+    },
     RX {
         rot: Real,
         target: QubitIndex,
@@ -117,6 +121,7 @@ impl Gate {
             &GateDefn::Hadamard(qi)
             | &GateDefn::PauliY(qi)
             | &GateDefn::PauliZ(qi)
+            | &GateDefn::Phase { target: qi, .. }
             | &GateDefn::S(qi)
             | &GateDefn::SqrtW(qi)
             | &GateDefn::SqrtX(qi)
@@ -159,6 +164,7 @@ impl Gate {
             | GateDefn::CZ { .. }
             | GateDefn::PauliY(_)
             | GateDefn::PauliZ(_)
+            | GateDefn::Phase { .. }
             | GateDefn::RZ { .. }
             | GateDefn::S(_)
             | GateDefn::Swap { .. }
@@ -197,6 +203,7 @@ impl Gate {
             | GateDefn::CPhase { .. }
             | GateDefn::CSwap { .. }
             | GateDefn::FSim { .. }
+            | GateDefn::Phase { .. }
             | GateDefn::PauliY(_)
             | GateDefn::PauliZ(_)
             | GateDefn::S(_)
@@ -313,6 +320,14 @@ impl PushApplicable for Gate {
                 } else {
                     PushApplyOutput::Branching((bidx1, new_weight), (bidx2, new_weight))
                 }
+            }
+            GateDefn::Phase { rot, target } => {
+                let new_weight = if bidx.get(target) {
+                    weight * Complex::new((rot).cos(), (rot).sin())
+                } else {
+                    weight
+                };
+                PushApplyOutput::Nonbranching(bidx, new_weight)
             }
             GateDefn::RX { rot, target } => {
                 let cos = Complex::new((rot / 2.0).cos(), 0.0);
@@ -726,6 +741,13 @@ impl PullApplicable for Gate {
                         (bidx0, Complex::new(constants::RECP_SQRT_2, 0.0)),
                         (bidx1, Complex::new(constants::RECP_SQRT_2, 0.0)),
                     )
+                }
+            }
+            GateDefn::Phase { rot, target } => {
+                if bidx.get(target) {
+                    PullApplyOutput::Nonbranching(bidx, Complex::new((-rot).cos(), (-rot).sin()))
+                } else {
+                    PullApplyOutput::Nonbranching(bidx, Complex::new(1.0, 0.0))
                 }
             }
             GateDefn::RX { rot, target } => {

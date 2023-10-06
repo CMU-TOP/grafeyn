@@ -109,6 +109,10 @@ impl Circuit {
                             phi: params[1],
                         },
                         ("h", 0, 1) => GateDefn::Hadamard(args[0]),
+                        ("phase", 1, 1) | ("p", 1, 1) => GateDefn::Phase {
+                            target: args[0],
+                            rot: params[0],
+                        },
                         ("rx", 1, 1) => GateDefn::RX {
                             rot: params[0],
                             target: args[0],
