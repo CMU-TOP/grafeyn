@@ -40,7 +40,12 @@ impl State {
 impl Compactifiable for State {
     fn compactify(self) -> Box<dyn Iterator<Item = (BasisIdx, Complex)>> {
         match self {
-            State::Sparse(table) => Box::new(table.table.into_iter()),
+            State::Sparse(table) => Box::new(
+                table
+                    .table
+                    .into_iter()
+                    .filter(|(_bidx, weight)| utility::is_nonzero(*weight)),
+            ),
             State::Dense(table) => Box::new(table.array.into_iter().enumerate().map(|(idx, v)| {
                 let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
                 (BasisIdx::from_idx(idx), Complex::new(re, im))

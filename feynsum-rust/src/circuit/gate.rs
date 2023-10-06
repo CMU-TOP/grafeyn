@@ -61,6 +61,14 @@ pub enum GateDefn {
     Hadamard(QubitIndex),
     PauliY(QubitIndex),
     PauliZ(QubitIndex),
+    Phase {
+        rot: Real,
+        target: QubitIndex,
+    },
+    RX {
+        rot: Real,
+        target: QubitIndex,
+    },
     RY {
         rot: Real,
         target: QubitIndex,
@@ -113,6 +121,7 @@ impl Gate {
             &GateDefn::Hadamard(qi)
             | &GateDefn::PauliY(qi)
             | &GateDefn::PauliZ(qi)
+            | &GateDefn::Phase { target: qi, .. }
             | &GateDefn::S(qi)
             | &GateDefn::SqrtW(qi)
             | &GateDefn::SqrtX(qi)
@@ -131,7 +140,9 @@ impl Gate {
                 target,
             } => HashSet::from([control1, control2, target]),
             &GateDefn::FSim { left, right, .. } => HashSet::from([left, right]),
-            &GateDefn::RZ { target, .. } | &GateDefn::RY { target, .. } => HashSet::from([target]),
+            &GateDefn::RX { target, .. }
+            | &GateDefn::RY { target, .. }
+            | &GateDefn::RZ { target, .. } => HashSet::from([target]),
             &GateDefn::CSwap {
                 control,
                 target1,
@@ -153,6 +164,7 @@ impl Gate {
             | GateDefn::CZ { .. }
             | GateDefn::PauliY(_)
             | GateDefn::PauliZ(_)
+            | GateDefn::Phase { .. }
             | GateDefn::RZ { .. }
             | GateDefn::S(_)
             | GateDefn::Swap { .. }
@@ -164,7 +176,9 @@ impl Gate {
             | GateDefn::SqrtW(_)
             | GateDefn::SqrtX(_)
             | GateDefn::SqrtY(_) => BranchingType::Branching,
-            GateDefn::FSim { .. } | GateDefn::U { .. } => BranchingType::MaybeBranching,
+            GateDefn::FSim { .. } | GateDefn::RX { .. } | GateDefn::U { .. } => {
+                BranchingType::MaybeBranching
+            }
             GateDefn::Other { .. } => unimplemented!(),
         }
     }
@@ -180,6 +194,7 @@ impl Gate {
             GateDefn::CX { .. }
             | GateDefn::CZ { .. }
             | GateDefn::Hadamard(_)
+            | GateDefn::RX { .. }
             | GateDefn::RY { .. }
             | GateDefn::RZ { .. }
             | GateDefn::SqrtX(_)
@@ -188,6 +203,7 @@ impl Gate {
             | GateDefn::CPhase { .. }
             | GateDefn::CSwap { .. }
             | GateDefn::FSim { .. }
+            | GateDefn::Phase { .. }
             | GateDefn::PauliY(_)
             | GateDefn::PauliZ(_)
             | GateDefn::S(_)
@@ -305,6 +321,24 @@ impl PushApplicable for Gate {
                     PushApplyOutput::Branching((bidx1, new_weight), (bidx2, new_weight))
                 }
             }
+            GateDefn::Phase { rot, target } => {
+                let new_weight = if bidx.get(target) {
+                    weight * Complex::new((rot).cos(), (rot).sin())
+                } else {
+                    weight
+                };
+                PushApplyOutput::Nonbranching(bidx, new_weight)
+            }
+            GateDefn::RX { rot, target } => {
+                let cos = Complex::new((rot / 2.0).cos(), 0.0);
+                let sin = Complex::new((rot / 2.0).sin(), 0.0);
+                let a = cos;
+                let b = sin * Complex::new(0.0, -1.0);
+                let c = b;
+                let d = a;
+
+                single_qubit_unitary_push(bidx, weight, target, a, b, c, d)
+            }
             GateDefn::RY { rot, target } => {
                 let x = rot / 2.0;
 
@@ -414,7 +448,7 @@ impl PushApplicable for Gate {
                 let c = sin * Complex::new(phi.cos(), phi.sin());
                 let d = cos * Complex::new((phi + lambda).cos(), (phi + lambda).sin());
 
-                single_qubit_unitary(bidx, weight, target, a, b, c, d)
+                single_qubit_unitary_push(bidx, weight, target, a, b, c, d)
             }
             GateDefn::PauliY(qi) => {
                 let new_bidx = bidx.flip(qi);
@@ -439,7 +473,7 @@ impl PushApplicable for Gate {
     }
 }
 
-fn single_qubit_unitary(
+fn single_qubit_unitary_push(
     bidx: BasisIdx,
     weight: Complex,
     target: QubitIndex,
@@ -471,6 +505,36 @@ fn single_qubit_unitary(
         let bidx1 = bidx.set(target);
         let (mult0, mult1) = if bidx.get(target) { (b, d) } else { (a, c) };
         PushApplyOutput::Branching((bidx0, mult0 * weight), (bidx1, mult1 * weight))
+    }
+}
+
+fn single_qubit_unitary_pull(
+    bidx: BasisIdx,
+    target: QubitIndex,
+    a: Complex,
+    b: Complex,
+    c: Complex,
+    d: Complex,
+) -> PullApplyOutput {
+    assert!(!(utility::is_zero(a) && utility::is_zero(b)));
+    assert!(!(utility::is_zero(c) && utility::is_zero(d)));
+
+    if utility::is_zero(a) && utility::is_zero(d) {
+        let neighbor = bidx.flip(target);
+        let multiplier = if bidx.get(target) { c } else { b };
+        PullApplyOutput::Nonbranching(neighbor, multiplier)
+    } else if utility::is_zero(c) && utility::is_zero(b) {
+        let multiplier = if bidx.get(target) { d } else { a };
+        PullApplyOutput::Nonbranching(bidx, multiplier)
+    } else {
+        let bidx0 = bidx.unset(target);
+        let bidx1 = bidx.set(target);
+
+        if bidx.get(target) {
+            PullApplyOutput::Branching((bidx0, c), (bidx1, d))
+        } else {
+            PullApplyOutput::Branching((bidx0, a), (bidx1, b))
+        }
     }
 }
 
@@ -591,16 +655,16 @@ macro_rules! push_to_pull {
                 let qi = *touches.iter().next().unwrap();
 
                 let PushApplyOutput::Branching((b00, m00), (b01, m01)) =
-                        $self.push_apply(BasisIdx::zeros(), Complex::new(1.0, 0.0))
-                    else {
-                        unreachable!()
-                    };
+                    $self.push_apply(BasisIdx::zeros(), Complex::new(1.0, 0.0))
+                else {
+                    unreachable!()
+                };
 
                 let PushApplyOutput::Branching((b10, m10), (b11, m11)) =
-                        $self.push_apply(BasisIdx::zeros().set(qi), Complex::new(1.0, 0.0))
-                    else {
-                        unreachable!()
-                    };
+                    $self.push_apply(BasisIdx::zeros().set(qi), Complex::new(1.0, 0.0))
+                else {
+                    unreachable!()
+                };
 
                 let ((b00, m00), (b01, m01)) = if b00.get(qi) {
                     ((b01, m01), (b00, m00))
@@ -679,6 +743,23 @@ impl PullApplicable for Gate {
                     )
                 }
             }
+            GateDefn::Phase { rot, target } => {
+                if bidx.get(target) {
+                    PullApplyOutput::Nonbranching(bidx, Complex::new((-rot).cos(), (-rot).sin()))
+                } else {
+                    PullApplyOutput::Nonbranching(bidx, Complex::new(1.0, 0.0))
+                }
+            }
+            GateDefn::RX { rot, target } => {
+                let cos = Complex::new((rot / 2.0).cos(), 0.0);
+                let sin = Complex::new((rot / 2.0).sin(), 0.0);
+                let a = cos;
+                let b = sin * Complex::new(0.0, -1.0);
+                let c = b;
+                let d = a;
+
+                single_qubit_unitary_pull(bidx, target, a, b, c, d)
+            }
             GateDefn::RY { rot, target } => {
                 let bidx0 = bidx.unset(target);
                 let bidx1 = bidx.set(target);
@@ -744,23 +825,7 @@ impl PullApplicable for Gate {
                 assert!(!(utility::is_zero(a) && utility::is_zero(b)));
                 assert!(!(utility::is_zero(c) && utility::is_zero(d)));
 
-                if utility::is_zero(a) && utility::is_zero(d) {
-                    let neighbor = bidx.flip(target);
-                    let multiplier = if bidx.get(target) { c } else { b };
-                    PullApplyOutput::Nonbranching(neighbor, multiplier)
-                } else if utility::is_zero(c) && utility::is_zero(b) {
-                    let multiplier = if bidx.get(target) { d } else { a };
-                    PullApplyOutput::Nonbranching(bidx, multiplier)
-                } else {
-                    let bidx0 = bidx.unset(target);
-                    let bidx1 = bidx.set(target);
-
-                    if bidx.get(target) {
-                        PullApplyOutput::Branching((bidx0, c), (bidx1, d))
-                    } else {
-                        PullApplyOutput::Branching((bidx0, a), (bidx1, b))
-                    }
-                }
+                single_qubit_unitary_pull(bidx, target, a, b, c, d)
             }
             GateDefn::Other { .. } => {
                 unimplemented!()

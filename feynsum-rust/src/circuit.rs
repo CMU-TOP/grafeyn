@@ -84,7 +84,7 @@ impl Circuit {
                             control2: args[1],
                             target: args[2],
                         },
-                        ("cphase", 1, 2) => GateDefn::CPhase {
+                        ("cphase", 1, 2) | ("cp", 1, 2) => GateDefn::CPhase {
                             control: args[0],
                             target: args[1],
                             rot: params[0],
@@ -109,6 +109,14 @@ impl Circuit {
                             phi: params[1],
                         },
                         ("h", 0, 1) => GateDefn::Hadamard(args[0]),
+                        ("phase", 1, 1) | ("p", 1, 1) => GateDefn::Phase {
+                            target: args[0],
+                            rot: params[0],
+                        },
+                        ("rx", 1, 1) => GateDefn::RX {
+                            rot: params[0],
+                            target: args[0],
+                        },
                         ("ry", 1, 1) => GateDefn::RY {
                             rot: params[0],
                             target: args[0],
