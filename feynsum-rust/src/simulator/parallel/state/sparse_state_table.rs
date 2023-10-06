@@ -21,6 +21,7 @@ fn calculate_hash<T: Hash>(t: &T) -> u64 {
 pub struct ConcurrentSparseStateTable {
     keys: Vec<AtomicU64>,
     packed_weights: Vec<AtomicU64>,
+    nonzeros: Vec<usize>,
 }
 
 unsafe impl Sync for ConcurrentSparseStateTable {}
@@ -37,9 +38,11 @@ impl ConcurrentSparseStateTable {
         }
         assert!(keys.len() == capacity);
         assert!(packed_weights.len() == capacity);
+        let mut nonzeros = Vec::new();
         Self {
             keys,
             packed_weights,
+            nonzeros,
         }
     }
     pub fn new() -> Self {
@@ -150,6 +153,18 @@ impl ConcurrentSparseStateTable {
             self.insert_add_weights_limit_probes(1, k, c);
         }
         new_table
+    }
+    pub fn keepers(&self) -> Vec<usize> {
+        (0..self.keys.len())
+            .filter(|&i| {
+                if self.keys[i].load(Ordering::Relaxed) == BasisIdx::into_u64(EMPTY_KEY) {
+                    return false;
+                }
+                let (re, im) =
+                    utility::unpack_complex(self.packed_weights[i].load(Ordering::Relaxed));
+                utility::is_real_nonzero(re) && utility::is_real_nonzero(im)
+            })
+            .collect()
     }
 }
 

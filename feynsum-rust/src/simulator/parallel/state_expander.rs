@@ -245,7 +245,6 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: State) -> ExpandRes
         std::mem::swap(&mut remaining_blocks, &mut remaining_blocks_next);
         if !remaining_blocks.is_empty() {
             log::debug!("resize");
-            println!("resize");
             let mut table2 = table.increase_capacity_by_factor(1.5);
             std::mem::swap(&mut table, &mut table2);
         }
