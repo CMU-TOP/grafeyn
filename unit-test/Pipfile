@@ -1,0 +1,13 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+qiskit-terra = {ref = "feynsum-unit-test", git = "git+https://github.com/byeongjee/qiskit.git"}
+
+[dev-packages]
+black = "==23.9.1"
+
+[requires]
+python_version = "3.8.18"
