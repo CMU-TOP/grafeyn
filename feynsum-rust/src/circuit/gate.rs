@@ -196,6 +196,7 @@ impl Gate {
             | GateDefn::RY { .. }
             | GateDefn::RZ { .. }
             | GateDefn::SqrtX(_)
+            | GateDefn::Swap { .. }
             | GateDefn::U { .. } => true,
             GateDefn::CCX { .. }
             | GateDefn::CPhase { .. }
@@ -207,7 +208,6 @@ impl Gate {
             | GateDefn::S(_)
             | GateDefn::SqrtW(_)
             | GateDefn::SqrtY(_)
-            | GateDefn::Swap { .. }
             | GateDefn::T(_)
             | GateDefn::Tdg(_)
             | GateDefn::X(_) => {
