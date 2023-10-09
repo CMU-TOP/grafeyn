@@ -702,7 +702,6 @@ impl PullApplicable for Gate {
             | GateDefn::S(_)
             | GateDefn::SqrtW(_)
             | GateDefn::SqrtY(_)
-            | GateDefn::Swap { .. }
             | GateDefn::T(_)
             | GateDefn::Tdg(_)
             | GateDefn::X(_) => {
@@ -800,6 +799,10 @@ impl PullApplicable for Gate {
                         (bidx1, Complex::new(0.5, -0.5)),
                     )
                 }
+            }
+            GateDefn::Swap { target1, target2 } => {
+                let new_bidx = bidx.swap(target1, target2);
+                PullApplyOutput::Nonbranching(new_bidx, Complex::new(1.0, 0.0))
             }
             GateDefn::U {
                 target,
