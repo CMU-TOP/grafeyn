@@ -35,16 +35,23 @@ struct
         }
     end
 
+  
+  fun checkSpaceForEmptyAndLockedKeys numQubits =
+    numQubits >= 0 andalso
+    (case BasisIdx.maxNumQubits of
+      NONE => true
+    | SOME limit => numQubits <= limit-2)
+
 
   fun make {capacity, numQubits} =
     if capacity = 0 then
-      raise Fail "SparseStateTable.make: capacity 0"
-    else if numQubits < 0 orelse numQubits > 62 then
-      raise Fail "SparseStateTable.make: bad number of qubits"
+      raise Fail "SparseStateTableLockedSlots.make: capacity 0"
+    else if not (checkSpaceForEmptyAndLockedKeys numQubits) then
+      raise Fail "SparseStateTableLockedSlots.make: too many qubits"
     else
       let
-        val emptykey = BasisIdx.flip BasisIdx.zeros 63
-        val lockedIdx = 62
+        val emptykey = BasisIdx.flip BasisIdx.zeros (numQubits+1)
+        val lockedIdx = numQubits
       in
         make' {capacity = capacity, emptykey = emptykey, lockedIdx = lockedIdx}
       end

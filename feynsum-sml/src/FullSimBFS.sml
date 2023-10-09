@@ -91,8 +91,8 @@ struct
             | _ => true)
         }
 
-      val _ =
-        if numQubits > 63 then raise Fail "whoops, too many qubits" else ()
+      (* val _ =
+        if numQubits > 63 then raise Fail "whoops, too many qubits" else () *)
       val maxNumStates = Word64.toInt
         (Word64.<< (0w1, Word64.fromInt numQubits))
       val maxCountSize = String.size (Int.toString maxNumStates)

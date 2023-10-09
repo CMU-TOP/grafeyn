@@ -30,14 +30,21 @@ struct
       T {keys = keys, emptykey = emptykey, packedWeights = packedWeights}
     end
 
+  
+  fun checkSpaceForEmptyKey numQubits =
+    numQubits >= 0 andalso
+    (case BasisIdx.maxNumQubits of
+      NONE => true
+    | SOME limit => numQubits <= limit-1)
+
 
   fun make {capacity, numQubits} =
     if capacity = 0 then
       raise Fail "SparseStateTable.make: capacity 0"
-    else if numQubits < 0 orelse numQubits > 63 then
-      raise Fail "SparseStateTable.make: bad number of qubits"
+    else if not (checkSpaceForEmptyKey numQubits) then
+      raise Fail "SparseStateTable.make: cannot construct empty key"
     else
-      make' {capacity = capacity, emptykey = BasisIdx.flip BasisIdx.zeros 63}
+      make' {capacity = capacity, emptykey = BasisIdx.flip BasisIdx.zeros numQubits}
 
 
   fun capacity (T {keys, ...}) = Array.length keys

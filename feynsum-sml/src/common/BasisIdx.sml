@@ -1,37 +1,10 @@
 (* mapping of qubit index to {0,1} *)
-structure BasisIdx :>
-sig
-  type qubit_idx = int
-  type t
-
-  val toString: {numQubits: int} -> t -> string
-
-  val zeros: t
-
-  val setTo: bool -> t -> qubit_idx -> t
-  val set: t -> qubit_idx -> t
-  val unset: t -> qubit_idx -> t
-  val flip: t -> qubit_idx -> t
-  val swap: t -> qubit_idx * qubit_idx -> t
-  val get: t -> qubit_idx -> bool
-
-  (* not a very meaningful comparison; this is just for storing it in
-   * ordered maps and whatever.
-   *)
-  val compare: t * t -> order
-  val equal: t * t -> bool
-  val hash: t -> int
-
-  val fromDenseIndex: int -> t
-  val toDenseIndex: t -> int
-end =
+structure BasisIdx :> BASIS_IDX =
 struct
   type qubit_idx = int
 
-  (* allows up to 63 qubits; we reserve one bit to allow for a bogus value, and
-   * also to enable casting to/from dense indices.
-   *)
   type t = Word64.word
+  val maxNumQubits = SOME 64
 
   fun fromDenseIndex i = Word64.fromInt i
   fun toDenseIndex t = Word64.toInt t

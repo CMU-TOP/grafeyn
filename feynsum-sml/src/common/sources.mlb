@@ -27,6 +27,8 @@ local
   Complex32.sml
   Complex64.sml
   Complex.sml
+
+  BASIS_IDX.sml
   
   ann "allowExtendedTextConsts true" in
     BasisIdx.sml
@@ -59,7 +61,10 @@ in
   structure Complex32
   structure Complex64
   structure Complex
+
+  signature BASIS_IDX
   structure BasisIdx
+  
   (* structure SparseState *)
 
   structure SMLQasmError
