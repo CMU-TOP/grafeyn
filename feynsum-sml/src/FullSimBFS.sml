@@ -93,9 +93,11 @@ struct
 
       (* val _ =
         if numQubits > 63 then raise Fail "whoops, too many qubits" else () *)
-      val maxNumStates = Word64.toInt
-        (Word64.<< (0w1, Word64.fromInt numQubits))
-      val maxCountSize = String.size (Int.toString maxNumStates)
+      val maxNumStates = IntInf.pow (2, numQubits)
+      (* val maxNumStates = Word64.toInt
+        (Word64.<< (0w1, Word64.fromInt numQubits)) *)
+      (* val maxCountSize = String.size (IntInf.toString maxNumStates) *)
+      val maxCountSize = 10
       val maxGateNameSize = String.size (Int.toString depth)
 
       fun padCount x =
@@ -105,8 +107,10 @@ struct
 
       fun dumpDensity (i, nonZeroSize, zeroSize, capacity) =
         let
-          val density = Real.fromInt nonZeroSize / Real.fromInt maxNumStates
-          val densityStr = Real.fmt (StringCvt.FIX (SOME 8)) density
+          val density = 0.0
+          (* val density = Real.fromInt nonZeroSize / Real.fromInt maxNumStates *)
+          (* val densityStr = Real.fmt (StringCvt.FIX (SOME 8)) density *)
+          val densityStr = "??"
           val zStr =
             case zeroSize of
               NONE => ""

@@ -29,9 +29,17 @@ local
   Complex.sml
 
   BASIS_IDX.sml
+
+  local
+    ann "allowExtendedTextConsts true" in
+      (* BasisIdx.sml *)
+      BasisIdxUnlimited.sml
+    end
+  in
+    structure BasisIdx = BasisIdxUnlimited
+  end
   
   ann "allowExtendedTextConsts true" in
-    BasisIdx.sml
     (* SparseState.sml *)
     GateDefn.sml
     Gate.sml

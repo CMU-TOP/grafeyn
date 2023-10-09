@@ -384,4 +384,33 @@ struct
       }
     end
 
+
+  fun expand (xxx as {gates, numQubits, state, prevNonZeroSize}) =
+    let
+      val nonZeroSize =
+        case state of
+          Sparse sst => SST.nonZeroSize sst
+        | Dense ds => DS.nonZeroSize ds
+        | DenseKnownNonZeroSize (_, nz) => nz
+
+      val rate = Real.max
+        (1.0, Real.fromInt nonZeroSize / Real.fromInt prevNonZeroSize)
+      val expected = Real.ceil (rate * Real.fromInt nonZeroSize)
+
+      val args =
+        { gates = gates
+        , numQubits = numQubits
+        , state = state
+        , expected = expected
+        }
+
+      val (method, {result, numGateApps}) = ("push sparse", expandSparse args)
+    in
+      { result = result
+      , method = method
+      , numNonZeros = nonZeroSize
+      , numGateApps = numGateApps
+      }
+    end
+
 end
