@@ -50,7 +50,14 @@ impl Compactifiable for State {
                 let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
                 (BasisIdx::from_idx(idx), Complex::new(re, im))
             })),
-            State::ConcurrentSparse(_) => unimplemented!(),
+            State::ConcurrentSparse(table) => {
+                Box::new(table.nonzeros.into_iter().map(move |i: usize| {
+                    let idx = table.keys[i].load(Ordering::Relaxed) as usize;
+                    let (re, im) =
+                        utility::unpack_complex(table.packed_weights[i].load(Ordering::Relaxed));
+                    (BasisIdx::from_idx(idx), Complex::new(re, im))
+                }))
+            }
         }
     }
 }
