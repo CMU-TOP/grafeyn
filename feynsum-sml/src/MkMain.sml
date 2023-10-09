@@ -63,6 +63,7 @@ struct
 
       val circuit =
         case inputName of
+        (*
           "random" =>
             let
               val numGates = CLA.parseInt "gates" 60
@@ -117,8 +118,9 @@ struct
                 , seed = seed
                 }
             end
+        *)
 
-        | _ =>
+          _ =>
             let
               fun handleLexOrParseError exn =
                 let

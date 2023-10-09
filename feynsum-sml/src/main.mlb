@@ -11,7 +11,8 @@ in
 end
 
 common/sources.mlb
-full-strong-sim/just-bfs.mlb
-gen-google-circuit/sources.mlb
+ann "allowExtendedTextConsts true" in
+  FullSimBFS.sml
+end
 MkMain.sml
 main.sml
