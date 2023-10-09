@@ -1,3 +1,7 @@
+# TODO
+We threw this together a while ago. Does it work? Are we using it for
+comparison?
+
 # Setup
   Create a virtual environment
 	Activate

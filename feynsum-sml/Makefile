@@ -5,22 +5,13 @@ MPL_COMPILER=mpl
 
 MPL=$(MPL_COMPILER) # -disable-pass splitTypes1 -disable-pass splitTypes2
 
-FLAGS=-verbose 2 -default-type int64 -default-type word64 -cc-opt "-O3 -march=native"
+FLAGS=-verbose 1 -default-type int64 -default-type word64 -cc-opt "-O3 -march=native"
 
 main.mpl: phony
-	$(MPL) $(FLAGS) -mlb-path-var 'COMPILER mpl' -output main.mpl main.mlb
+	$(MPL) $(FLAGS) -mlb-path-var 'COMPILER mpl' -output main.mpl src/main.mlb
 
 main.mlton: phony
-	mlton $(FLAGS) -mlb-path-var 'COMPILER mlton' -output main.mlton main.mlb
-
-all-main.mpl: phony
-	$(MPL) $(FLAGS) -mlb-path-var 'COMPILER mpl' -output all-main.mpl all-main.mlb
-
-all-main.mlton: phony
-	mlton $(FLAGS) -mlb-path-var 'COMPILER mlton' -output all-main.mlton all-main.mlb
-
-test: phony
-	mlton $(FLAGS) -output test test.mlton.mlb
+	mlton $(FLAGS) -mlb-path-var 'COMPILER mlton' -output main.mlton src/main.mlb
 
 .PHONY: phony
 phony:
