@@ -18,11 +18,19 @@ sig
   | DenseKnownNonZeroSize of DS.t * int
 
   val expand:
-    {gates: G.t Seq.t, numQubits: int, state: state, prevNonZeroSize: int}
+    { gates: G.t Seq.t
+    , numQubits: int
+    , maxNumStates: IntInf.int
+    , state: state
+    , prevNonZeroSize: int
+    }
     -> {result: state, method: string, numNonZeros: int, numGateApps: int}
 
 end =
 struct
+
+  val denseThreshold = Rat.fromReal denseThreshold
+  val pullThreshold = Rat.fromReal pullThreshold
 
   fun log2 x = Math.log10 x / Math.log10 2.0
 
@@ -236,7 +244,7 @@ struct
         end
 
       val initialCapacity = Real.ceil
-        (1.1 * (1.0 / maxload) * Real.fromInt expected)
+        (1.1 * (1.0 / maxload) * Real.fromInt (IntInf.toInt expected))
       val initialTable =
         SST.make {capacity = initialCapacity, numQubits = numQubits}
       val initialBlocks = Seq.tabulate (fn b => b) numBlocks
@@ -247,7 +255,7 @@ struct
     end
 
 
-  fun expandPushDense {gates: G.t Seq.t, numQubits, state, expected} =
+  fun expandPushDense {gates: G.t Seq.t, numQubits, state, expected: IntInf.int} =
     let
       val numGates = Seq.length gates
       fun gate i = Seq.nth gates i
@@ -293,7 +301,7 @@ struct
     end
 
 
-  fun expandPullDense {gates: G.t Seq.t, numQubits, state, expected} =
+  fun expandPullDense {gates: G.t Seq.t, numQubits, state, expected: IntInf.int} =
     let
       val actions = Seq.map (valOf o G.pullAction) gates
       fun action i = Seq.nth actions i
@@ -339,11 +347,8 @@ struct
     end
 
 
-  fun expand (xxx as {gates, numQubits, state, prevNonZeroSize}) =
+  fun expand (xxx as {gates, numQubits, maxNumStates, state, prevNonZeroSize}) =
     let
-      val maxNumStates = Word64.toInt
-        (Word64.<< (0w1, Word64.fromInt numQubits))
-
       val nonZeroSize =
         case state of
           Sparse sst => SST.nonZeroSize sst
@@ -353,11 +358,11 @@ struct
       val rate = Real.max
         (1.0, Real.fromInt nonZeroSize / Real.fromInt prevNonZeroSize)
       val expected = Real.ceil (rate * Real.fromInt nonZeroSize)
-      val expected = Int.min (expected, maxNumStates)
+      val expected = IntInf.min (IntInf.fromInt expected, maxNumStates)
 
-      val expectedDensity = Real.fromInt expected / Real.fromInt maxNumStates
-      val currentDensity = Real.fromInt nonZeroSize / Real.fromInt maxNumStates
-      val expectedCost = Real.max (expectedDensity, currentDensity)
+      val expectedDensity = Rat.make (expected, maxNumStates)
+      val currentDensity = Rat.make (IntInf.fromInt nonZeroSize, maxNumStates)
+      val expectedCost = Rat.max (expectedDensity, currentDensity)
 
       fun allGatesPullable () =
         Util.all (0, Seq.length gates) (G.pullable o Seq.nth gates)
@@ -370,41 +375,19 @@ struct
         }
 
       val (method, {result, numGateApps}) =
-        if expectedCost < denseThreshold then
+        if
+          Rat.compare (expectedCost, denseThreshold) = LESS
+        then
           ("push sparse", expandSparse args)
-        else if expectedCost >= pullThreshold andalso allGatesPullable () then
+
+        else if
+          Rat.compare (expectedCost, pullThreshold) <> LESS
+          andalso allGatesPullable ()
+        then
           ("pull dense", expandPullDense args)
+
         else
           ("push dense", expandPushDense args)
-    in
-      { result = result
-      , method = method
-      , numNonZeros = nonZeroSize
-      , numGateApps = numGateApps
-      }
-    end
-
-
-  fun expand (xxx as {gates, numQubits, state, prevNonZeroSize}) =
-    let
-      val nonZeroSize =
-        case state of
-          Sparse sst => SST.nonZeroSize sst
-        | Dense ds => DS.nonZeroSize ds
-        | DenseKnownNonZeroSize (_, nz) => nz
-
-      val rate = Real.max
-        (1.0, Real.fromInt nonZeroSize / Real.fromInt prevNonZeroSize)
-      val expected = Real.ceil (rate * Real.fromInt nonZeroSize)
-
-      val args =
-        { gates = gates
-        , numQubits = numQubits
-        , state = state
-        , expected = expected
-        }
-
-      val (method, {result, numGateApps}) = ("push sparse", expandSparse args)
     in
       { result = result
       , method = method

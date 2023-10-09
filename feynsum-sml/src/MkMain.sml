@@ -68,7 +68,7 @@ struct
             let
               val numGates = CLA.parseInt "gates" 60
               val numQubits = CLA.parseInt "qubits" 20
-
+        
               fun genGate seed =
                 let
                   val p = Util.hash seed mod 100
@@ -81,12 +81,12 @@ struct
                   else if p < 89 then GateDefn.T qi1
                   else GateDefn.CX {control = qi1, target = qi2}
                 end
-
+        
               val gates = Seq.tabulate (fn i => genGate (3 * i)) numGates
             in
               {numQubits = numQubits, gates = gates}
             end
-
+        
         | "google-circuit" =>
             let
               val numRows = CLA.parseInt "google-circuit-num-rows" 9
@@ -94,7 +94,7 @@ struct
               val numCycles = CLA.parseInt "google-circuit-num-cycles" 14
               val patterns = CLA.parseString "google-circuit-patterns" "EFGH"
               val seed = CLA.parseInt "google-circuit-seed" 15210
-
+        
               val _ = print
                 ("google-circuit-num-rows " ^ Int.toString numRows ^ "\n")
               val _ = print
@@ -103,7 +103,7 @@ struct
                 ("google-circuit-num-cycles " ^ Int.toString numCycles ^ "\n")
               val _ = print ("google-circuit-patterns " ^ patterns ^ "\n")
               val _ = print ("google-circuit-seed " ^ Int.toString seed ^ "\n")
-
+        
               val patterns =
                 Seq.tabulate
                   (fn i =>
@@ -119,7 +119,6 @@ struct
                 }
             end
         *)
-
           _ =>
             let
               fun handleLexOrParseError exn =
@@ -162,17 +161,23 @@ struct
              ^ Circuit.toString circuit
              ^ "=========================================================\n")
 
-      val {result, densities} = Benchmark.run "full-sim-bfs" (fn _ =>
-        sim circuit)
+      val {result, counts} = Benchmark.run "full-sim-bfs" (fn _ => sim circuit)
+      val counts = Seq.map IntInf.fromInt counts
 
-      val avgDensity =
-        (Seq.reduce op+ 0.0 densities) / Real.fromInt (Seq.length densities)
-      val maxDensity = Seq.reduce Real.max 0.0 densities
+      val maxNumStates = IntInf.pow (2, Circuit.numQubits circuit)
+      val numRounds = IntInf.fromInt (Seq.length counts)
+
+      val avgDensity = Rat.normalize (Rat.make
+        (Seq.reduce IntInf.+ 0 counts, IntInf.* (maxNumStates, numRounds)))
+      val maxDensity = Rat.normalize (Rat.make
+        (Seq.reduce IntInf.max 0 counts, maxNumStates))
 
       val _ = print
-        ("avg-density " ^ Real.fmt (StringCvt.FIX (SOME 12)) avgDensity ^ "\n")
+        ("avg-density "
+         ^ Real.fmt (StringCvt.FIX (SOME 12)) (Rat.approx avgDensity) ^ "\n")
       val _ = print
-        ("max-density " ^ Real.fmt (StringCvt.FIX (SOME 12)) maxDensity ^ "\n")
+        ("max-density "
+         ^ Real.fmt (StringCvt.FIX (SOME 12)) (Rat.approx maxDensity) ^ "\n")
 
       val _ =
         if output = "" then
@@ -205,10 +210,12 @@ struct
           let
             val outstream = TextIO.openOut outputDensities
           in
-            Util.for (0, Seq.length densities) (fn i =>
+            Util.for (0, Seq.length counts) (fn i =>
               let
-                val dstr = Real.fmt (StringCvt.FIX (SOME 8))
-                  (Seq.nth densities i)
+                val count = Seq.nth counts i
+                val density = Rat.normalize (Rat.make (count, maxNumStates))
+                val dstr =
+                  Real.fmt (StringCvt.FIX (SOME 12)) (Rat.approx density)
               in
                 TextIO.output (outstream, dstr ^ "\n")
               end);
@@ -223,8 +230,8 @@ struct
            [ name
            , Int.toString (Circuit.numQubits circuit)
            , Int.toString (Circuit.numGates circuit)
-           , Real.fmt (StringCvt.FIX (SOME 12)) maxDensity
-           , Real.fmt (StringCvt.FIX (SOME 12)) avgDensity
+           , Real.fmt (StringCvt.FIX (SOME 12)) (Rat.approx maxDensity)
+           , Real.fmt (StringCvt.FIX (SOME 12)) (Rat.approx avgDensity)
            ] ^ "\n")
     end
 

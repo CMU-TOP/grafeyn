@@ -22,6 +22,8 @@ local
   HashTable.sml
   ApplyUntilFailure.sml
 
+  Rat.sml
+
   Constants.sml
   MkComplex.sml
   Complex32.sml
@@ -63,6 +65,8 @@ local
 in
   structure HashTable
   structure ApplyUntilFailure
+
+  structure Rat
 
   signature COMPLEX
   functor MkComplex
