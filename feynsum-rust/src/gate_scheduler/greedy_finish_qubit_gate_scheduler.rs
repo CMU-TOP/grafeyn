@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use log::debug;
 
 use super::{utility, GateScheduler};
@@ -9,7 +7,7 @@ pub struct GreedyFinishQubitGateScheduler<'a> {
     frontier: Vec<GateIndex>,
     num_gates: usize,
     num_qubits: usize,
-    gate_touches: Vec<&'a HashSet<QubitIndex>>,
+    gate_touches: Vec<&'a [QubitIndex]>,
 }
 
 impl<'a> GateScheduler for GreedyFinishQubitGateScheduler<'a> {
@@ -24,11 +22,7 @@ impl<'a> GateScheduler for GreedyFinishQubitGateScheduler<'a> {
 }
 
 impl<'a> GreedyFinishQubitGateScheduler<'a> {
-    pub fn new(
-        num_gates: usize,
-        num_qubits: usize,
-        gate_touches: Vec<&'a HashSet<QubitIndex>>,
-    ) -> Self {
+    pub fn new(num_gates: usize, num_qubits: usize, gate_touches: Vec<&'a [QubitIndex]>) -> Self {
         debug!(
             "initializing greedy finish qubit gate scheduler with {} gates and {} qubits",
             num_gates, num_qubits

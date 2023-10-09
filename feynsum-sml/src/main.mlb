@@ -1,0 +1,18 @@
+$(SML_LIB)/basis/basis.mlb
+
+local
+  lib/github.com/mpllang/mpllib/sources.$(COMPILER).mlb
+in
+  structure Seq
+  structure DelayedSeq
+  structure CommandLineArgs
+  structure Util
+  structure Benchmark
+end
+
+common/sources.mlb
+ann "allowExtendedTextConsts true" in
+  FullSimBFS.sml
+end
+MkMain.sml
+main.sml

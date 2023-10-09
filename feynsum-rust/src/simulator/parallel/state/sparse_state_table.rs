@@ -174,7 +174,6 @@ impl<'a> ConcurrentSparseStateTable {
     }
     pub fn increase_capacity_by_factor(&self, alpha: f32) -> Self {
         let new_capacity = (alpha * self.keys.len() as f32).ceil() as usize;
-        println!("oldcap {} newcap {}", self.capacity(),new_capacity);
         let new_table = Self::new2(new_capacity);
         for i in 0..self.keys.len() {
             let k = BasisIdx::from_u64(self.keys[i].load(Ordering::Relaxed));

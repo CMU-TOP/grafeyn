@@ -210,7 +210,6 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
                         ) {
                             (_, SuccessorsResult::AllSucceeded) => {}
                             (_, SuccessorsResult::SomeFailed(vfs)) => {
-                                println!("clear failed");
                                 block_pending[b].extend(vfs);
                                 break;
                             }
@@ -235,7 +234,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
                     }
                     (_, SuccessorsResult::SomeFailed(vfs)) => {
                         block_remaining_starts[b] = i + 1;
-                        block_pending[b].extend_from_slice(&vfs);
+                        block_pending[b].extend(vfs);
                         break;
                     }
                 }
@@ -251,7 +250,6 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
         std::mem::swap(&mut remaining_blocks, &mut remaining_blocks_next);
         if !remaining_blocks.is_empty() {
             log::debug!("resize");
-            println!("resize");
             let mut table2 = table.increase_capacity_by_factor(1.5);
             std::mem::swap(&mut table, &mut table2);
         }

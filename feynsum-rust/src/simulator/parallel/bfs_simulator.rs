@@ -29,7 +29,11 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
     let mut num_gate_apps = 0;
     let mut prev_num_nonzeros = 1;
 
-    let gate_touches = circuit.gates.iter().map(|gate| &gate.touches).collect();
+    let gate_touches = circuit
+        .gates
+        .iter()
+        .map(|gate| gate.touches.as_slice())
+        .collect();
     let gate_is_branching = circuit
         .gates
         .iter()

@@ -1,0 +1,102 @@
+local
+  $(SML_LIB)/basis/basis.mlb
+  local
+    $(SML_LIB)/smlnj-lib/Util/smlnj-lib.mlb
+  in
+    functor RedBlackMapFn
+  end
+  ../lib/github.com/mpllang/mpllib/sources.$(COMPILER).mlb
+
+  local
+    ../lib/github.com/shwestrick/sml-qasm/sources.$(COMPILER).mlb
+  in
+    structure SMLQasmToken = Token
+    structure SMLQasmSimpleCircuit = SimpleCircuit
+    structure TerminalColorString
+    structure SMLQasmError = Error
+    structure SMLQasmSyntaxHighlighter = SyntaxHighlighter
+    structure SMLQasmAst = Ast
+    structure SMLQasmParser = Parser
+  end
+
+  HashTable.sml
+  ApplyUntilFailure.sml
+
+  Constants.sml
+  MkComplex.sml
+  Complex32.sml
+  Complex64.sml
+  Complex.sml
+
+  BASIS_IDX.sml
+  
+  ann "allowExtendedTextConsts true" in
+    BasisIdx.sml
+    (* SparseState.sml *)
+    GateDefn.sml
+    Gate.sml
+    Circuit.sml
+  end
+
+  SPARSE_STATE_TABLE.sml
+  SparseStateTable.sml
+  SparseStateTableLockedSlots.sml
+
+  DENSE_STATE.sml
+  DenseState.sml
+  
+  ExpandState.sml
+
+  GateScheduler.sml
+  GateSchedulerNaive.sml
+  GateSchedulerGreedyNonBranching.sml
+  GateSchedulerGreedyBranching.sml
+  GateSchedulerGreedyFinishQubit.sml
+in
+  structure HashTable
+  structure ApplyUntilFailure
+
+  signature COMPLEX
+  functor MkComplex
+  structure Complex32
+  structure Complex64
+  structure Complex
+
+  signature BASIS_IDX
+  structure BasisIdx
+  
+  (* structure SparseState *)
+
+  structure SMLQasmError
+  structure SMLQasmParser
+  structure SMLQasmAst
+  structure SMLQasmSyntaxHighlighter
+  structure SMLQasmSimpleCircuit
+  structure TerminalColorString
+
+  (* structure SMLQasmGate *)
+  structure GateDefn
+
+  signature GATE
+  functor Gate
+
+  structure Circuit
+  (* structure ParseQASM *)
+
+  signature SPARSE_STATE_TABLE
+  functor SparseStateTable
+  functor SparseStateTableLockedSlots
+
+  signature DENSE_STATE
+  functor DenseState
+
+  functor ExpandState
+
+  structure GateScheduler
+  structure GateSchedulerNaive
+  functor GateSchedulerGreedyNonBranching
+  structure GateSchedulerGreedyBranching
+  structure GateSchedulerGreedyFinishQubit
+
+  functor RedBlackMapFn
+end
