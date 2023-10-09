@@ -292,13 +292,12 @@ impl PushApplicable for Gate {
                 phi,
             } => match (bidx.get(left), bidx.get(right)) {
                 (false, false) => PushApplyOutput::Nonbranching(bidx, weight),
-                (true, true) => PushApplyOutput::Nonbranching(
-                    bidx,
-                    weight * Complex::new((-phi).cos(), (-phi).sin()),
-                ),
+                (true, true) => {
+                    PushApplyOutput::Nonbranching(bidx, weight * Complex::new(phi.cos(), phi.sin()))
+                }
                 _ => {
-                    let bidx1 = bidx;
-                    let bidx2 = bidx.flip(left).flip(right);
+                    let bidx1 = bidx.unset(left).set(right);
+                    let bidx2 = bidx.unset(right).set(left);
                     let weight1 = weight * Complex::new(theta.cos(), 0.0);
                     let weight2 = weight * Complex::new(0.0, -theta.sin());
 
