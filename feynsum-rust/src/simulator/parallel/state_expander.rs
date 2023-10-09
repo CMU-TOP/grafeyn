@@ -110,7 +110,10 @@ fn apply_gates1(
         if !full.load(Ordering::Relaxed) {
             full.store(true, Ordering::SeqCst);
         }
-        return (apps, SuccessorsResult::SomeFailed(vec![(bidx, weight, gatenum)]))
+        return (
+            apps,
+            SuccessorsResult::SomeFailed(vec![(bidx, weight, gatenum)]),
+        );
     }
     match gates[gatenum].push_apply(bidx, weight) {
         PushApplyOutput::Nonbranching(new_bidx, new_weight) => {
@@ -173,21 +176,20 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
     let mut block_remaining_starts: Vec<usize> = (0..num_blocks).map(|b| block_start(b)).collect();
     let mut block_pending: Vec<Vec<(BasisIdx, Complex, usize)>> = vec![vec![]; num_blocks];
     let mut remaining_blocks: Vec<usize> = (0..num_blocks).map(|b| b).collect();
-    let get = |i: usize| {
-        match state {
-            State::Dense(prev_table) => {
-                let v = prev_table.array[i].load(Ordering::Relaxed);
-                let (re, im) = utility::unpack_complex(v);
-                (BasisIdx::from_idx(i), Complex::new(re, im))
-            },
-            State::ConcurrentSparse(prev_table) => {
-                let j = prev_table.nonzeros[i];
-                let idx = BasisIdx::from_u64(prev_table.keys[j].load(Ordering::Relaxed));
-                let (re, im) = utility::unpack_complex(prev_table.packed_weights[j].load(Ordering::Relaxed));
-                (idx, Complex::new(re, im))
-            },
-            State::Sparse(_) => panic!()
+    let get = |i: usize| match state {
+        State::Dense(prev_table) => {
+            let v = prev_table.array[i].load(Ordering::Relaxed);
+            let (re, im) = utility::unpack_complex(v);
+            (BasisIdx::from_idx(i), Complex::new(re, im))
         }
+        State::ConcurrentSparse(prev_table) => {
+            let j = prev_table.nonzeros[i];
+            let idx = BasisIdx::from_u64(prev_table.keys[j].load(Ordering::Relaxed));
+            let (re, im) =
+                utility::unpack_complex(prev_table.packed_weights[j].load(Ordering::Relaxed));
+            (idx, Complex::new(re, im))
+        }
+        State::Sparse(_) => panic!(),
     };
 
     log::info!("expand_sparse2 started");
@@ -205,9 +207,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
                         break;
                     }
                     Some((idx, weight, gatenum)) => {
-                        match apply_gates1(
-                            gatenum, &gates, &mut table, idx, weight, &mut full, 0,
-                        ) {
+                        match apply_gates1(gatenum, &gates, &mut table, idx, weight, &mut full, 0) {
                             (_, SuccessorsResult::AllSucceeded) => {}
                             (_, SuccessorsResult::SomeFailed(vfs)) => {
                                 block_pending[b].extend(vfs);

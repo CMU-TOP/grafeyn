@@ -89,11 +89,7 @@ impl<'a> ConcurrentSparseStateTable {
             }
         }
     }
-    fn force_insert_unique(
-        &self,
-        x: BasisIdx,
-        v: Complex
-    ) {
+    fn force_insert_unique(&self, x: BasisIdx, v: Complex) {
         let n = self.keys.len();
         let start = calculate_hash(&x) as usize % n;
         let mut i: usize = start;
@@ -112,7 +108,7 @@ impl<'a> ConcurrentSparseStateTable {
                     }
                     Err(_) => assert!(false),
                 }
-            } 
+            }
             assert!(k != y); // duplicate key
             i += 1;
             assert!(i != start);
@@ -178,7 +174,7 @@ impl<'a> ConcurrentSparseStateTable {
         for i in 0..self.keys.len() {
             let k = BasisIdx::from_u64(self.keys[i].load(Ordering::Relaxed));
             let (re, im) = utility::unpack_complex(self.packed_weights[i].load(Ordering::Relaxed));
-            let c =  Complex::new(re, im);
+            let c = Complex::new(re, im);
             if utility::is_nonzero(c) {
                 new_table.force_insert_unique(k, c)
             }

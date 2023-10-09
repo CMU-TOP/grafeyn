@@ -234,7 +234,7 @@ h q0[28];
 
         //assert!(matches!(state, State::Sparse(SparseStateTable { .. })));
 
-        let table= match state {
+        let table = match state {
             //State::Sparse(table) => table,
             State::ConcurrentSparse(table) => table,
             _ => panic!(),
