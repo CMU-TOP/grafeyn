@@ -247,10 +247,10 @@ impl PushApplicable for Gate {
                 target,
                 rot,
             } => {
-                let new_weight = if !bidx.get(control) || !bidx.get(target) {
-                    weight
-                } else {
+                let new_weight = if bidx.get(control) && bidx.get(target) {
                     weight * Complex::new(rot.cos(), rot.sin())
+                } else {
+                    weight
                 };
 
                 PushApplyOutput::Nonbranching(bidx, new_weight)
