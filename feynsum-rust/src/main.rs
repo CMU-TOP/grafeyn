@@ -104,7 +104,7 @@ fn dump_densities(path: &PathBuf, state: impl Compactifiable, bidx_width: usize)
     let mut file = fs::File::create(path)?;
     for (bidx, weight) in state.compactify() {
         file.write_fmt(format_args!(
-            "{:0width$} {:.4}\n",
+            "{:0width$} {:.10}\n",
             bidx,
             weight,
             width = bidx_width,
