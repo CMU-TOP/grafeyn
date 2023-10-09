@@ -746,7 +746,7 @@ impl PullApplicable for Gate {
             }
             GateDefn::Phase { rot, target } => {
                 if bidx.get(target) {
-                    PullApplyOutput::Nonbranching(bidx, Complex::new((-rot).cos(), (-rot).sin()))
+                    PullApplyOutput::Nonbranching(bidx, Complex::new(rot.cos(), rot.sin()))
                 } else {
                     PullApplyOutput::Nonbranching(bidx, Complex::new(1.0, 0.0))
                 }
@@ -770,27 +770,23 @@ impl PullApplicable for Gate {
 
                 if bidx.get(target) {
                     PullApplyOutput::Branching(
-                        (bidx0, Complex::new(cos, 0.0)),
-                        (bidx1, Complex::new(-sin, 0.0)),
+                        (bidx0, Complex::new(sin, 0.0)),
+                        (bidx1, Complex::new(cos, 0.0)),
                     )
                 } else {
                     PullApplyOutput::Branching(
-                        (bidx0, Complex::new(sin, 0.0)),
-                        (bidx1, Complex::new(cos, 0.0)),
+                        (bidx0, Complex::new(cos, 0.0)),
+                        (bidx1, Complex::new(-sin, 0.0)),
                     )
                 }
             }
             GateDefn::RZ { rot, target } => {
+                let cos = (rot / 2.0).cos();
+                let sin = (rot / 2.0).sin();
                 if bidx.get(target) {
-                    PullApplyOutput::Nonbranching(
-                        bidx,
-                        Complex::new((-rot / 2.0).cos(), (-rot / 2.0).sin()),
-                    )
+                    PullApplyOutput::Nonbranching(bidx, Complex::new(cos, sin))
                 } else {
-                    PullApplyOutput::Nonbranching(
-                        bidx,
-                        Complex::new((rot / 2.0).cos(), (rot / 2.0).sin()),
-                    )
+                    PullApplyOutput::Nonbranching(bidx, Complex::new(cos, -sin))
                 }
             }
             GateDefn::SqrtX(qi) => {
