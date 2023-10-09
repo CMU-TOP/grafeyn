@@ -573,8 +573,10 @@ macro_rules! push_to_pull {
                 }
             }
             (2, BranchingType::Nonbranching) => {
-                let qi = *touches.iter().next().unwrap();
-                let qj = *touches.iter().next().unwrap();
+                let (qi, qj) = {
+                    let mut iter = touches.iter();
+                    (*iter.next().unwrap(), *iter.next().unwrap())
+                };
 
                 let (b00, m00) = match $self.push_apply(BasisIdx::zeros(), Complex::new(1.0, 0.0)) {
                     PushApplyOutput::Nonbranching(bidx, multiplier) => (bidx, multiplier),
