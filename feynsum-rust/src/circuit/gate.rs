@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use log::debug;
 
 use crate::{
@@ -112,7 +110,7 @@ pub trait PullApplicable {
 #[derive(Debug)]
 pub struct Gate {
     defn: GateDefn,
-    pub touches: HashSet<QubitIndex>,
+    pub touches: Vec<QubitIndex>,
 }
 
 impl Gate {
@@ -128,29 +126,29 @@ impl Gate {
             | &GateDefn::SqrtY(qi)
             | &GateDefn::T(qi)
             | &GateDefn::Tdg(qi)
-            | &GateDefn::X(qi) => HashSet::from([qi]),
+            | &GateDefn::X(qi) => vec![qi],
             &GateDefn::CPhase {
                 control, target, ..
             }
             | &GateDefn::CZ { control, target }
-            | &GateDefn::CX { control, target } => HashSet::from([control, target]),
+            | &GateDefn::CX { control, target } => vec![control, target],
             &GateDefn::CCX {
                 control1,
                 control2,
                 target,
-            } => HashSet::from([control1, control2, target]),
-            &GateDefn::FSim { left, right, .. } => HashSet::from([left, right]),
+            } => vec![control1, control2, target],
+            &GateDefn::FSim { left, right, .. } => vec![left, right],
             &GateDefn::RX { target, .. }
             | &GateDefn::RY { target, .. }
-            | &GateDefn::RZ { target, .. } => HashSet::from([target]),
+            | &GateDefn::RZ { target, .. } => vec![target],
             &GateDefn::CSwap {
                 control,
                 target1,
                 target2,
-            } => HashSet::from([control, target1, target2]),
-            &GateDefn::Swap { target1, target2 } => HashSet::from([target1, target2]),
-            &GateDefn::U { target, .. } => HashSet::from([target]),
-            &GateDefn::Other { .. } => HashSet::new(),
+            } => vec![control, target1, target2],
+            &GateDefn::Swap { target1, target2 } => vec![target1, target2],
+            &GateDefn::U { target, .. } => vec![target],
+            &GateDefn::Other { .. } => vec![],
         };
         Self { defn, touches }
     }
@@ -549,7 +547,7 @@ macro_rules! push_to_pull {
         );
         match (touches.len(), $self.branching_type()) {
             (1, BranchingType::Nonbranching) => {
-                let qi = *touches.iter().next().unwrap();
+                let qi = touches[0];
 
                 let (b0, m0) = match $self.push_apply(BasisIdx::zeros(), Complex::new(1.0, 0.0)) {
                     PushApplyOutput::Nonbranching(bidx, multiplier) => (bidx, multiplier),
@@ -572,10 +570,8 @@ macro_rules! push_to_pull {
                 }
             }
             (2, BranchingType::Nonbranching) => {
-                let (qi, qj) = {
-                    let mut iter = touches.iter();
-                    (*iter.next().unwrap(), *iter.next().unwrap())
-                };
+                let qi = touches[0];
+                let qj = touches[1];
 
                 let (b00, m00) = match $self.push_apply(BasisIdx::zeros(), Complex::new(1.0, 0.0)) {
                     PushApplyOutput::Nonbranching(bidx, multiplier) => (bidx, multiplier),
@@ -653,7 +649,7 @@ macro_rules! push_to_pull {
                 }
             }
             (1, BranchingType::Branching) => {
-                let qi = *touches.iter().next().unwrap();
+                let qi = touches[0];
 
                 let PushApplyOutput::Branching((b00, m00), (b01, m01)) =
                     $self.push_apply(BasisIdx::zeros(), Complex::new(1.0, 0.0))

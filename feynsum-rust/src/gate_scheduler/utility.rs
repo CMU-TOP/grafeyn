@@ -1,12 +1,10 @@
-use std::collections::HashSet;
-
 use log::debug;
 
 use crate::types::{GateIndex, QubitIndex};
 
 pub fn okay_to_visit(
     num_gates: usize,
-    gate_touches: &[&HashSet<QubitIndex>],
+    gate_touches: &[&[QubitIndex]],
     frontier: &[GateIndex],
     gi: GateIndex,
 ) -> bool {
@@ -15,7 +13,7 @@ pub fn okay_to_visit(
 
 pub fn mark_as_visit(
     num_gates: usize,
-    gate_touches: &[&HashSet<QubitIndex>],
+    gate_touches: &[&[QubitIndex]],
     frontier: &mut [GateIndex],
     gi: GateIndex,
 ) {
@@ -31,7 +29,7 @@ pub fn mark_as_visit(
 
 pub fn next_touch(
     num_gates: usize,
-    gate_touches: &[&HashSet<QubitIndex>],
+    gate_touches: &[&[QubitIndex]],
     qi: QubitIndex,
     gi: GateIndex,
 ) -> GateIndex {
