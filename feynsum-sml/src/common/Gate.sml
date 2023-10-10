@@ -450,6 +450,34 @@ struct
     end
 
 
+  fun s qi =
+    let
+      fun apply (bidx, weight) =
+        let
+          val weight' =
+            if not (B.get bidx qi) then weight else C.* (C.i, weight)
+        in
+          (bidx, weight')
+        end
+    in
+      makePushPull {touches = Seq.singleton qi, action = NonBranching apply}
+    end
+
+
+  fun sdg qi =
+    let
+      fun apply (bidx, weight) =
+        let
+          val weight' =
+            if not (B.get bidx qi) then weight else C.* (C.~ C.i, weight)
+        in
+          (bidx, weight')
+        end
+    in
+      makePushPull {touches = Seq.singleton qi, action = NonBranching apply}
+    end
+
+
   fun cphase {control, target, rot} =
     let
       val rot = R.fromLarge rot
@@ -816,6 +844,8 @@ struct
     | GateDefn.SqrtY xx => sqrty xx
     | GateDefn.SqrtX xx => sqrtx xx
     | GateDefn.SqrtW xx => sqrtw xx
+    | GateDefn.S xx => s xx
+    | GateDefn.Sdg xx => sdg xx
     | GateDefn.X xx => x xx
     | GateDefn.CX xx => cx xx
     | GateDefn.CZ xx => cz xx
