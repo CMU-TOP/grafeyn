@@ -179,15 +179,15 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
     let get = |i: usize| match state {
         State::Dense(prev_table) => {
             let v = prev_table.array[i].load(Ordering::Relaxed);
-            let (re, im) = utility::unpack_complex(v);
-            (BasisIdx::from_idx(i), Complex::new(re, im))
+            let weight = utility::unpack_complex(v);
+            (BasisIdx::from_idx(i), weight)
         }
         State::ConcurrentSparse(prev_table) => {
             let j = prev_table.nonzeros[i];
             let idx = BasisIdx::from_u64(prev_table.keys[j].load(Ordering::Relaxed));
-            let (re, im) =
+            let weight =
                 utility::unpack_complex(prev_table.packed_weights[j].load(Ordering::Relaxed));
-            (idx, Complex::new(re, im))
+            (idx, weight)
         }
         State::Sparse(_) => panic!(),
     };
@@ -298,13 +298,8 @@ fn expand_push_dense(gates: Vec<&Gate>, num_qubits: usize, state: State) -> Expa
             .into_par_iter()
             .enumerate()
             .map(|(idx, v)| {
-                let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
-                apply_gates(
-                    &gates,
-                    &table,
-                    BasisIdx::from_idx(idx),
-                    Complex::new(re, im),
-                )
+                let weight = utility::unpack_complex(v.load(Ordering::Relaxed));
+                apply_gates(&gates, &table, BasisIdx::from_idx(idx), weight)
             })
             .sum(),
         State::ConcurrentSparse(_) => unimplemented!(),

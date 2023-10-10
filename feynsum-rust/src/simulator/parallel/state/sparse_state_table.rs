@@ -64,9 +64,9 @@ impl<'a> ConcurrentSparseStateTable {
             .enumerate()
             .filter(|(i, k)| {
                 if k.load(Ordering::Relaxed) != BasisIdx::into_u64(EMPTY_KEY) {
-                    let (re, im) =
+                    let weight =
                         utility::unpack_complex(self.packed_weights[*i].load(Ordering::Relaxed));
-                    utility::is_real_nonzero(re) || utility::is_real_nonzero(im)
+                    utility::is_nonzero(weight)
                 } else {
                     false
                 }
@@ -76,8 +76,8 @@ impl<'a> ConcurrentSparseStateTable {
     fn put_value_at(&self, i: usize, v: Complex) {
         loop {
             let old: u64 = self.packed_weights[i].load(Ordering::Relaxed);
-            let (re, im) = utility::unpack_complex(old);
-            let new = utility::pack_complex(re + v.re, im + v.im);
+            let weight = utility::unpack_complex(old);
+            let new = utility::pack_complex(Complex::new(weight.re + v.re, weight.im + v.im));
             match self.packed_weights[i].compare_exchange(
                 old,
                 new,
@@ -161,8 +161,8 @@ impl<'a> ConcurrentSparseStateTable {
                 return None;
             } else if k == y {
                 let old: u64 = self.packed_weights[i].load(Ordering::Relaxed);
-                let (re, im) = utility::unpack_complex(old);
-                return Some(Complex::new(re, im));
+                let weight = utility::unpack_complex(old);
+                return Some(weight);
             } else {
                 i += 1
             }
@@ -173,10 +173,9 @@ impl<'a> ConcurrentSparseStateTable {
         let new_table = Self::new2(new_capacity);
         for i in 0..self.keys.len() {
             let k = BasisIdx::from_u64(self.keys[i].load(Ordering::Relaxed));
-            let (re, im) = utility::unpack_complex(self.packed_weights[i].load(Ordering::Relaxed));
-            let c = Complex::new(re, im);
-            if utility::is_nonzero(c) {
-                new_table.force_insert_unique(k, c)
+            let weight = utility::unpack_complex(self.packed_weights[i].load(Ordering::Relaxed));
+            if utility::is_nonzero(weight) {
+                new_table.force_insert_unique(k, weight)
             }
         }
         new_table
@@ -187,9 +186,9 @@ impl<'a> ConcurrentSparseStateTable {
                 if self.keys[i].load(Ordering::Relaxed) == BasisIdx::into_u64(EMPTY_KEY) {
                     return false;
                 }
-                let (re, im) =
+                let weight =
                     utility::unpack_complex(self.packed_weights[i].load(Ordering::Relaxed));
-                utility::is_real_nonzero(re) || utility::is_real_nonzero(im)
+                utility::is_nonzero(weight)
             })
             .collect();
         std::mem::swap(&mut self.nonzeros, &mut nonzeros);

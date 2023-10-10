@@ -24,8 +24,8 @@ impl DenseStateTable {
         self.array
             .par_iter()
             .filter(|v| {
-                let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
-                utility::is_real_nonzero(re) || utility::is_real_nonzero(im)
+                let weight = utility::unpack_complex(v.load(Ordering::Relaxed));
+                utility::is_nonzero(weight)
             })
             .count()
     }
@@ -38,18 +38,17 @@ impl DenseStateTable {
     }
 
     pub fn get(&self, bidx: &BasisIdx) -> Option<Complex> {
-        self.array.get(bidx.into_idx()).map(|v| {
-            let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
-            Complex::new(re, im)
-        })
+        self.array
+            .get(bidx.into_idx())
+            .map(|v| utility::unpack_complex(v.load(Ordering::Relaxed)))
     }
 }
 
 fn atomic_put(to: &AtomicU64, v: Complex) {
     loop {
         let old = to.load(Ordering::Relaxed);
-        let (re, im) = utility::unpack_complex(old);
-        let new = utility::pack_complex(re + v.re, im + v.im);
+        let weight = utility::unpack_complex(old);
+        let new = utility::pack_complex(Complex::new(weight.re + v.re, weight.im + v.im));
 
         if let Ok(_) = to.compare_exchange(old, new, Ordering::SeqCst, Ordering::Acquire) {
             return;
@@ -68,7 +67,7 @@ mod tests {
 
         atomic_put(&a, Complex::new(1.0, 2.0));
 
-        let (re, im) = utility::unpack_complex(a.load(Ordering::Relaxed));
-        assert_eq!(Complex::new(re, im), Complex::new(1.0, 2.0));
+        let weight = utility::unpack_complex(a.load(Ordering::Relaxed));
+        assert_eq!(weight, Complex::new(1.0, 2.0));
     }
 }
