@@ -142,9 +142,9 @@ if __name__ == "__main__":
             "h": (1, 0, HGate),
             "y": (1, 0, YGate),
             "z": (1, 0, ZGate),
-            # "t": (1, 0, TGate),
+            "t": (1, 0, TGate),
             "x": (1, 0, XGate),
-            # "sx": (1, 0, SXGate),
+            "sx": (1, 0, SXGate),
             # "sy": (1, 0, SYGate),  #!not implemented by qiskit
             "cx": (2, 0, CXGate),
             "cz": (2, 0, CZGate),
