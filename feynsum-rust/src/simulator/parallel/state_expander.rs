@@ -176,6 +176,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
     let mut block_remaining_starts: Vec<usize> = (0..num_blocks).map(|b| block_start(b)).collect();
     let mut block_pending: Vec<Vec<(BasisIdx, Complex, usize)>> = vec![vec![]; num_blocks];
     let mut remaining_blocks: Vec<usize> = (0..num_blocks).map(|b| b).collect();
+    //let mut blocks: Vec<(usize, usize, Vec<(BasisIdx, Complex, usize)>)> = (0..num_blocks).map(|b| (b, block_start(b), vec![])).collect();
     let get = |i: usize| match state {
         State::Dense(prev_table) => {
             let v = prev_table.array[i].load(Ordering::Relaxed);
@@ -193,6 +194,18 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
     };
 
     log::info!("expand_sparse2 started");
+/*
+    while !blocks.is_empty() {
+        let mut full: AtomicBool = AtomicBool::new(false);
+        let mut blocks_next = blocks
+            .iter()
+            .map(|(b, s, ps)| {
+                (b, s, ps)
+            })
+            .collect();
+        std::mem::swap(&mut blocks, &mut blocks_next);
+    }
+     */
 
     while !remaining_blocks.is_empty() {
         let mut full: AtomicBool = AtomicBool::new(false);
