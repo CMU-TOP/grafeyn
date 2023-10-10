@@ -10,6 +10,7 @@ struct
   | SqrtY of qubit_idx
   | SqrtX of qubit_idx
   | SqrtW of qubit_idx
+  | Sxdg of qubit_idx
   | S of qubit_idx
   | Sdg of qubit_idx
   | X of qubit_idx

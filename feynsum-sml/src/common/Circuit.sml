@@ -123,6 +123,8 @@ struct
 
           | ("x", 0, 1) => GateDefn.X (getArg 0)
 
+          | ("sxdg", 0, 1) => GateDefn.Sxdg (getArg 0)
+
           | ("sx", 0, 1) => GateDefn.SqrtX (getArg 0)
 
           | ("cx", 0, 2) => GateDefn.CX {control = getArg 0, target = getArg 1}
@@ -234,6 +236,7 @@ struct
         | GateDefn.SqrtY i => "sqrty " ^ qi i
         | GateDefn.SqrtX i => "sx " ^ qi i
         | GateDefn.SqrtW i => "sqrtw " ^ qi i
+        | GateDefn.Sxdg i => "sxdg " ^ qi i
         | GateDefn.S i => "s " ^ qi i
         | GateDefn.Sdg i => "sdg " ^ qi i
         | GateDefn.X i => "x " ^ qi i

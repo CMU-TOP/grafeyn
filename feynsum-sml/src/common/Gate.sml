@@ -332,6 +332,25 @@ struct
     end
 
 
+  fun sxdg qi =
+    let
+      val coeff = C.make (half, half)
+      val negi = C.~ C.i
+
+      fun apply (bidx, weight) =
+        let
+          val weight' = C.* (coeff, weight)
+        in
+          if B.get bidx qi then
+            ((B.unset bidx qi, weight'), (bidx, C.* (negi, weight')))
+          else
+            ((bidx, C.* (negi, weight')), (B.set bidx qi, weight'))
+        end
+    in
+      makePushPull {touches = Seq.singleton qi, action = Branching apply}
+    end
+
+
   fun sqrtw qi =
     let
       fun apply (bidx, weight) =
@@ -844,6 +863,7 @@ struct
     | GateDefn.SqrtY xx => sqrty xx
     | GateDefn.SqrtX xx => sqrtx xx
     | GateDefn.SqrtW xx => sqrtw xx
+    | GateDefn.Sxdg xx => sxdg xx
     | GateDefn.S xx => s xx
     | GateDefn.Sdg xx => sdg xx
     | GateDefn.X xx => x xx
