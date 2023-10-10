@@ -115,9 +115,17 @@ struct
 
           | ("z", 0, 1) => GateDefn.PauliZ (getArg 0)
 
+          | ("s", 0, 1) => GateDefn.S (getArg 0)
+
+          | ("sdg", 0, 1) => GateDefn.Sdg (getArg 0)
+
           | ("t", 0, 1) => GateDefn.T (getArg 0)
 
+          | ("tdg", 0, 1) => GateDefn.Tdg (getArg 0)
+
           | ("x", 0, 1) => GateDefn.X (getArg 0)
+
+          | ("sxdg", 0, 1) => GateDefn.Sxdg (getArg 0)
 
           | ("sx", 0, 1) => GateDefn.SqrtX (getArg 0)
 
@@ -227,9 +235,11 @@ struct
         | GateDefn.PauliZ i => "z " ^ qi i
         | GateDefn.Hadamard i => "h " ^ qi i
         | GateDefn.T i => "t " ^ qi i
-        | GateDefn.SqrtY i => "sqrty " ^ qi i
+        | GateDefn.Tdg i => "tdg " ^ qi i
         | GateDefn.SqrtX i => "sx " ^ qi i
-        | GateDefn.SqrtW i => "sqrtw " ^ qi i
+        | GateDefn.Sxdg i => "sxdg " ^ qi i
+        | GateDefn.S i => "s " ^ qi i
+        | GateDefn.Sdg i => "sdg " ^ qi i
         | GateDefn.X i => "x " ^ qi i
         | GateDefn.CX {control, target} => "cx " ^ qi control ^ ", " ^ qi target
         | GateDefn.CZ {control, target} => "cz " ^ qi control ^ ", " ^ qi target
@@ -244,6 +254,8 @@ struct
             "rz(" ^ Real.toString rot ^ ") " ^ qi target
         | GateDefn.RY {rot, target} =>
             "ry(" ^ Real.toString rot ^ ") " ^ qi target
+        | GateDefn.RX {rot, target} =>
+            "rx(" ^ Real.toString rot ^ ") " ^ qi target
         | GateDefn.CSwap {control, target1, target2} =>
             "cswap " ^ qi control ^ ", " ^ qi target1 ^ ", " ^ qi target2
 
