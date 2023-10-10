@@ -24,6 +24,8 @@ local
 
   Rat.sml
 
+  QubitIdx.sml
+
   Constants.sml
   MkComplex.sml
   Complex32.sml
@@ -31,18 +33,12 @@ local
   Complex.sml
 
   BASIS_IDX.sml
-
-  local
-    ann "allowExtendedTextConsts true" in
-      (* BasisIdx.sml *)
-      BasisIdxUnlimited.sml
-    end
-  in
-    structure BasisIdx = BasisIdxUnlimited
+  ann "allowExtendedTextConsts true" in
+    BasisIdx64.sml
+    BasisIdxUnlimited.sml
   end
   
   ann "allowExtendedTextConsts true" in
-    (* SparseState.sml *)
     GateDefn.sml
     Gate.sml
     Circuit.sml
@@ -74,8 +70,11 @@ in
   structure Complex64
   structure Complex
 
+  structure QubitIdx
+
   signature BASIS_IDX
-  structure BasisIdx
+  structure BasisIdx64
+  structure BasisIdxUnlimited
   
   (* structure SparseState *)
 

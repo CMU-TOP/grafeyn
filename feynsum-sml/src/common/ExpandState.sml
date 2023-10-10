@@ -1,16 +1,16 @@
 functor ExpandState
-  (structure C: COMPLEX
+  (structure B: BASIS_IDX
+   structure C: COMPLEX
    structure SST: SPARSE_STATE_TABLE
    structure DS: DENSE_STATE
    structure G: GATE
+   sharing B = SST.B = DS.B = G.B
    sharing C = SST.C = DS.C = G.C
    val blockSize: int
    val maxload: real
    val denseThreshold: real
    val pullThreshold: real) :>
 sig
-
-  (* type state = (BasisIdx.t * C.t) option DelayedSeq.t *)
 
   datatype state =
     Sparse of SST.t
@@ -106,7 +106,7 @@ struct
 
   datatype successors_result =
     AllSucceeded
-  | SomeFailed of {widx: BasisIdx.t * C.t, gatenum: int} list
+  | SomeFailed of {widx: B.t * C.t, gatenum: int} list
 
 
   datatype state =

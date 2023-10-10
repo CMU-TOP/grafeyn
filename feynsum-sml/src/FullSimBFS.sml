@@ -1,7 +1,9 @@
 functor FullSimBFS
-  (structure C: COMPLEX
+  (structure B: BASIS_IDX
+   structure C: COMPLEX
    structure SST: SPARSE_STATE_TABLE
    structure G: GATE
+   sharing B = SST.B = G.B
    sharing C = SST.C = G.C
 
    val blockSize: int
@@ -11,17 +13,17 @@ functor FullSimBFS
    val denseThreshold: real
    val pullThreshold: real):
 sig
-  val run:
-    Circuit.t
-    -> {result: (BasisIdx.t * C.t) option DelayedSeq.t, counts: int Seq.t}
+  val run: Circuit.t
+           -> {result: (B.t * C.t) option DelayedSeq.t, counts: int Seq.t}
 end =
 struct
 
-  structure DS = DenseState(C)
+  structure DS = DenseState (structure C = C structure B = B)
 
   structure Expander =
     ExpandState
-      (structure C = C
+      (structure B = B
+       structure C = C
        structure SST = SST
        structure DS = DS
        structure G = G
@@ -69,7 +71,7 @@ struct
         | SOME (bidx, weight) =>
             let in
               print
-                (BasisIdx.toString {numQubits = numQubits} bidx ^ " "
+                (B.toString {numQubits = numQubits} bidx ^ " "
                  ^ C.toString weight ^ "\n")
             end)
     end
@@ -198,8 +200,7 @@ struct
 
 
       val initialState = Expander.Sparse
-        (SST.singleton {numQubits = numQubits}
-           (BasisIdx.zeros, C.defaultReal 1.0))
+        (SST.singleton {numQubits = numQubits} (B.zeros, C.defaultReal 1.0))
 
       val (numGateApps, finalState, counts) = loop 0 0 [] 1 initialState
       val _ = print ("gate app count " ^ Int.toString numGateApps ^ "\n")

@@ -1,5 +1,6 @@
 signature SPARSE_STATE_TABLE =
 sig
+  structure B: BASIS_IDX
   structure C: COMPLEX
 
   type t
@@ -9,28 +10,23 @@ sig
   exception DuplicateKey (* only raised by forceInsertUnique *)
 
   val make: {capacity: int, numQubits: int} -> table
-  val singleton: {numQubits: int} -> BasisIdx.t * C.t -> table
+  val singleton: {numQubits: int} -> B.t * C.t -> table
 
   val size: table -> int
   val nonZeroSize: table -> int
   val zeroSize: table -> int
   val capacity: table -> int
 
-  (* val insertIfNotPresent: table -> BasisIdx.t * C.t -> bool *)
+  val insertAddWeights: table -> B.t * C.t -> unit
 
-  val insertAddWeights: table -> BasisIdx.t * C.t -> unit
+  val insertAddWeightsLimitProbes: {probes: int} -> table -> B.t * C.t -> unit
 
-  val insertAddWeightsLimitProbes: {probes: int}
-                                   -> table
-                                   -> BasisIdx.t * C.t
-                                   -> unit
-
-  val forceInsertUnique: table -> BasisIdx.t * C.t -> unit
+  val forceInsertUnique: table -> B.t * C.t -> unit
 
   (* not safe for concurrency with insertions *)
-  val lookup: table -> BasisIdx.t -> C.t option
+  val lookup: table -> B.t -> C.t option
 
-  val compact: table -> (BasisIdx.t * C.t) DelayedSeq.t
+  val compact: table -> (B.t * C.t) DelayedSeq.t
 
   val increaseCapacityByFactor: real -> table -> table
 
@@ -41,5 +37,5 @@ sig
    * table as immutable (preventing further inserts). That would be a safer
    * version of this function.
    *)
-  val unsafeViewContents: table -> (BasisIdx.t * C.t) option DelayedSeq.t
+  val unsafeViewContents: table -> (B.t * C.t) option DelayedSeq.t
 end
