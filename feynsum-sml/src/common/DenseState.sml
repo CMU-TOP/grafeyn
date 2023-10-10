@@ -1,5 +1,6 @@
-functor DenseState(C: COMPLEX): DENSE_STATE =
+functor DenseState (structure B: BASIS_IDX structure C: COMPLEX): DENSE_STATE =
 struct
+  structure B = B
   structure C = C
   structure R =
   struct open C.R val fromLarge = fromLarge IEEEReal.TO_NEAREST end
@@ -31,7 +32,7 @@ struct
           (0, capacity)
           (fn i =>
              let
-               val {weight, count} = f (BasisIdx.fromDenseIndex i)
+               val {weight, count} = f (B.fromDenseIndex i)
                val (re, im) = C.view weight
              in
                Array.update (packedWeights, 2 * i, re);
@@ -56,7 +57,7 @@ struct
         C.make (Array.sub (packedWeights, 2 * i), Array.sub
           (packedWeights, 2 * i + 1))
 
-      fun elem i = (BasisIdx.fromDenseIndex i, makeWeight i)
+      fun elem i = (B.fromDenseIndex i, makeWeight i)
     in
       DelayedSeq.tabulate elem (Array.length packedWeights div 2)
     end
@@ -92,7 +93,7 @@ struct
 
   fun lookupDirect (T {packedWeights}) bidx =
     let
-      val i = BasisIdx.toDenseIndex bidx
+      val i = B.toDenseIndex bidx
       val weight = C.make (Array.sub (packedWeights, 2 * i), Array.sub
         (packedWeights, 2 * i + 1))
     in
@@ -121,7 +122,7 @@ struct
 
   fun insertAddWeights (T {packedWeights}) (bidx, weight) =
     let
-      val i = BasisIdx.toDenseIndex bidx
+      val i = B.toDenseIndex bidx
       val (re, im) = C.view weight
     in
       atomicAdd packedWeights (2 * i) re;

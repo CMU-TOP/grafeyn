@@ -1,6 +1,8 @@
-functor SparseStateTable(C: COMPLEX): SPARSE_STATE_TABLE =
+functor SparseStateTable (structure B: BASIS_IDX structure C: COMPLEX):
+  SPARSE_STATE_TABLE =
 struct
 
+  structure B = B
   structure C = C
   structure R =
   struct open C.R val fromLarge = fromLarge IEEEReal.TO_NEAREST end
@@ -9,8 +11,8 @@ struct
 
   datatype t =
     T of
-      { keys: BasisIdx.t array
-      , emptykey: BasisIdx.t
+      { keys: B.t array
+      , emptykey: B.t
       , packedWeights: r array (* 2x capacity, for manual unboxing *)
       }
 
@@ -30,12 +32,13 @@ struct
       T {keys = keys, emptykey = emptykey, packedWeights = packedWeights}
     end
 
-  
+
   fun checkSpaceForEmptyKey numQubits =
-    numQubits >= 0 andalso
-    (case BasisIdx.maxNumQubits of
-      NONE => true
-    | SOME limit => numQubits <= limit-1)
+    numQubits >= 0
+    andalso
+    (case B.maxNumQubits of
+       NONE => true
+     | SOME limit => numQubits <= limit - 1)
 
 
   fun make {capacity, numQubits} =
@@ -44,7 +47,7 @@ struct
     else if not (checkSpaceForEmptyKey numQubits) then
       raise Fail "SparseStateTable.make: cannot construct empty key"
     else
-      make' {capacity = capacity, emptykey = BasisIdx.flip BasisIdx.zeros numQubits}
+      make' {capacity = capacity, emptykey = B.flip B.zeros numQubits}
 
 
   fun capacity (T {keys, ...}) = Array.length keys
@@ -52,7 +55,7 @@ struct
 
   fun size (T {keys, emptykey, ...}) =
     SeqBasis.reduce 10000 op+ 0 (0, Array.length keys) (fn i =>
-      if BasisIdx.equal (Array.sub (keys, i), emptykey) then 0 else 1)
+      if B.equal (Array.sub (keys, i), emptykey) then 0 else 1)
 
 
   fun unsafeViewContents (T {keys, packedWeights, emptykey, ...}) =
@@ -63,7 +66,7 @@ struct
 
       fun elem i =
         let val k = Array.sub (keys, i)
-        in if BasisIdx.equal (k, emptykey) then NONE else SOME (k, makeWeight i)
+        in if B.equal (k, emptykey) then NONE else SOME (k, makeWeight i)
         end
     in
       DelayedSeq.tabulate elem (Array.length keys)
@@ -111,15 +114,15 @@ struct
           let
             val k = Array.sub (keys, i)
           in
-            if BasisIdx.equal (k, emptykey) then
+            if B.equal (k, emptykey) then
               if claimSlotAt i then putValueAt i else loop i probes
-            else if BasisIdx.equal (k, x) then
+            else if B.equal (k, x) then
               putValueAt i
             else
               loop (i + 1) (probes + 1)
           end
 
-      val start = (BasisIdx.hash x) mod (Array.length keys)
+      val start = (B.hash x) mod (Array.length keys)
     in
       loop start 0
     end
@@ -132,7 +135,7 @@ struct
   fun forceInsertUnique (T {keys, packedWeights, emptykey}) (x, v) =
     let
       val n = Array.length keys
-      val start = (BasisIdx.hash x) mod n
+      val start = (B.hash x) mod n
 
       fun claimSlotAt i = bcas (keys, i, emptykey, x)
 
@@ -151,9 +154,9 @@ struct
           let
             val k = Array.sub (keys, i)
           in
-            if BasisIdx.equal (k, emptykey) then
+            if B.equal (k, emptykey) then
               if claimSlotAt i then putValueAt i else loop i
-            else if BasisIdx.equal (k, x) then
+            else if B.equal (k, x) then
               raise DuplicateKey
             else
               loopNext (i + 1)
@@ -169,7 +172,7 @@ struct
   fun lookup (T {keys, packedWeights, emptykey, ...}) x =
     let
       val n = Array.length keys
-      val start = (BasisIdx.hash x) mod n
+      val start = (B.hash x) mod n
 
       fun makeWeight i =
         C.make (Array.sub (packedWeights, 2 * i), Array.sub
@@ -179,8 +182,8 @@ struct
         let
           val k = Array.sub (keys, i)
         in
-          if BasisIdx.equal (k, emptykey) then NONE
-          else if BasisIdx.equal (k, x) then SOME (makeWeight i)
+          if B.equal (k, emptykey) then NONE
+          else if B.equal (k, x) then SOME (makeWeight i)
           else loopCheck (i + 1)
         end
 
@@ -229,7 +232,7 @@ struct
         not (C.realIsZero x)
 
       fun keepElem i =
-        not (BasisIdx.equal (Array.sub (keys, i), emptykey))
+        not (B.equal (Array.sub (keys, i), emptykey))
         andalso
         (isNonZero (Array.sub (packedWeights, 2 * i))
          orelse isNonZero (Array.sub (packedWeights, 2 * i + 1)))

@@ -19,9 +19,6 @@ pub fn is_real_zero(x: Real) -> bool {
     x.abs() < constants::ZERO_THRESHOLD
 }
 
-pub fn is_real_nonzero(x: Real) -> bool {
-    !is_real_zero(x)
-}
 pub fn is_zero(c: Complex) -> bool {
     is_real_zero(c.re) && is_real_zero(c.im)
 }
@@ -30,12 +27,13 @@ pub fn is_nonzero(c: Complex) -> bool {
     !is_real_zero(c.re) || !is_real_zero(c.im)
 }
 
-pub fn unpack_complex(num: u64) -> (f32, f32) {
+pub fn unpack_complex(num: u64) -> Complex {
     let [re, im]: [f32; 2] = bytemuck::cast(num);
-    (re, im)
+    Complex::new(re, im)
 }
 
-pub fn pack_complex(re: f32, im: f32) -> u64 {
+pub fn pack_complex(c: Complex) -> u64 {
+    let Complex { re, im } = c;
     bytemuck::cast([re, im])
 }
 

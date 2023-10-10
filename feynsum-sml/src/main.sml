@@ -25,6 +25,9 @@ val _ = print
 val schedulerName = CLA.parseString "scheduler" "greedy-nonbranching"
 val _ = print ("scheduler " ^ schedulerName ^ "\n")
 
+(* input circuit *)
+val inputName = CLA.parseString "input" ""
+val _ = print ("input " ^ inputName ^ "\n")
 
 (* ========================================================================
  * gate scheduling
@@ -79,13 +82,66 @@ val gateScheduler =
          ^
          "; valid options are: naive, greedy-branching (gb), greedy-nonbranching (gnb), greedy-finish-qubit (gfq)")
 
+(* =========================================================================
+ * parse input
+ *)
+
+val _ = print
+  ("-------------------------------\n\
+   \--- input-specific specs\n\
+   \-------------------------------\n")
+
+val circuit =
+  case inputName of
+    "" => Util.die ("missing: -input FILE.qasm")
+
+  | _ =>
+      let
+        fun handleLexOrParseError exn =
+          let
+            val e =
+              case exn of
+                SMLQasmError.Error e => e
+              | other => raise other
+          in
+            TerminalColorString.print
+              (SMLQasmError.show
+                 {highlighter = SOME SMLQasmSyntaxHighlighter.fuzzyHighlight} e);
+            OS.Process.exit OS.Process.failure
+          end
+
+        val ast = SMLQasmParser.parseFromFile inputName
+                  handle exn => handleLexOrParseError exn
+
+        val simpleCirc = SMLQasmSimpleCircuit.fromAst ast
+      in
+        Circuit.fromSMLQasmSimpleCircuit simpleCirc
+      end
+
+val _ = print ("-------------------------------\n")
+
+val _ = print ("gates  " ^ Int.toString (Circuit.numGates circuit) ^ "\n")
+val _ = print ("qubits " ^ Int.toString (Circuit.numQubits circuit) ^ "\n")
+
+val showCircuit = CLA.parseFlag "show-circuit"
+val _ = print ("show-circuit? " ^ (if showCircuit then "yes" else "no") ^ "\n")
+val _ =
+  if not showCircuit then
+    ()
+  else
+    print
+      ("=========================================================\n"
+       ^ Circuit.toString circuit
+       ^ "=========================================================\n")
+
 (* ========================================================================
  * mains: 32-bit and 64-bit
  *)
 
-structure M32 =
+structure M_64_32 =
   MkMain
-    (structure C = Complex32
+    (structure B = BasisIdx64
+     structure C = Complex32
      val blockSize = blockSize
      val maxload = maxload
      val gateScheduler = gateScheduler
@@ -93,23 +149,50 @@ structure M32 =
      val denseThreshold = denseThreshold
      val pullThreshold = pullThreshold)
 
-structure M64 =
+structure M_64_64 =
   MkMain
-    (structure C = Complex64
+    (structure B = BasisIdx64
+     structure C = Complex64
      val blockSize = blockSize
      val maxload = maxload
      val gateScheduler = gateScheduler
      val doMeasureZeros = doMeasureZeros
      val denseThreshold = denseThreshold
      val pullThreshold = pullThreshold)
+
+structure M_U_32 =
+  MkMain
+    (structure B = BasisIdxUnlimited
+     structure C = Complex32
+     val blockSize = blockSize
+     val maxload = maxload
+     val gateScheduler = gateScheduler
+     val doMeasureZeros = doMeasureZeros
+     val denseThreshold = denseThreshold
+     val pullThreshold = pullThreshold)
+
+structure M_U_64 =
+  MkMain
+    (structure B = BasisIdxUnlimited
+     structure C = Complex64
+     val blockSize = blockSize
+     val maxload = maxload
+     val gateScheduler = gateScheduler
+     val doMeasureZeros = doMeasureZeros
+     val denseThreshold = denseThreshold
+     val pullThreshold = pullThreshold)
+
+val basisIdx64Okay = Circuit.numQubits circuit <= 62
 
 val main =
   case precision of
-    32 => M32.main
-  | 64 => M64.main
+    32 => if basisIdx64Okay then M_64_32.main else M_U_32.main
+  | 64 => if basisIdx64Okay then M_64_64.main else M_U_64.main
   | _ =>
       Util.die
         ("unknown precision " ^ Int.toString precision
          ^ "; valid values are: 32, 64")
 
-val _ = main ()
+(* ======================================================================== *)
+
+val _ = main (inputName, circuit)

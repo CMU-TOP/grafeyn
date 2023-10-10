@@ -31,7 +31,7 @@ impl SparseStateTable {
     }
 
     pub fn get(&self, bidx: &BasisIdx) -> Option<&Complex> {
-        self.table.get(&bidx)
+        self.table.get(bidx)
     }
 }
 
