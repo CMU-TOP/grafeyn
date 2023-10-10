@@ -151,7 +151,7 @@ if __name__ == "__main__":
             "cx": (2, 0, CXGate),
             "cz": (2, 0, CZGate),
             "ccx": (3, 0, CCXGate),
-            # "cphase": (2, 1, CPhaseGate), #!identical to cz
+            "cphase": (2, 1, CPhaseGate), #!identical to cz
             "ry": (1, 1, RYGate),
             "rz": (1, 1, RZGate),
             "cswap": (3, 0, CSwapGate),
