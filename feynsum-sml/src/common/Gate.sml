@@ -597,6 +597,16 @@ struct
     end
 
 
+  fun swap {target1, target2} =
+    let
+      fun apply (bidx, weight) =
+        (B.swap bidx (target1, target2), weight)
+    in
+      makePushPull
+        {touches = Seq.fromList [target1, target2], action = NonBranching apply}
+    end
+
+
   (* condMult (x, y) b w == C.* (if b then x else y, w)
    * we partially apply it for improved performance
    *)
@@ -842,6 +852,7 @@ struct
     | GateDefn.RX xx => rx xx
     | GateDefn.RZ xx => rz xx
     | GateDefn.RY xx => ry xx
+    | GateDefn.Swap xx => swap xx
     | GateDefn.CSwap xx => cswap xx
     | GateDefn.U xx => u xx
     | GateDefn.Other xx =>
