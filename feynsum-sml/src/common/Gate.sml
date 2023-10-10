@@ -413,6 +413,19 @@ struct
     end
 
 
+  fun tdg qi =
+    let
+      val mult = C.make (recp_sqrt_2, R.~ recp_sqrt_2)
+
+      fun apply (bidx, weight) =
+        let val weight' = if B.get bidx qi then C.* (weight, mult) else weight
+        in (bidx, weight')
+        end
+    in
+      makePushPull {touches = Seq.singleton qi, action = NonBranching apply}
+    end
+
+
   fun x qi =
     let
       fun apply (bidx, weight) =
@@ -815,6 +828,7 @@ struct
     | GateDefn.PauliZ xx => pauliz xx
     | GateDefn.Hadamard xx => hadamard xx
     | GateDefn.T xx => t xx
+    | GateDefn.Tdg xx => tdg xx
     | GateDefn.SqrtX xx => sqrtx xx
     | GateDefn.Sxdg xx => sxdg xx
     | GateDefn.S xx => s xx

@@ -121,6 +121,8 @@ struct
 
           | ("t", 0, 1) => GateDefn.T (getArg 0)
 
+          | ("tdg", 0, 1) => GateDefn.Tdg (getArg 0)
+
           | ("x", 0, 1) => GateDefn.X (getArg 0)
 
           | ("sxdg", 0, 1) => GateDefn.Sxdg (getArg 0)
@@ -233,6 +235,7 @@ struct
         | GateDefn.PauliZ i => "z " ^ qi i
         | GateDefn.Hadamard i => "h " ^ qi i
         | GateDefn.T i => "t " ^ qi i
+        | GateDefn.Tdg i => "tdg " ^ qi i
         | GateDefn.SqrtX i => "sx " ^ qi i
         | GateDefn.Sxdg i => "sxdg " ^ qi i
         | GateDefn.S i => "s " ^ qi i

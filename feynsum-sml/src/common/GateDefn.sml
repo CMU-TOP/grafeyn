@@ -13,6 +13,7 @@ struct
   | Sdg of qubit_idx
   | X of qubit_idx
   | T of qubit_idx
+  | Tdg of qubit_idx
   | CX of {control: qubit_idx, target: qubit_idx}
   | CZ of {control: qubit_idx, target: qubit_idx}
   | CCX of {control1: qubit_idx, control2: qubit_idx, target: qubit_idx}
