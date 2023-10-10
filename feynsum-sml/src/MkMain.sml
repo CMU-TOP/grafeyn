@@ -1,5 +1,6 @@
 functor MkMain
   (structure C: COMPLEX
+   structure B: BASIS_IDX
    val blockSize: int
    val maxload: real
    val gateScheduler: GateScheduler.t
@@ -10,12 +11,14 @@ struct
 
   structure CLA = CommandLineArgs
 
-  structure G = Gate(C)
+  structure G = Gate (structure B = B structure C = C)
 
   structure BFSLocked =
     FullSimBFS
-      (structure C = C
-       structure SST = SparseStateTableLockedSlots(C)
+      (structure B = B
+       structure C = C
+       structure SST =
+         SparseStateTableLockedSlots (structure B = B structure C = C)
        structure G = G
        val blockSize = blockSize
        val maxload = maxload
@@ -26,8 +29,9 @@ struct
 
   structure BFSLockfree =
     FullSimBFS
-      (structure C = C
-       structure SST = SparseStateTable(C)
+      (structure B = B
+       structure C = C
+       structure SST = SparseStateTable (structure B = B structure C = C)
        structure G = G
        val blockSize = blockSize
        val maxload = maxload
@@ -36,15 +40,13 @@ struct
        val denseThreshold = denseThreshold
        val pullThreshold = pullThreshold)
 
-  fun main () =
+  fun main (inputName, circuit) =
     let
       val impl = CLA.parseString "impl" "lockfree"
-      val inputName = CLA.parseString "input" "random"
       val output = CLA.parseString "output" ""
       val outputDensities = CLA.parseString "output-densities" ""
 
       val _ = print ("impl " ^ impl ^ "\n")
-      val _ = print ("input " ^ inputName ^ "\n")
 
       val sim =
         case impl of
@@ -55,124 +57,23 @@ struct
               ("unknown impl " ^ impl
                ^ "; valid options are: locked, lockfree\n")
 
+      val {result, counts} = Benchmark.run "full-sim-bfs" (fn _ => sim circuit)
+      val counts = Seq.map IntInf.fromInt counts
+
+      val maxNumStates = IntInf.pow (2, Circuit.numQubits circuit)
+      val numRounds = IntInf.fromInt (Seq.length counts)
+
+      val avgDensity = Rat.normalize (Rat.make
+        (Seq.reduce IntInf.+ 0 counts, IntInf.* (maxNumStates, numRounds)))
+      val maxDensity = Rat.normalize (Rat.make
+        (Seq.reduce IntInf.max 0 counts, maxNumStates))
 
       val _ = print
-        ("-------------------------------\n\
-         \--- input-specific specs\n\
-         \-------------------------------\n")
-
-      val circuit =
-        case inputName of
-        (*
-          "random" =>
-            let
-              val numGates = CLA.parseInt "gates" 60
-              val numQubits = CLA.parseInt "qubits" 20
-
-              fun genGate seed =
-                let
-                  val p = Util.hash seed mod 100
-                  val qi1 = Util.hash (seed + 1) mod numQubits
-                  val qi2 = Util.hash (seed + 2) mod numQubits
-                in
-                  if p < 50 then GateDefn.Hadamard qi1
-                  else if p < 63 then GateDefn.PauliY qi1
-                  else if p < 76 then GateDefn.PauliZ qi1
-                  else if p < 89 then GateDefn.T qi1
-                  else GateDefn.CX {control = qi1, target = qi2}
-                end
-
-              val gates = Seq.tabulate (fn i => genGate (3 * i)) numGates
-            in
-              {numQubits = numQubits, gates = gates}
-            end
-
-        | "google-circuit" =>
-            let
-              val numRows = CLA.parseInt "google-circuit-num-rows" 9
-              val numCols = CLA.parseInt "google-circuit-num-cols" 6
-              val numCycles = CLA.parseInt "google-circuit-num-cycles" 14
-              val patterns = CLA.parseString "google-circuit-patterns" "EFGH"
-              val seed = CLA.parseInt "google-circuit-seed" 15210
-
-              val _ = print
-                ("google-circuit-num-rows " ^ Int.toString numRows ^ "\n")
-              val _ = print
-                ("google-circuit-num-cols " ^ Int.toString numCols ^ "\n")
-              val _ = print
-                ("google-circuit-num-cycles " ^ Int.toString numCycles ^ "\n")
-              val _ = print ("google-circuit-patterns " ^ patterns ^ "\n")
-              val _ = print ("google-circuit-seed " ^ Int.toString seed ^ "\n")
-
-              val patterns =
-                Seq.tabulate
-                  (fn i =>
-                     GenerateGoogleCircuit.twoQubitPatternFromChar
-                       (String.sub (patterns, i))) (String.size patterns)
-            in
-              GenerateGoogleCircuit.generate
-                { numQubitRows = numRows
-                , numQubitCols = numCols
-                , numCycles = numCycles
-                , patterns = patterns
-                , seed = seed
-                }
-            end
-        *)
-
-          _ =>
-            let
-              fun handleLexOrParseError exn =
-                let
-                  val e =
-                    case exn of
-                      SMLQasmError.Error e => e
-                    | other => raise other
-                in
-                  TerminalColorString.print
-                    (SMLQasmError.show
-                       {highlighter = SOME
-                          SMLQasmSyntaxHighlighter.fuzzyHighlight} e);
-                  OS.Process.exit OS.Process.failure
-                end
-
-              val ast = SMLQasmParser.parseFromFile inputName
-                        handle exn => handleLexOrParseError exn
-
-              val simpleCirc = SMLQasmSimpleCircuit.fromAst ast
-            in
-              Circuit.fromSMLQasmSimpleCircuit simpleCirc
-            end
-
-      val _ = print ("-------------------------------\n")
-
-      val _ = print ("gates  " ^ Int.toString (Circuit.numGates circuit) ^ "\n")
+        ("avg-density "
+         ^ Real.fmt (StringCvt.FIX (SOME 12)) (Rat.approx avgDensity) ^ "\n")
       val _ = print
-        ("qubits " ^ Int.toString (Circuit.numQubits circuit) ^ "\n")
-
-      val showCircuit = CLA.parseFlag "show-circuit"
-      val _ = print
-        ("show-circuit? " ^ (if showCircuit then "yes" else "no") ^ "\n")
-      val _ =
-        if not showCircuit then
-          ()
-        else
-          print
-            ("=========================================================\n"
-             ^ Circuit.toString circuit
-             ^ "=========================================================\n")
-
-      val {result, densities} = Benchmark.run "full-sim-bfs" (fn _ =>
-        sim circuit)
-
-      val avgDensity =
-        (Seq.reduce op+ 0.0 densities) / Real.fromInt (Seq.length densities)
-      val maxDensity = Seq.reduce Real.max 0.0 densities
-
-      val _ = print
-        ("avg-density " ^ Real.fmt (StringCvt.FIX (SOME 12)) avgDensity ^ "\n")
-      val _ = print
-        ("max-density " ^ Real.fmt (StringCvt.FIX (SOME 12)) maxDensity ^ "\n")
+        ("max-density "
+         ^ Real.fmt (StringCvt.FIX (SOME 12)) (Rat.approx maxDensity) ^ "\n")
 
       val _ =
         if output = "" then
@@ -190,7 +91,7 @@ struct
                   let in
                     TextIO.output
                       ( outstream
-                      , BasisIdx.toString {numQubits = numQubits} bidx ^ " "
+                      , B.toString {numQubits = numQubits} bidx ^ " "
                         ^ C.toString weight ^ "\n"
                       )
                   end);
@@ -205,10 +106,12 @@ struct
           let
             val outstream = TextIO.openOut outputDensities
           in
-            Util.for (0, Seq.length densities) (fn i =>
+            Util.for (0, Seq.length counts) (fn i =>
               let
-                val dstr = Real.fmt (StringCvt.FIX (SOME 8))
-                  (Seq.nth densities i)
+                val count = Seq.nth counts i
+                val density = Rat.normalize (Rat.make (count, maxNumStates))
+                val dstr =
+                  Real.fmt (StringCvt.FIX (SOME 12)) (Rat.approx density)
               in
                 TextIO.output (outstream, dstr ^ "\n")
               end);
@@ -223,8 +126,8 @@ struct
            [ name
            , Int.toString (Circuit.numQubits circuit)
            , Int.toString (Circuit.numGates circuit)
-           , Real.fmt (StringCvt.FIX (SOME 12)) maxDensity
-           , Real.fmt (StringCvt.FIX (SOME 12)) avgDensity
+           , Real.fmt (StringCvt.FIX (SOME 12)) (Rat.approx maxDensity)
+           , Real.fmt (StringCvt.FIX (SOME 12)) (Rat.approx avgDensity)
            ] ^ "\n")
     end
 

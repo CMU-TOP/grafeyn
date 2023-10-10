@@ -1,5 +1,6 @@
 signature DENSE_STATE =
 sig
+  structure B: BASIS_IDX
   structure C: COMPLEX
 
   type t
@@ -8,7 +9,7 @@ sig
   val make: {numQubits: int} -> state
 
   val pull: {numQubits: int}
-            -> (BasisIdx.t -> {weight: C.t, count: int})
+            -> (B.t -> {weight: C.t, count: int})
             -> {result: state, nonZeroSize: int, totalCount: int}
 
   val size: state -> int
@@ -16,9 +17,9 @@ sig
   val zeroSize: state -> int
   val capacity: state -> int
 
-  val unsafeViewContents: state -> (BasisIdx.t * C.t) option DelayedSeq.t
+  val unsafeViewContents: state -> (B.t * C.t) option DelayedSeq.t
 
-  val lookup: state -> BasisIdx.t -> C.t option
-  val lookupDirect: state -> BasisIdx.t -> C.t
-  val insertAddWeights: state -> BasisIdx.t * C.t -> unit
+  val lookup: state -> B.t -> C.t option
+  val lookupDirect: state -> B.t -> C.t
+  val insertAddWeights: state -> B.t * C.t -> unit
 end

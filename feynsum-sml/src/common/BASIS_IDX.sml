@@ -1,6 +1,5 @@
 signature BASIS_IDX =
 sig
-  type qubit_idx = int
   type t
 
   val maxNumQubits: int option (* NONE: unlimited *)
@@ -9,12 +8,12 @@ sig
 
   val zeros: t
 
-  val setTo: bool -> t -> qubit_idx -> t
-  val set: t -> qubit_idx -> t
-  val unset: t -> qubit_idx -> t
-  val flip: t -> qubit_idx -> t
-  val swap: t -> qubit_idx * qubit_idx -> t
-  val get: t -> qubit_idx -> bool
+  val setTo: bool -> t -> QubitIdx.t -> t
+  val set: t -> QubitIdx.t -> t
+  val unset: t -> QubitIdx.t -> t
+  val flip: t -> QubitIdx.t -> t
+  val swap: t -> QubitIdx.t * QubitIdx.t -> t
+  val get: t -> QubitIdx.t -> bool
 
   (* not a very meaningful comparison; this is just for storing it in
    * ordered maps and whatever.

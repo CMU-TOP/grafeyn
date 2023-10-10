@@ -1,5 +1,5 @@
 (* mapping of qubit index to {0,1} *)
-structure BasisIdx :> BASIS_IDX =
+structure BasisIdx64 :> BASIS_IDX =
 struct
   type qubit_idx = int
 

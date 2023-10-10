@@ -1,8 +1,10 @@
 functor ExpandState
-  (structure C: COMPLEX
+  (structure B: BASIS_IDX
+   structure C: COMPLEX
    structure SST: SPARSE_STATE_TABLE
    structure DS: DENSE_STATE
    structure G: GATE
+   sharing B = SST.B = DS.B = G.B
    sharing C = SST.C = DS.C = G.C
    val blockSize: int
    val maxload: real
@@ -10,19 +12,59 @@ functor ExpandState
    val pullThreshold: real) :>
 sig
 
-  (* type state = (BasisIdx.t * C.t) option DelayedSeq.t *)
-
   datatype state =
     Sparse of SST.t
   | Dense of DS.t
   | DenseKnownNonZeroSize of DS.t * int
 
   val expand:
-    {gates: G.t Seq.t, numQubits: int, state: state, prevNonZeroSize: int}
+    { gates: G.t Seq.t
+    , numQubits: int
+    , maxNumStates: IntInf.int
+    , state: state
+    , prevNonZeroSize: int
+    }
     -> {result: state, method: string, numNonZeros: int, numGateApps: int}
 
 end =
 struct
+
+  (* 0 < r < 1
+   *
+   * I wish this wasn't so difficult
+   *
+   * The problem is that I can't always convert the IntInf into a real,
+   * because it might be too large.
+   *)
+  fun riMult (r: real) (i: IntInf.int) : IntInf.int =
+    if IntInf.abs i <= 1000000000000 then
+      Real.toLargeInt IEEEReal.TO_NEAREST
+        (r * Real.fromLargeInt (IntInf.toLarge i))
+    else
+      let
+        val digits = Real.fmt StringCvt.EXACT r
+        val digits =
+          if String.isPrefix "0." digits then String.extract (digits, 2, NONE)
+          else raise Fail "riMult: uh oh"
+
+        fun loop acc depth =
+          if depth >= String.size digits then
+            acc
+          else
+            let
+              val d = Char.ord (String.sub (digits, depth)) - Char.ord #"0"
+              val _ =
+                if 0 <= d andalso d <= 9 then ()
+                else raise Fail "riMult: bad digit"
+              val acc =
+                acc + (i * IntInf.fromInt d) div (IntInf.pow (10, depth + 1))
+            in
+              loop acc (depth + 1)
+            end
+      in
+        loop 0 0
+      end
+
 
   fun log2 x = Math.log10 x / Math.log10 2.0
 
@@ -64,7 +106,7 @@ struct
 
   datatype successors_result =
     AllSucceeded
-  | SomeFailed of {widx: BasisIdx.t * C.t, gatenum: int} list
+  | SomeFailed of {widx: B.t * C.t, gatenum: int} list
 
 
   datatype state =
@@ -236,7 +278,7 @@ struct
         end
 
       val initialCapacity = Real.ceil
-        (1.1 * (1.0 / maxload) * Real.fromInt expected)
+        (1.1 * (1.0 / maxload) * Real.fromInt (IntInf.toInt expected))
       val initialTable =
         SST.make {capacity = initialCapacity, numQubits = numQubits}
       val initialBlocks = Seq.tabulate (fn b => b) numBlocks
@@ -247,7 +289,7 @@ struct
     end
 
 
-  fun expandPushDense {gates: G.t Seq.t, numQubits, state, expected} =
+  fun expandPushDense {gates: G.t Seq.t, numQubits, state, expected: IntInf.int} =
     let
       val numGates = Seq.length gates
       fun gate i = Seq.nth gates i
@@ -293,7 +335,7 @@ struct
     end
 
 
-  fun expandPullDense {gates: G.t Seq.t, numQubits, state, expected} =
+  fun expandPullDense {gates: G.t Seq.t, numQubits, state, expected: IntInf.int} =
     let
       val actions = Seq.map (valOf o G.pullAction) gates
       fun action i = Seq.nth actions i
@@ -339,11 +381,8 @@ struct
     end
 
 
-  fun expand (xxx as {gates, numQubits, state, prevNonZeroSize}) =
+  fun expand (xxx as {gates, numQubits, maxNumStates, state, prevNonZeroSize}) =
     let
-      val maxNumStates = Word64.toInt
-        (Word64.<< (0w1, Word64.fromInt numQubits))
-
       val nonZeroSize =
         case state of
           Sparse sst => SST.nonZeroSize sst
@@ -353,11 +392,8 @@ struct
       val rate = Real.max
         (1.0, Real.fromInt nonZeroSize / Real.fromInt prevNonZeroSize)
       val expected = Real.ceil (rate * Real.fromInt nonZeroSize)
-      val expected = Int.min (expected, maxNumStates)
-
-      val expectedDensity = Real.fromInt expected / Real.fromInt maxNumStates
-      val currentDensity = Real.fromInt nonZeroSize / Real.fromInt maxNumStates
-      val expectedCost = Real.max (expectedDensity, currentDensity)
+      val expected = IntInf.min (IntInf.fromInt expected, maxNumStates)
+      val expectedCost = IntInf.max (IntInf.fromInt nonZeroSize, expected)
 
       fun allGatesPullable () =
         Util.all (0, Seq.length gates) (G.pullable o Seq.nth gates)
@@ -370,10 +406,17 @@ struct
         }
 
       val (method, {result, numGateApps}) =
-        if expectedCost < denseThreshold then
+        if
+          expectedCost < riMult denseThreshold maxNumStates
+        then
           ("push sparse", expandSparse args)
-        else if expectedCost >= pullThreshold andalso allGatesPullable () then
+
+        else if
+          expectedCost >= riMult pullThreshold maxNumStates
+          andalso allGatesPullable ()
+        then
           ("pull dense", expandPullDense args)
+
         else
           ("push dense", expandPushDense args)
     in

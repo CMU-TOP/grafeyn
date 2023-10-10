@@ -1,7 +1,9 @@
 functor FullSimBFS
-  (structure C: COMPLEX
+  (structure B: BASIS_IDX
+   structure C: COMPLEX
    structure SST: SPARSE_STATE_TABLE
    structure G: GATE
+   sharing B = SST.B = G.B
    sharing C = SST.C = G.C
 
    val blockSize: int
@@ -11,17 +13,17 @@ functor FullSimBFS
    val denseThreshold: real
    val pullThreshold: real):
 sig
-  val run:
-    Circuit.t
-    -> {result: (BasisIdx.t * C.t) option DelayedSeq.t, densities: real Seq.t}
+  val run: Circuit.t
+           -> {result: (B.t * C.t) option DelayedSeq.t, counts: int Seq.t}
 end =
 struct
 
-  structure DS = DenseState(C)
+  structure DS = DenseState (structure C = C structure B = B)
 
   structure Expander =
     ExpandState
-      (structure C = C
+      (structure B = B
+       structure C = C
        structure SST = SST
        structure DS = DS
        structure G = G
@@ -69,7 +71,7 @@ struct
         | SOME (bidx, weight) =>
             let in
               print
-                (BasisIdx.toString {numQubits = numQubits} bidx ^ " "
+                (B.toString {numQubits = numQubits} bidx ^ " "
                  ^ C.toString weight ^ "\n")
             end)
     end
@@ -93,9 +95,11 @@ struct
 
       (* val _ =
         if numQubits > 63 then raise Fail "whoops, too many qubits" else () *)
-      val maxNumStates = Word64.toInt
-        (Word64.<< (0w1, Word64.fromInt numQubits))
-      val maxCountSize = String.size (Int.toString maxNumStates)
+      val maxNumStates = IntInf.pow (2, numQubits)
+      (* val maxNumStates = Word64.toInt
+        (Word64.<< (0w1, Word64.fromInt numQubits)) *)
+      val maxCountSize = Int.min
+        (10, String.size (IntInf.toString maxNumStates))
       val maxGateNameSize = String.size (Int.toString depth)
 
       fun padCount x =
@@ -105,8 +109,9 @@ struct
 
       fun dumpDensity (i, nonZeroSize, zeroSize, capacity) =
         let
-          val density = Real.fromInt nonZeroSize / Real.fromInt maxNumStates
-          val densityStr = Real.fmt (StringCvt.FIX (SOME 8)) density
+          val density = Rat.make (IntInf.fromInt nonZeroSize, maxNumStates)
+          val approxDensity = Rat.approx density
+          val densityStr = Real.fmt (StringCvt.FIX (SOME 8)) approxDensity
           val zStr =
             case zeroSize of
               NONE => ""
@@ -123,14 +128,14 @@ struct
             | _ => ""
         in
           print
-            (fillBar 12 density ^ " " ^ "gate " ^ padGate i ^ " density "
+            (fillBar 12 approxDensity ^ " " ^ "gate " ^ padGate i ^ " density "
              ^ densityStr ^ " nonzero " ^ padCount nonZeroSize ^ zStr ^ slackStr);
           TextIO.flushOut TextIO.stdOut;
           density
         end
 
 
-      fun loop numGateApps gatesVisitedSoFar densities prevNonZeroSize state =
+      fun loop numGateApps gatesVisitedSoFar counts prevNonZeroSize state =
         if gatesVisitedSoFar >= depth then
           let
             val (nonZeros, numNonZeros) =
@@ -148,7 +153,7 @@ struct
               dumpDensity (gatesVisitedSoFar, numNonZeros, NONE, NONE)
           in
             print "\n";
-            (numGateApps, nonZeros, Seq.fromRevList (density :: densities))
+            (numGateApps, nonZeros, Seq.fromRevList (numNonZeros :: counts))
           end
 
         else
@@ -172,6 +177,7 @@ struct
                 Expander.expand
                   { gates = theseGates
                   , numQubits = numQubits
+                  , maxNumStates = maxNumStates
                   , state = state
                   , prevNonZeroSize = prevNonZeroSize
                   })
@@ -189,17 +195,16 @@ struct
                ^ throughputStr ^ "\n")
           in
             loop (numGateApps + apps) (gatesVisitedSoFar + numGatesVisitedHere)
-              (density :: densities) numNonZeros result
+              (numNonZeros :: counts) numNonZeros result
           end
 
 
       val initialState = Expander.Sparse
-        (SST.singleton {numQubits = numQubits}
-           (BasisIdx.zeros, C.defaultReal 1.0))
+        (SST.singleton {numQubits = numQubits} (B.zeros, C.defaultReal 1.0))
 
-      val (numGateApps, finalState, densities) = loop 0 0 [] 1 initialState
+      val (numGateApps, finalState, counts) = loop 0 0 [] 1 initialState
       val _ = print ("gate app count " ^ Int.toString numGateApps ^ "\n")
     in
-      {result = finalState, densities = densities}
+      {result = finalState, counts = counts}
     end
 end

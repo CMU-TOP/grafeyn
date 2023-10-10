@@ -1,10 +1,11 @@
 signature GATE =
 sig
   structure C: COMPLEX
+  structure B: BASIS_IDX
 
   type qubit_idx = int
   type weight = C.t
-  type weighted_idx = BasisIdx.t * weight
+  type weighted_idx = B.t * weight
 
   datatype maybe_branching_output =
     OutputOne of weighted_idx
@@ -16,8 +17,8 @@ sig
   | MaybeBranching of weighted_idx -> maybe_branching_output
 
   datatype pull_gate_action =
-    PullNonBranching of BasisIdx.t -> BasisIdx.t * weight
-  | PullBranching of BasisIdx.t -> (BasisIdx.t * weight) * (BasisIdx.t * weight)
+    PullNonBranching of B.t -> B.t * weight
+  | PullBranching of B.t -> (B.t * weight) * (B.t * weight)
 
   type gate =
     { touches: qubit_idx Seq.t
@@ -37,9 +38,10 @@ sig
 end
 
 
-functor Gate(C: COMPLEX): GATE =
+functor Gate (structure C: COMPLEX structure B: BASIS_IDX): GATE =
 struct
 
+  structure B = B
   structure C = C
   structure R =
   struct open C.R val fromLarge = fromLarge IEEEReal.TO_NEAREST end
@@ -47,7 +49,7 @@ struct
   type qubit_idx = int
   type weight = C.t
   type r = C.r
-  type weighted_idx = BasisIdx.t * weight
+  type weighted_idx = B.t * weight
 
   datatype maybe_branching_output =
     OutputOne of weighted_idx
@@ -59,11 +61,8 @@ struct
   | MaybeBranching of weighted_idx -> maybe_branching_output
 
   datatype pull_gate_action =
-    PullNonBranching of BasisIdx.t -> BasisIdx.t * weight
-  | PullBranching of BasisIdx.t -> (BasisIdx.t * weight) * (BasisIdx.t * weight)
-  (* | PullBranchingRealModifier of
-      BasisIdx.t
-      -> (BasisIdx.t * C.r) * (BasisIdx.t * C.r) *)
+    PullNonBranching of B.t -> B.t * weight
+  | PullBranching of B.t -> (B.t * weight) * (B.t * weight)
 
   type gate =
     { touches: qubit_idx Seq.t
@@ -96,19 +95,16 @@ struct
           (1, NonBranching apply) =>
             let
               val qi = Seq.nth touches 0
-              val (b0, m0) = apply (BasisIdx.zeros, C.real one)
-              val (b1, m1) = apply (BasisIdx.set BasisIdx.zeros qi, C.real one)
+              val (b0, m0) = apply (B.zeros, C.real one)
+              val (b1, m1) = apply (B.set B.zeros qi, C.real one)
 
-              val notFlipped = BasisIdx.equal (b0, BasisIdx.zeros)
+              val notFlipped = B.equal (b0, B.zeros)
 
               val action =
                 if notFlipped then
-                  fn bidx => (bidx, if BasisIdx.get bidx qi then m1 else m0)
+                  fn bidx => (bidx, if B.get bidx qi then m1 else m0)
                 else
-                  fn bidx =>
-                    ( BasisIdx.flip bidx qi
-                    , if BasisIdx.get bidx qi then m0 else m1
-                    )
+                  fn bidx => (B.flip bidx qi, if B.get bidx qi then m0 else m1)
             in
               SOME (PullNonBranching action)
             end
@@ -122,16 +118,13 @@ struct
                * |10⟩  ->  m10 * |b10⟩
                * |11⟩  ->  m11 * |b11⟩
                *)
-              val (b00, m00) = apply (BasisIdx.zeros, C.real one)
-              val (b01, m01) = apply
-                (BasisIdx.set BasisIdx.zeros qj, C.real one)
-              val (b10, m10) = apply
-                (BasisIdx.set BasisIdx.zeros qi, C.real one)
-              val (b11, m11) = apply
-                (BasisIdx.set (BasisIdx.set BasisIdx.zeros qi) qj, C.real one)
+              val (b00, m00) = apply (B.zeros, C.real one)
+              val (b01, m01) = apply (B.set B.zeros qj, C.real one)
+              val (b10, m10) = apply (B.set B.zeros qi, C.real one)
+              val (b11, m11) = apply (B.set (B.set B.zeros qi) qj, C.real one)
 
               fun match left right bb =
-                left = BasisIdx.get bb qi andalso right = BasisIdx.get bb qj
+                left = B.get bb qi andalso right = B.get bb qj
 
               fun find left right =
                 if match left right b00 then (b00, m00)
@@ -155,19 +148,19 @@ struct
 
               fun alignWith bb bidx =
                 let
-                  val bidx = BasisIdx.setTo (BasisIdx.get bb qi) bidx qi
-                  val bidx = BasisIdx.setTo (BasisIdx.get bb qj) bidx qj
+                  val bidx = B.setTo (B.get bb qi) bidx qi
+                  val bidx = B.setTo (B.get bb qj) bidx qj
                 in
                   bidx
                 end
 
 
               fun action bidx =
-                if BasisIdx.get bidx qi then
-                  (if BasisIdx.get bidx qj then (alignWith b11' bidx, m11')
+                if B.get bidx qi then
+                  (if B.get bidx qj then (alignWith b11' bidx, m11')
                    else (alignWith b10' bidx, m10'))
                 else
-                  (if BasisIdx.get bidx qj then (alignWith b01' bidx, m01')
+                  (if B.get bidx qj then (alignWith b01' bidx, m01')
                    else (alignWith b00' bidx, m00'))
             in
               SOME (PullNonBranching action)
@@ -180,23 +173,23 @@ struct
               (* |0⟩  ->  m00 * |b00⟩ + m01 * |b01⟩
                * |1⟩  ->  m10 * |b10⟩ + m11 * |b11⟩
                *)
-              val ((b00, m00), (b01, m01)) = apply (BasisIdx.zeros, C.real one)
+              val ((b00, m00), (b01, m01)) = apply (B.zeros, C.real one)
               val ((b10, m10), (b11, m11)) = apply
-                (BasisIdx.set BasisIdx.zeros qi, C.real one)
+                (B.set B.zeros qi, C.real one)
 
               val ((b00, m00), (b01, m01)) =
-                if BasisIdx.get b00 qi then ((b01, m01), (b00, m00))
+                if B.get b00 qi then ((b01, m01), (b00, m00))
                 else ((b00, m00), (b01, m01))
 
               val ((b10, m10), (b11, m11)) =
-                if BasisIdx.get b10 qi then ((b11, m11), (b10, m10))
+                if B.get b10 qi then ((b11, m11), (b10, m10))
                 else ((b10, m10), (b11, m11))
 
               (* sanity check *)
               val _ =
                 if
-                  not (BasisIdx.get b00 qi) andalso not (BasisIdx.get b10 qi)
-                  andalso BasisIdx.get b01 qi andalso BasisIdx.get b11 qi
+                  not (B.get b00 qi) andalso not (B.get b10 qi)
+                  andalso B.get b01 qi andalso B.get b11 qi
                 then
                   ()
                 else
@@ -204,10 +197,8 @@ struct
                     "Gate.pushPull: branching gate doesn't output in order |0⟩, |1⟩"
 
               fun action bidx =
-                if BasisIdx.get bidx qi then
-                  ((BasisIdx.unset bidx qi, m01), (bidx, m11))
-                else
-                  ((bidx, m00), (BasisIdx.set bidx qi, m10))
+                if B.get bidx qi then ((B.unset bidx qi, m01), (bidx, m11))
+                else ((bidx, m00), (B.set bidx qi, m10))
             in
               SOME (PullBranching action)
             end
@@ -230,8 +221,8 @@ struct
 
       fun apply (bidx, weight) =
         let
-          val bidx' = BasisIdx.flip bidx qi
-          val multiplier = if BasisIdx.get bidx qi then xx else yy
+          val bidx' = B.flip bidx qi
+          val multiplier = if B.get bidx qi then xx else yy
           val weight' = C.* (weight, multiplier)
         in
           (bidx', weight')
@@ -246,11 +237,8 @@ struct
       val xx = R.~ one
 
       fun apply (bidx, weight) =
-        let
-          val weight' =
-            if BasisIdx.get bidx qi then C.scale (xx, weight) else weight
-        in
-          (bidx, weight')
+        let val weight' = if B.get bidx qi then C.scale (xx, weight) else weight
+        in (bidx, weight')
         end
     in
       makePushPull {touches = Seq.singleton qi, action = NonBranching apply}
@@ -267,7 +255,7 @@ struct
       fun apply (bidx, weight) =
         let
           val weight' =
-            if BasisIdx.get bidx control andalso BasisIdx.get bidx target then
+            if B.get bidx control andalso B.get bidx target then
               C.scale (xx, weight)
             else
               weight
@@ -277,10 +265,8 @@ struct
 
 
       fun pullApply bidx =
-        if BasisIdx.get bidx control andalso BasisIdx.get bidx target then
-          (bidx, Cnegone)
-        else
-          (bidx, Cone)
+        if B.get bidx control andalso B.get bidx target then (bidx, Cnegone)
+        else (bidx, Cone)
     in
       { touches = Seq.fromList [control, target]
       , action = NonBranching apply
@@ -293,12 +279,12 @@ struct
     let
       fun apply (bidx, weight) =
         let
-          val bidx1 = BasisIdx.unset bidx qi
-          val bidx2 = BasisIdx.set bidx qi
+          val bidx1 = B.unset bidx qi
+          val bidx2 = B.set bidx qi
 
           val multiplier1 = C.make (half, R.~ half)
           val multiplier2 =
-            if BasisIdx.get bidx qi then C.make (half, R.~ half)
+            if B.get bidx qi then C.make (half, R.~ half)
             else C.make (R.~ half, half)
 
           val weight1 = C.* (weight, multiplier1)
@@ -318,23 +304,23 @@ struct
 
       fun apply (bidx, weight) =
         let
-          val bidx1 = BasisIdx.unset bidx qi
-          val bidx2 = BasisIdx.set bidx qi
+          val bidx1 = B.unset bidx qi
+          val bidx2 = B.set bidx qi
 
           val weightA = C.* (weight, xx)
           val weightB = C.* (weight, yy)
         in
-          if BasisIdx.get bidx qi then ((bidx1, weightB), (bidx2, weightA))
+          if B.get bidx qi then ((bidx1, weightB), (bidx2, weightA))
           else ((bidx1, weightA), (bidx2, weightB))
         end
 
 
       fun pullApply bidx =
         let
-          val bidx0 = BasisIdx.unset bidx qi
-          val bidx1 = BasisIdx.set bidx qi
+          val bidx0 = B.unset bidx qi
+          val bidx1 = B.set bidx qi
         in
-          if BasisIdx.get bidx qi then ((bidx0, yy), (bidx1, xx))
+          if B.get bidx qi then ((bidx0, yy), (bidx1, xx))
           else ((bidx0, xx), (bidx1, yy))
         end
 
@@ -350,11 +336,11 @@ struct
     let
       fun apply (bidx, weight) =
         let
-          val bidx1 = BasisIdx.unset bidx qi
-          val bidx2 = BasisIdx.set bidx qi
+          val bidx1 = B.unset bidx qi
+          val bidx2 = B.set bidx qi
 
           val (mult1, mult2) =
-            if BasisIdx.get bidx qi then
+            if B.get bidx qi then
               (C.imag recp_sqrt_2, C.make (R.~ half, R.~ half))
             else
               (C.make (R.~ half, R.~ half), C.real (R.~ recp_sqrt_2))
@@ -376,10 +362,10 @@ struct
 
       fun apply (bidx, weight) =
         let
-          val bidx0 = BasisIdx.unset bidx qi
-          val bidx1 = BasisIdx.set bidx qi
+          val bidx0 = B.unset bidx qi
+          val bidx1 = B.set bidx qi
         in
-          if BasisIdx.get bidx qi then
+          if B.get bidx qi then
             ( (bidx0, C.scale (recp_sqrt_2, weight))
             , (bidx1, C.scale (neg_recp_sqrt_2, weight))
             )
@@ -391,10 +377,10 @@ struct
 
       fun pullApply bidx =
         let
-          val bidx0 = BasisIdx.unset bidx qi
-          val bidx1 = BasisIdx.set bidx qi
+          val bidx0 = B.unset bidx qi
+          val bidx1 = B.set bidx qi
         in
-          if BasisIdx.get bidx qi then ((bidx0, Crs2), (bidx1, Cnrs2))
+          if B.get bidx qi then ((bidx0, Crs2), (bidx1, Cnrs2))
           else ((bidx0, Crs2), (bidx1, Crs2))
         end
     in
@@ -410,15 +396,12 @@ struct
       val Cone = C.real one
 
       fun apply (bidx, weight) =
-        let
-          val bidx' =
-            if BasisIdx.get bidx ci then BasisIdx.flip bidx ti else bidx
-        in
-          (bidx', weight)
+        let val bidx' = if B.get bidx ci then B.flip bidx ti else bidx
+        in (bidx', weight)
         end
 
       fun pullApply bidx =
-        (if BasisIdx.get bidx ci then BasisIdx.flip bidx ti else bidx, Cone)
+        (if B.get bidx ci then B.flip bidx ti else bidx, Cone)
     in
       { touches = Seq.fromList [ci, ti]
       , action = NonBranching apply
@@ -432,10 +415,8 @@ struct
       fun apply (bidx, weight) =
         let
           val bidx' =
-            if BasisIdx.get bidx ci1 andalso BasisIdx.get bidx ci2 then
-              BasisIdx.flip bidx ti
-            else
-              bidx
+            if B.get bidx ci1 andalso B.get bidx ci2 then B.flip bidx ti
+            else bidx
         in
           (bidx', weight)
         end
@@ -450,11 +431,8 @@ struct
       val mult = C.make (recp_sqrt_2, recp_sqrt_2)
 
       fun apply (bidx, weight) =
-        let
-          val weight' =
-            if BasisIdx.get bidx qi then C.* (weight, mult) else weight
-        in
-          (bidx, weight')
+        let val weight' = if B.get bidx qi then C.* (weight, mult) else weight
+        in (bidx, weight')
         end
     in
       makePushPull {touches = Seq.singleton qi, action = NonBranching apply}
@@ -464,7 +442,7 @@ struct
   fun x qi =
     let
       fun apply (bidx, weight) =
-        let val bidx' = BasisIdx.flip bidx qi
+        let val bidx' = B.flip bidx qi
         in (bidx', weight)
         end
     in
@@ -480,11 +458,10 @@ struct
       fun apply (bidx, weight) =
         let
           val weight =
-            if
-              not (BasisIdx.get bidx control)
-              orelse not (BasisIdx.get bidx target)
-            then weight
-            else C.* (mult, weight)
+            if not (B.get bidx control) orelse not (B.get bidx target) then
+              weight
+            else
+              C.* (mult, weight)
         in
           (bidx, weight)
         end
@@ -498,8 +475,8 @@ struct
     let
       fun apply (bidx, weight) =
         let
-          val l = BasisIdx.get bidx left
-          val r = BasisIdx.get bidx right
+          val l = B.get bidx left
+          val r = B.get bidx right
 
           val theta = R.fromLarge theta
           val phi = R.fromLarge phi
@@ -510,11 +487,11 @@ struct
           | _ =>
               let
                 val bidx1 = bidx
-                val bidx2 = BasisIdx.flip (BasisIdx.flip bidx left) right
+                val bidx2 = B.flip (B.flip bidx left) right
                 val weight1 = C.* (weight, C.real (R.Math.cos theta))
                 val weight2 = C.* (weight, C.imag (R.~ (R.Math.sin theta)))
               in
-                if BasisIdx.get bidx left then
+                if B.get bidx left then
                   OutputTwo ((bidx1, weight2), (bidx2, weight1))
                 else
                   OutputTwo ((bidx1, weight1), (bidx2, weight2))
@@ -534,12 +511,12 @@ struct
       val rot1 = C.rotateBy x
 
       fun apply (bidx, weight) =
-        let val mult = if BasisIdx.get bidx target then rot1 else rot0
+        let val mult = if B.get bidx target then rot1 else rot0
         in (bidx, C.* (mult, weight))
         end
 
       fun pullApply bidx =
-        if BasisIdx.get bidx target then (bidx, rot0) else (bidx, rot1)
+        if B.get bidx target then (bidx, rot0) else (bidx, rot1)
     in
       { touches = Seq.singleton target
       , action = NonBranching apply
@@ -563,9 +540,9 @@ struct
 
       fun apply (bidx, weight) =
         let
-          val bidx0 = BasisIdx.unset bidx target
-          val bidx1 = BasisIdx.set bidx target
-          val (mult0, mult1) = if BasisIdx.get bidx target then xx else yy
+          val bidx0 = B.unset bidx target
+          val bidx1 = B.set bidx target
+          val (mult0, mult1) = if B.get bidx target then xx else yy
         in
           ((bidx0, C.scale (mult0, weight)), (bidx1, C.scale (mult1, weight)))
         end
@@ -573,10 +550,10 @@ struct
 
       fun pullApply bidx =
         let
-          val bidx0 = BasisIdx.unset bidx target
-          val bidx1 = BasisIdx.set bidx target
+          val bidx0 = B.unset bidx target
+          val bidx1 = B.set bidx target
         in
-          if BasisIdx.get bidx target then ((bidx0, Cc), (bidx1, Cns))
+          if B.get bidx target then ((bidx0, Cc), (bidx1, Cns))
           else ((bidx0, Cs), (bidx1, Cc))
         end
 
@@ -593,10 +570,7 @@ struct
       fun apply (bidx, weight) =
         let
           val bidx' =
-            if BasisIdx.get bidx control then
-              BasisIdx.swap bidx (target1, target2)
-            else
-              bidx
+            if B.get bidx control then B.swap bidx (target1, target2) else bidx
         in
           (bidx', weight)
         end
@@ -635,7 +609,7 @@ struct
             val fw = condMult (d, c)
           in
             NonBranching (fn (bidx, weight) =>
-              (BasisIdx.set bidx target, fw (BasisIdx.get bidx target) weight))
+              (B.set bidx target, fw (B.get bidx target) weight))
           end
           *)
           raise Fail "Gate.singleQubitUnitary: impossible?"
@@ -645,7 +619,7 @@ struct
             val fw = condMult (b, c)
           in
             NonBranching (fn (bidx, weight) =>
-              (BasisIdx.flip bidx target, fw (BasisIdx.get bidx target) weight))
+              (B.flip bidx target, fw (B.get bidx target) weight))
           end
 
         else if C.isZero c andalso C.isZero b then
@@ -653,7 +627,7 @@ struct
             val fw = condMult (d, a)
           in
             NonBranching (fn (bidx, weight) =>
-              (bidx, fw (BasisIdx.get bidx target) weight))
+              (bidx, fw (B.get bidx target) weight))
           end
 
         else if C.isZero c andalso C.isZero d then
@@ -662,7 +636,7 @@ struct
             val fw = condMult (b, a)
           in
             NonBranching (fn (bidx, weight) =>
-              (BasisIdx.unset bidx target, fw (BasisIdx.get bidx target) weight))
+              (B.unset bidx target, fw (B.get bidx target) weight))
           end
           *)
           raise Fail "Gate.singleQubitUnitary: impossible?"
@@ -670,11 +644,10 @@ struct
         else
           Branching (fn (bidx, weight) =>
             let
-              val bidx0 = BasisIdx.unset bidx target
-              val bidx1 = BasisIdx.set bidx target
+              val bidx0 = B.unset bidx target
+              val bidx1 = B.set bidx target
 
-              val (mult0, mult1) =
-                if BasisIdx.get bidx target then (b, d) else (a, c)
+              val (mult0, mult1) = if B.get bidx target then (b, d) else (a, c)
             in
               ((bidx0, C.* (mult0, weight)), (bidx1, C.* (mult1, weight)))
             end)
@@ -685,21 +658,19 @@ struct
           raise Fail "Gate.singleQubitUnitary: impossible?"
         else if C.isZero a andalso C.isZero d then
           PullNonBranching (fn bidx =>
-            ( BasisIdx.flip bidx target
-            , if BasisIdx.get bidx target then c else b
-            ))
+            (B.flip bidx target, if B.get bidx target then c else b))
         else if C.isZero c andalso C.isZero b then
           PullNonBranching (fn bidx =>
-            (bidx, if BasisIdx.get bidx target then d else a))
+            (bidx, if B.get bidx target then d else a))
         else if C.isZero c andalso C.isZero d then
           raise Fail "Gate.singleQubitUnitary: impossible?"
         else
           PullBranching (fn bidx =>
             let
-              val bidx0 = BasisIdx.unset bidx target
-              val bidx1 = BasisIdx.set bidx target
+              val bidx0 = B.unset bidx target
+              val bidx1 = B.set bidx target
             in
-              if BasisIdx.get bidx target then ((bidx0, c), (bidx1, d))
+              if B.get bidx target then ((bidx0, c), (bidx1, d))
               else ((bidx0, a), (bidx1, b))
             end)
     in
