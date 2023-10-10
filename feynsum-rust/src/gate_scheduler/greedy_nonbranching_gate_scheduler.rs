@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use log::debug;
 
 use super::{utility, GateScheduler};
@@ -9,7 +7,7 @@ pub struct GreedyNonbranchingGateScheduler<'a> {
     frontier: Vec<GateIndex>,
     num_gates: usize,
     num_qubits: usize,
-    gate_touches: Vec<&'a HashSet<QubitIndex>>,
+    gate_touches: Vec<&'a [QubitIndex]>,
     gate_is_branching: Vec<bool>,
     max_branching_stride: usize,
 }
@@ -48,7 +46,7 @@ impl<'a> GreedyNonbranchingGateScheduler<'a> {
     pub fn new(
         num_gates: usize,
         num_qubits: usize,
-        gate_touches: Vec<&'a HashSet<QubitIndex>>,
+        gate_touches: Vec<&'a [QubitIndex]>,
         gate_is_branching: Vec<bool>,
     ) -> Self {
         debug!(
@@ -148,7 +146,7 @@ impl<'a> GreedyNonbranchingGateScheduler<'a> {
 
 fn next_touch(
     num_gates: usize,
-    gate_touches: &[&HashSet<QubitIndex>],
+    gate_touches: &[&[QubitIndex]],
     qi: QubitIndex,
     gi: GateIndex,
 ) -> GateIndex {

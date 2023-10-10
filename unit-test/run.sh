@@ -36,7 +36,7 @@ shift
 # Run the appropriate simulator based on the first argument
 
 
-pipenv run python random_test.py -r --output random_test
+pipenv run python random_test.py --output random_test
 
 case $SIM_TYPE in
     sml)

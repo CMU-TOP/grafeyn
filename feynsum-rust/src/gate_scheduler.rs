@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -56,7 +55,7 @@ pub fn create_gate_scheduler<'a>(
     gate_scheduling_policy: &GateSchedulingPolicy,
     num_gates: usize,
     num_qubits: usize,
-    gate_touches: Vec<&'a HashSet<QubitIndex>>,
+    gate_touches: Vec<&'a [QubitIndex]>,
     gate_is_branching: Vec<bool>,
 ) -> Box<dyn GateScheduler + 'a> {
     match gate_scheduling_policy {

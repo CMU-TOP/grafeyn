@@ -9,6 +9,11 @@ If you are using Mac, just run
 brew bundle
 ```
 
+Run the following to install python dependencies:
+```sh
+pipenv install
+```
+
 ## How to run
 ```sh
 ./run.sh rust <additional args to pass to feynsum-rust>

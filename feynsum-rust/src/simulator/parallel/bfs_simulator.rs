@@ -8,7 +8,7 @@ use crate::types::basis_idx::MAX_QUBITS;
 use crate::types::{BasisIdx, Complex, Real};
 
 use super::super::SimulatorError;
-use super::state::{SparseStateTable, State};
+use super::state::{ConcurrentSparseStateTable, State};
 use super::state_expander::{self, ExpandResult};
 
 pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
@@ -21,7 +21,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
     }
 
     let mut num_gates_visited = 0;
-    let mut state = State::Sparse(SparseStateTable::singleton(
+    let mut state = State::ConcurrentSparse(ConcurrentSparseStateTable::singleton(
         BasisIdx::zeros(),
         Complex::new(1.0, 0.0),
     )); // initial state
@@ -29,7 +29,11 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
     let mut num_gate_apps = 0;
     let mut prev_num_nonzeros = 1;
 
-    let gate_touches = circuit.gates.iter().map(|gate| &gate.touches).collect();
+    let gate_touches = circuit
+        .gates
+        .iter()
+        .map(|gate| gate.touches.as_slice())
+        .collect();
     let gate_is_branching = circuit
         .gates
         .iter()
@@ -231,7 +235,8 @@ h q0[28];
         //assert!(matches!(state, State::Sparse(SparseStateTable { .. })));
 
         let table = match state {
-            State::Sparse(table) => table,
+            //State::Sparse(table) => table,
+            State::ConcurrentSparse(table) => table,
             _ => panic!(),
         };
 

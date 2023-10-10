@@ -126,15 +126,18 @@ impl Circuit {
                             target: args[0],
                         },
                         ("s", 0, 1) => GateDefn::S(args[0]),
+                        ("sdg", 0, 1) => GateDefn::Sdg(args[0]),
                         ("sw", 0, 1) => GateDefn::SqrtW(args[0]),
                         ("swap", 0, 2) => GateDefn::Swap {
                             target1: args[0],
                             target2: args[1],
-                        }, // NOTE: U3 gate is deprecated
+                        },
                         ("sx", 0, 1) => GateDefn::SqrtX(args[0]),
+                        ("sxdg", 0, 1) => GateDefn::SqrtXdg(args[0]),
                         ("sy", 0, 1) => GateDefn::SqrtY(args[0]),
                         ("t", 0, 1) => GateDefn::T(args[0]),
                         ("tdg", 0, 1) => GateDefn::Tdg(args[0]),
+                        // NOTE: U3 gate is deprecated
                         ("u", 3, 1) | ("u3", 3, 1) => GateDefn::U {
                             target: args[0],
                             theta: params[0],

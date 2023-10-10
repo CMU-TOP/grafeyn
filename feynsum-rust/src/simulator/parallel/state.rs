@@ -47,10 +47,17 @@ impl Compactifiable for State {
                     .filter(|(_bidx, weight)| utility::is_nonzero(*weight)),
             ),
             State::Dense(table) => Box::new(table.array.into_iter().enumerate().map(|(idx, v)| {
-                let (re, im) = utility::unpack_complex(v.load(Ordering::Relaxed));
-                (BasisIdx::from_idx(idx), Complex::new(re, im))
+                let weight = utility::unpack_complex(v.load(Ordering::Relaxed));
+                (BasisIdx::from_idx(idx), weight)
             })),
-            State::ConcurrentSparse(_) => unimplemented!(),
+            State::ConcurrentSparse(table) => {
+                Box::new(table.nonzeros.into_iter().map(move |i: usize| {
+                    let idx = table.keys[i].load(Ordering::Relaxed) as usize;
+                    let weight =
+                        utility::unpack_complex(table.packed_weights[i].load(Ordering::Relaxed));
+                    (BasisIdx::from_idx(idx), weight)
+                }))
+            }
         }
     }
 }
