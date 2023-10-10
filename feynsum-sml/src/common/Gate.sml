@@ -568,8 +568,8 @@ struct
           val bidx0 = B.unset bidx target
           val bidx1 = B.set bidx target
         in
-          if B.get bidx target then ((bidx0, Cc), (bidx1, Cns))
-          else ((bidx0, Cs), (bidx1, Cc))
+          if B.get bidx target then ((bidx0, Cs), (bidx1, Cc))
+          else ((bidx0, Cc), (bidx1, Cns))
         end
 
     in
