@@ -190,8 +190,6 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
         State::Sparse(_) => panic!(),
     };
 
-    log::info!("expand_sparse2 started");
-
     while !remaining_blocks.is_empty() {
         let mut full: AtomicBool = AtomicBool::new(false);
         for &b in &remaining_blocks {
@@ -247,7 +245,6 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
             .collect();
         std::mem::swap(&mut remaining_blocks, &mut remaining_blocks_next);
         if !remaining_blocks.is_empty() {
-            log::debug!("resize");
             let mut table2 = table.increase_capacity_by_factor(1.5);
             std::mem::swap(&mut table, &mut table2);
         }
