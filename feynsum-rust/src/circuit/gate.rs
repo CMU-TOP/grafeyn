@@ -76,6 +76,7 @@ pub enum GateDefn {
         target: QubitIndex,
     },
     S(QubitIndex),
+    Sdg(QubitIndex),
     SqrtW(QubitIndex),
     SqrtX(QubitIndex),
     SqrtXdg(QubitIndex),
@@ -122,6 +123,7 @@ impl Gate {
             | &GateDefn::PauliZ(qi)
             | &GateDefn::Phase { target: qi, .. }
             | &GateDefn::S(qi)
+            | &GateDefn::Sdg(qi)
             | &GateDefn::SqrtW(qi)
             | &GateDefn::SqrtX(qi)
             | &GateDefn::SqrtXdg(qi)
@@ -167,6 +169,7 @@ impl Gate {
             | GateDefn::Phase { .. }
             | GateDefn::RZ { .. }
             | GateDefn::S(_)
+            | GateDefn::Sdg(_)
             | GateDefn::Swap { .. }
             | GateDefn::T(_)
             | GateDefn::Tdg(_)
@@ -210,6 +213,7 @@ impl Gate {
             | GateDefn::PauliY(_)
             | GateDefn::PauliZ(_)
             | GateDefn::S(_)
+            | GateDefn::Sdg(_)
             | GateDefn::SqrtW(_)
             | GateDefn::SqrtY(_)
             | GateDefn::T(_)
@@ -367,6 +371,14 @@ impl PushApplicable for Gate {
             GateDefn::S(qi) => {
                 let new_weight = if bidx.get(qi) {
                     weight * Complex::new(0.0, 1.0)
+                } else {
+                    weight
+                };
+                PushApplyOutput::Nonbranching(bidx, new_weight)
+            }
+            GateDefn::Sdg(qi) => {
+                let new_weight = if bidx.get(qi) {
+                    weight * Complex::new(0.0, -1.0)
                 } else {
                     weight
                 };
@@ -695,6 +707,7 @@ impl PullApplicable for Gate {
             | GateDefn::PauliY(_)
             | GateDefn::PauliZ(_)
             | GateDefn::S(_)
+            | GateDefn::Sdg(_)
             | GateDefn::SqrtW(_)
             | GateDefn::SqrtY(_)
             | GateDefn::T(_)
