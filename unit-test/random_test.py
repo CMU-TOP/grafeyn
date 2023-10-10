@@ -18,6 +18,7 @@ from qiskit.circuit.library import (
     U2Gate,
     U1Gate,
     UGate,
+    SGate,
 )
 import numpy as np
 import argparse
@@ -144,6 +145,7 @@ if __name__ == "__main__":
             "z": (1, 0, ZGate),
             "t": (1, 0, TGate),
             "x": (1, 0, XGate),
+            "s": (1, 0, SGate),
             "sx": (1, 0, SXGate),
             # "sy": (1, 0, SYGate),  #!not implemented by qiskit
             "cx": (2, 0, CXGate),
