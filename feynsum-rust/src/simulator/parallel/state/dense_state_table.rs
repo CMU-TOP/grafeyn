@@ -50,7 +50,10 @@ fn atomic_put(to: &AtomicU64, v: Complex) {
         let weight = utility::unpack_complex(old);
         let new = utility::pack_complex(Complex::new(weight.re + v.re, weight.im + v.im));
 
-        if let Ok(_) = to.compare_exchange(old, new, Ordering::SeqCst, Ordering::Acquire) {
+        if to
+            .compare_exchange(old, new, Ordering::SeqCst, Ordering::Acquire)
+            .is_ok()
+        {
             return;
         }
     }

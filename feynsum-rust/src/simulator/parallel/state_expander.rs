@@ -116,19 +116,17 @@ fn apply_gates1(
         );
     }
     match gates[gatenum].push_apply(bidx, weight) {
-        PushApplyOutput::Nonbranching(new_bidx, new_weight) => {
-            return apply_gates1(
-                gatenum + 1,
-                gates,
-                table,
-                new_bidx,
-                new_weight,
-                full,
-                apps + 1,
-            )
-        }
+        PushApplyOutput::Nonbranching(new_bidx, new_weight) => apply_gates1(
+            gatenum + 1,
+            gates,
+            table,
+            new_bidx,
+            new_weight,
+            full,
+            apps + 1,
+        ),
         PushApplyOutput::Branching((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
-            return apply_gates2(
+            apply_gates2(
                 gatenum + 1,
                 gates,
                 table,
@@ -173,9 +171,9 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
     let num_blocks = (n as f64 / block_size as f64).ceil() as usize;
     let block_start = |b: usize| block_size * b;
     let block_stop = |b: usize| std::cmp::min(n, block_size + block_start(b));
-    let mut block_remaining_starts: Vec<usize> = (0..num_blocks).map(|b| block_start(b)).collect();
+    let mut block_remaining_starts: Vec<usize> = (0..num_blocks).map(block_start).collect();
     let mut block_pending: Vec<Vec<(BasisIdx, Complex, usize)>> = vec![vec![]; num_blocks];
-    let mut remaining_blocks: Vec<usize> = (0..num_blocks).map(|b| b).collect();
+    let mut remaining_blocks: Vec<usize> = (0..num_blocks).collect();
     let get = |i: usize| match state {
         State::Dense(prev_table) => {
             let v = prev_table.array[i].load(Ordering::Relaxed);

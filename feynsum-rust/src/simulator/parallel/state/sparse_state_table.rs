@@ -1,4 +1,3 @@
-use std::alloc::{alloc, dealloc, Layout};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -26,7 +25,7 @@ pub struct ConcurrentSparseStateTable {
 
 unsafe impl Sync for ConcurrentSparseStateTable {}
 
-impl<'a> ConcurrentSparseStateTable {
+impl ConcurrentSparseStateTable {
     pub fn new2(capacity: usize) -> Self {
         let mut keys = Vec::with_capacity(capacity);
         for _i in 0..capacity {
@@ -78,14 +77,11 @@ impl<'a> ConcurrentSparseStateTable {
             let old: u64 = self.packed_weights[i].load(Ordering::Relaxed);
             let weight = utility::unpack_complex(old);
             let new = utility::pack_complex(Complex::new(weight.re + v.re, weight.im + v.im));
-            match self.packed_weights[i].compare_exchange(
-                old,
-                new,
-                Ordering::SeqCst,
-                Ordering::Acquire,
-            ) {
-                Ok(_) => return,
-                Err(_) => (),
+            if self.packed_weights[i]
+                .compare_exchange(old, new, Ordering::SeqCst, Ordering::Acquire)
+                .is_ok()
+            {
+                return;
             }
         }
     }
@@ -106,7 +102,7 @@ impl<'a> ConcurrentSparseStateTable {
                         self.put_value_at(i, v); // later: optimize by using non atomic add
                         break;
                     }
-                    Err(_) => assert!(false),
+                    Err(_) => panic!(),
                 }
             }
             assert!(k != y); // duplicate key
@@ -228,6 +224,6 @@ impl SparseStateTable {
     }
 
     pub fn get(&self, bidx: &BasisIdx) -> Option<Complex> {
-        self.table.get(&bidx).map(Clone::clone)
+        self.table.get(bidx).map(Clone::clone)
     }
 }
