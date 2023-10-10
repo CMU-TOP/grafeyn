@@ -113,24 +113,29 @@ struct
             let
               val (qi, qj) = (Seq.nth touches 0, Seq.nth touches 1)
 
+              val a00 = B.zeros
+              val a01 = B.set B.zeros qj
+              val a10 = B.set B.zeros qi
+              val a11 = B.set (B.set B.zeros qi) qj
+
               (* |00⟩  ->  m00 * |b00⟩
                * |01⟩  ->  m01 * |b01⟩
                * |10⟩  ->  m10 * |b10⟩
                * |11⟩  ->  m11 * |b11⟩
                *)
-              val (b00, m00) = apply (B.zeros, C.real one)
-              val (b01, m01) = apply (B.set B.zeros qj, C.real one)
-              val (b10, m10) = apply (B.set B.zeros qi, C.real one)
-              val (b11, m11) = apply (B.set (B.set B.zeros qi) qj, C.real one)
+              val (b00, m00) = apply (a00, C.real one)
+              val (b01, m01) = apply (a01, C.real one)
+              val (b10, m10) = apply (a10, C.real one)
+              val (b11, m11) = apply (a11, C.real one)
 
               fun match left right bb =
                 left = B.get bb qi andalso right = B.get bb qj
 
               fun find left right =
-                if match left right b00 then (b00, m00)
-                else if match left right b01 then (b01, m01)
-                else if match left right b10 then (b10, m10)
-                else (b11, m11)
+                if match left right b00 then (a00, m00)
+                else if match left right b01 then (a01, m01)
+                else if match left right b10 then (a10, m10)
+                else (a11, m11)
 
 
               (* Invert the lookup.
