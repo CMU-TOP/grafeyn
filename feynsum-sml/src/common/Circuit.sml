@@ -233,9 +233,7 @@ struct
         | GateDefn.PauliZ i => "z " ^ qi i
         | GateDefn.Hadamard i => "h " ^ qi i
         | GateDefn.T i => "t " ^ qi i
-        | GateDefn.SqrtY i => "sqrty " ^ qi i
         | GateDefn.SqrtX i => "sx " ^ qi i
-        | GateDefn.SqrtW i => "sqrtw " ^ qi i
         | GateDefn.Sxdg i => "sxdg " ^ qi i
         | GateDefn.S i => "s " ^ qi i
         | GateDefn.Sdg i => "sdg " ^ qi i

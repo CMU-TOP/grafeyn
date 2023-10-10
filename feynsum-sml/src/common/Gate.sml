@@ -275,28 +275,6 @@ struct
     end
 
 
-  fun sqrty qi =
-    let
-      fun apply (bidx, weight) =
-        let
-          val bidx1 = B.unset bidx qi
-          val bidx2 = B.set bidx qi
-
-          val multiplier1 = C.make (half, R.~ half)
-          val multiplier2 =
-            if B.get bidx qi then C.make (half, R.~ half)
-            else C.make (R.~ half, half)
-
-          val weight1 = C.* (weight, multiplier1)
-          val weight2 = C.* (weight, multiplier2)
-        in
-          ((bidx1, weight1), (bidx2, weight2))
-        end
-    in
-      makePushPull {touches = Seq.singleton qi, action = Branching apply}
-    end
-
-
   fun sqrtx qi =
     let
       val xx = C.make (half, half)
@@ -345,29 +323,6 @@ struct
             ((B.unset bidx qi, weight'), (bidx, C.* (negi, weight')))
           else
             ((bidx, C.* (negi, weight')), (B.set bidx qi, weight'))
-        end
-    in
-      makePushPull {touches = Seq.singleton qi, action = Branching apply}
-    end
-
-
-  fun sqrtw qi =
-    let
-      fun apply (bidx, weight) =
-        let
-          val bidx1 = B.unset bidx qi
-          val bidx2 = B.set bidx qi
-
-          val (mult1, mult2) =
-            if B.get bidx qi then
-              (C.imag recp_sqrt_2, C.make (R.~ half, R.~ half))
-            else
-              (C.make (R.~ half, R.~ half), C.real (R.~ recp_sqrt_2))
-
-          val weight1 = C.* (weight, mult1)
-          val weight2 = C.* (weight, mult2)
-        in
-          ((bidx1, weight1), (bidx2, weight2))
         end
     in
       makePushPull {touches = Seq.singleton qi, action = Branching apply}
@@ -860,9 +815,7 @@ struct
     | GateDefn.PauliZ xx => pauliz xx
     | GateDefn.Hadamard xx => hadamard xx
     | GateDefn.T xx => t xx
-    | GateDefn.SqrtY xx => sqrty xx
     | GateDefn.SqrtX xx => sqrtx xx
-    | GateDefn.SqrtW xx => sqrtw xx
     | GateDefn.Sxdg xx => sxdg xx
     | GateDefn.S xx => s xx
     | GateDefn.Sdg xx => sdg xx
