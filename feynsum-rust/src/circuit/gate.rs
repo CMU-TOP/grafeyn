@@ -78,6 +78,7 @@ pub enum GateDefn {
     S(QubitIndex),
     SqrtW(QubitIndex),
     SqrtX(QubitIndex),
+    SqrtXdg(QubitIndex),
     SqrtY(QubitIndex),
     Swap {
         target1: QubitIndex,
@@ -123,6 +124,7 @@ impl Gate {
             | &GateDefn::S(qi)
             | &GateDefn::SqrtW(qi)
             | &GateDefn::SqrtX(qi)
+            | &GateDefn::SqrtXdg(qi)
             | &GateDefn::SqrtY(qi)
             | &GateDefn::T(qi)
             | &GateDefn::Tdg(qi)
@@ -173,6 +175,7 @@ impl Gate {
             | GateDefn::RY { .. }
             | GateDefn::SqrtW(_)
             | GateDefn::SqrtX(_)
+            | GateDefn::SqrtXdg(_)
             | GateDefn::SqrtY(_) => BranchingType::Branching,
             GateDefn::FSim { .. } | GateDefn::RX { .. } | GateDefn::U { .. } => {
                 BranchingType::MaybeBranching
@@ -196,6 +199,7 @@ impl Gate {
             | GateDefn::RY { .. }
             | GateDefn::RZ { .. }
             | GateDefn::SqrtX(_)
+            | GateDefn::SqrtXdg(_)
             | GateDefn::Swap { .. }
             | GateDefn::U { .. } => true,
             GateDefn::CCX { .. }
@@ -399,6 +403,19 @@ impl PushApplicable for Gate {
                     PushApplyOutput::Branching((bidx1, weight_b), (bidx2, weight_a))
                 } else {
                     PushApplyOutput::Branching((bidx1, weight_a), (bidx2, weight_b))
+                }
+            }
+            GateDefn::SqrtXdg(qi) => {
+                let bidx1 = bidx.unset(qi);
+                let bidx2 = bidx.set(qi);
+
+                let weight_a = weight * Complex::new(0.5, 0.5);
+                let weight_b = weight * Complex::new(0.5, -0.5);
+
+                if bidx.get(qi) {
+                    PushApplyOutput::Branching((bidx1, weight_a), (bidx2, weight_b))
+                } else {
+                    PushApplyOutput::Branching((bidx1, weight_b), (bidx2, weight_a))
                 }
             }
             GateDefn::SqrtY(qi) => {
@@ -775,6 +792,22 @@ impl PullApplicable for Gate {
                     PullApplyOutput::Branching(
                         (bidx0, Complex::new(0.5, 0.5)),
                         (bidx1, Complex::new(0.5, -0.5)),
+                    )
+                }
+            }
+            GateDefn::SqrtXdg(qi) => {
+                let bidx0 = bidx.unset(qi);
+                let bidx1 = bidx.set(qi);
+
+                if bidx.get(qi) {
+                    PullApplyOutput::Branching(
+                        (bidx0, Complex::new(0.5, 0.5)),
+                        (bidx1, Complex::new(0.5, -0.5)),
+                    )
+                } else {
+                    PullApplyOutput::Branching(
+                        (bidx0, Complex::new(0.5, -0.5)),
+                        (bidx1, Complex::new(0.5, 0.5)),
                     )
                 }
             }

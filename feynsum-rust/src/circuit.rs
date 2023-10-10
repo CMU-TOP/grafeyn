@@ -132,6 +132,7 @@ impl Circuit {
                             target2: args[1],
                         },
                         ("sx", 0, 1) => GateDefn::SqrtX(args[0]),
+                        ("sxdg", 0, 1) => GateDefn::SqrtXdg(args[0]),
                         ("sy", 0, 1) => GateDefn::SqrtY(args[0]),
                         ("t", 0, 1) => GateDefn::T(args[0]),
                         ("tdg", 0, 1) => GateDefn::Tdg(args[0]),
