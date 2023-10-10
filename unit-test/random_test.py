@@ -140,7 +140,7 @@ def compare():
         f"The distance between two results are: {np.linalg.norm(statevector - feynsum_state)}"
     )
     print(
-        f"The fidelity of the two results are: {np.abs((statevector*feynsum_state).sum())}"
+        f"The fidelity of the two results are: {np.abs((statevector*feynsum_state.conj()).sum())}"
     )
 
 
