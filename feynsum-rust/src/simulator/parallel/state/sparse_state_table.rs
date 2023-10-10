@@ -45,7 +45,7 @@ impl ConcurrentSparseStateTable {
         }
     }
     pub fn new() -> Self {
-        let capacity = 100000;
+        let capacity = 100;
         Self::new2(capacity)
     }
     pub fn singleton(bidx: BasisIdx, weight: Complex) -> Self {
@@ -58,19 +58,7 @@ impl ConcurrentSparseStateTable {
         self.keys.len()
     }
     pub fn num_nonzeros(&self) -> usize {
-        self.keys
-            .iter()
-            .enumerate()
-            .filter(|(i, k)| {
-                if k.load(Ordering::Relaxed) != BasisIdx::into_u64(EMPTY_KEY) {
-                    let weight =
-                        utility::unpack_complex(self.packed_weights[*i].load(Ordering::Relaxed));
-                    utility::is_nonzero(weight)
-                } else {
-                    false
-                }
-            })
-            .count()
+        self.nonzeros.len()
     }
     fn put_value_at(&self, i: usize, v: Complex) {
         loop {

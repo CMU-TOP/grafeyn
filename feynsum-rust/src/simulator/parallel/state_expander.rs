@@ -166,14 +166,17 @@ fn apply_gates2(
 
 fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandResult {
     let mut table = ConcurrentSparseStateTable::new();
-    let n: usize = state.num_nonzeros();
+    let n: usize = match state {
+        State::ConcurrentSparse(prev_table) => prev_table.num_nonzeros(),
+        State::Dense(prev_table) => prev_table.capacity(),
+        State::Sparse(_) => panic!()
+    };
     let block_size = std::cmp::max(100, std::cmp::min(n / 1000, config.block_size));
     let num_blocks = (n as f64 / block_size as f64).ceil() as usize;
     let block_start = |b: usize| block_size * b;
     let block_stop = |b: usize| std::cmp::min(n, block_size + block_start(b));
-    let mut block_remaining_starts: Vec<usize> = (0..num_blocks).map(block_start).collect();
-    let mut block_pending: Vec<Vec<(BasisIdx, Complex, usize)>> = vec![vec![]; num_blocks];
-    let mut remaining_blocks: Vec<usize> = (0..num_blocks).collect();
+    let mut blocks: Vec<(usize, usize, Vec<(BasisIdx, Complex, usize)>)> = 
+        (0..num_blocks).map(|b| (b, block_start(b), vec![])).collect();
     let get = |i: usize| match state {
         State::Dense(prev_table) => {
             let v = prev_table.array[i].load(Ordering::Relaxed);
@@ -190,69 +193,67 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
         State::Sparse(_) => panic!(),
     };
 
-    while !remaining_blocks.is_empty() {
+    while !blocks.is_empty() {
         let mut full: AtomicBool = AtomicBool::new(false);
-        for &b in &remaining_blocks {
-            if full.load(Ordering::Relaxed) {
-                break;
-            }
-            // process each block b, i.e., workOnBlock(b)
-            loop {
-                match block_pending[b].pop() {
-                    None => {
-                        break;
+        let mut blocks_next =
+            blocks
+            .iter()
+            .cloned()
+            .map(|(b, s, ps)| {
+                let mut s2 = s;
+                let mut ps2 = ps.clone();
+                loop { // clear pending blocks
+                    if full.load(Ordering::Relaxed) {
+                        return (b, s2, ps2)
                     }
-                    Some((idx, weight, gatenum)) => {
-                        match apply_gates1(gatenum, &gates, &mut table, idx, weight, &mut full, 0) {
-                            (_, SuccessorsResult::AllSucceeded) => {}
-                            (_, SuccessorsResult::SomeFailed(vfs)) => {
-                                block_pending[b].extend(vfs);
-                                break;
+                    match ps2.pop() {
+                        None => {
+                            break;
+                        }
+                        Some((idx, weight, gatenum)) => {
+                            match apply_gates1(gatenum, &gates, &mut table, idx, weight, &mut full, 0) {
+                                (_, SuccessorsResult::AllSucceeded) => {}
+                                (_, SuccessorsResult::SomeFailed(fs)) => {
+                                    ps2.extend(fs);
+                                    return (b, s2, ps2)
+                                }
                             }
                         }
                     }
                 }
-            }
-            if !block_pending[b].is_empty() {
-                break;
-            }
-            let mut i = block_remaining_starts[b];
-            loop {
-                // process each item i in block b
-                if i >= block_stop(b) {
-                    block_remaining_starts[b] = block_stop(b);
-                    break;
-                }
-                let (idx, weight) = get(i);
-                match apply_gates1(0, &gates, &mut table, idx, weight, &mut full, 0) {
-                    (_, SuccessorsResult::AllSucceeded) => {
-                        i += 1;
-                    }
-                    (_, SuccessorsResult::SomeFailed(vfs)) => {
-                        block_remaining_starts[b] = i + 1;
-                        block_pending[b].extend(vfs);
+                for i in s..block_stop(b) { // work on block b
+                    if full.load(Ordering::Relaxed) {
+                        s2 = i;
                         break;
                     }
+                    let (idx, weight) = get(i);
+                    match apply_gates1(0, &gates, &mut table, idx, weight, &mut full, 0) {
+                        (_, SuccessorsResult::AllSucceeded) => { }
+                        (_, SuccessorsResult::SomeFailed(fs)) => {
+                            s2 = i + 1;
+                            ps2.extend(fs);
+                            break;
+                        }
+                    }
+                    if i + 1 == block_stop(b) {
+                        s2 = i + 1
+                    }
                 }
-            }
-        }
-        let block_has_remaining = |b: usize| block_remaining_starts[b] < block_stop(b);
-        let block_has_pending = |b: usize| !block_pending[b].is_empty();
-        let mut remaining_blocks_next: Vec<usize> = remaining_blocks
-            .iter()
-            .filter(|&&b| block_has_pending(b) || block_has_remaining(b))
-            .cloned()
+                (b, s2, ps2)
+            })
+            .filter(|(b, s, ps)| {
+                s < &block_stop(*b) || !ps.is_empty()
+            })
             .collect();
-        std::mem::swap(&mut remaining_blocks, &mut remaining_blocks_next);
-        if !remaining_blocks.is_empty() {
+        std::mem::swap(&mut blocks, &mut blocks_next);
+        if !blocks.is_empty() {
             let mut table2 = table.increase_capacity_by_factor(1.5);
             std::mem::swap(&mut table, &mut table2);
         }
     }
+    table.make_nonzero_shortcuts();
     let num_nonzeros = table.num_nonzeros();
     let num_gate_apps = 0;
-    table.make_nonzero_shortcuts();
-    assert!(table.nonzeros.len() == num_nonzeros);
     ExpandResult {
         state: State::ConcurrentSparse(table),
         num_nonzeros,

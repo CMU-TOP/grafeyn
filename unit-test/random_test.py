@@ -31,6 +31,8 @@ from qiskit.circuit.gate import Gate
 from qiskit.circuit.quantumregister import QuantumRegister
 from qiskit.circuit._utils import with_gate_array, with_controlled_gate_array
 from qiskit.circuit.parameterexpression import ParameterValueType
+from qiskit.extensions import UnitaryGate
+from qiskit.circuit.quantumcircuit import QuantumCircuit
 
 
 class FsimGate(Gate):
@@ -43,11 +45,8 @@ class FsimGate(Gate):
         super().__init__("fsim", 2, [theta, phi], label=label)
 
     def _define(self):
-        from qiskit.circuit.quantumcircuit import QuantumCircuit
-
         q = QuantumRegister(2, "q")
         qc = QuantumCircuit(q, name=self.name)
-        from qiskit.extensions import UnitaryGate
 
         theta, phi = self.params
 
@@ -80,7 +79,14 @@ class SYGate(Gate):
     def _define(self):
         q = QuantumRegister(1, "q")
         qc = QuantumCircuit(q, name=self.name)
-        rules = [(RYGate(np.pi / 2), [q[0]], [])]
+        gate = UnitaryGate(
+            1
+            / 2
+            * np.array(
+                [[1 - 1j, 1 - 1j], [-1 + 1j, 1 - 1j]],
+            )
+        )
+        rules = [(gate, [q[0]], [])]
         for operation, qubits, clbits in rules:
             qc._append(operation, qubits, clbits)
         self.definition = qc
@@ -96,7 +102,14 @@ class SYdgGate(Gate):
     def _define(self):
         q = QuantumRegister(1, "q")
         qc = QuantumCircuit(q, name=self.name)
-        rules = [(RYGate(-np.pi / 2), [q[0]], [])]
+        gate = UnitaryGate(
+            1
+            / 2
+            * np.array(
+                [[1 + 1j, -1 - 1j], [1 + 1j, 1 + 1j]],
+            )
+        )
+        rules = [(gate, [q[0]], [])]
         for operation, qubits, clbits in rules:
             qc._append(operation, qubits, clbits)
         self.definition = qc
@@ -121,6 +134,9 @@ def compare():
         feynsum_state[idx] = amp
     print(
         f"The distance between two results are: {np.linalg.norm(statevector - feynsum_state)}"
+    )
+    print(
+        f"The fidelity of the two results are: {np.abs((statevector*feynsum_state.conj()).sum())}"
     )
 
 
@@ -151,7 +167,7 @@ if __name__ == "__main__":
             "cx": (2, 0, CXGate),
             "cz": (2, 0, CZGate),
             "ccx": (3, 0, CCXGate),
-            "cphase": (2, 1, CPhaseGate), #!identical to cz
+            "cphase": (2, 1, CPhaseGate),  #!identical to cz
             "ry": (1, 1, RYGate),
             "rz": (1, 1, RZGate),
             "cswap": (3, 0, CSwapGate),

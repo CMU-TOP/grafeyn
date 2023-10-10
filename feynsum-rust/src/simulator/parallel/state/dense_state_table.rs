@@ -20,6 +20,9 @@ impl DenseStateTable {
         Self { array }
     }
 
+    pub fn capacity(&self) -> usize {
+        self.array.len()
+    }
     pub fn num_nonzeros(&self) -> usize {
         self.array
             .par_iter()
