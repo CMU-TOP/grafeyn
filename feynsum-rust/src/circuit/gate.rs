@@ -597,23 +597,6 @@ macro_rules! push_to_pull {
                     _ => unreachable!("push_apply(BasisIdx::zeros().set(qi).set(qj), Complex::new(1.0,0.0)) must return Nonbranching"),
                 };
 
-                let apply_match = |left: bool, right: bool, bb: &BasisIdx| -> bool {
-                    left == bb.get(qi) && right == bb.get(qj)
-                };
-                let find = |left: bool, right: bool| -> (BasisIdx, Complex) {
-                    if apply_match(left, right, &b00) {
-                        (b00, m00.clone())
-                    } else if apply_match(left, right, &b01) {
-                        (b01, m01.clone())
-                    } else if apply_match(left, right, &b10) {
-                        (b10, m10.clone())
-                    } else if apply_match(left, right, &b11) {
-                        (b11, m11.clone())
-                    } else {
-                        unreachable!("apply_match must return true for one of the basis")
-                    }
-                };
-
                 let align_with = |bb: &BasisIdx, bidx: &BasisIdx| -> BasisIdx {
                     let bidx = if bb.get(qi) {
                         bidx.set(qi)
@@ -628,23 +611,18 @@ macro_rules! push_to_pull {
                     bidx
                 };
 
-                let (new_b00, new_m00) = find(false, false);
-                let (new_b01, new_m01) = find(false, true);
-                let (new_b10, new_m10) = find(true, false);
-                let (new_b11, new_m11) = find(true, true);
-
                 match ($bidx.get(qi), $bidx.get(qj)) {
                     (true, true) => {
-                        PullApplyOutput::Nonbranching(align_with(&new_b11, &$bidx), new_m11)
+                        PullApplyOutput::Nonbranching(align_with(&b11, &$bidx), m11)
                     }
                     (true, false) => {
-                        PullApplyOutput::Nonbranching(align_with(&new_b10, &$bidx), new_m10)
+                        PullApplyOutput::Nonbranching(align_with(&b10, &$bidx), m10)
                     }
                     (false, true) => {
-                        PullApplyOutput::Nonbranching(align_with(&new_b01, &$bidx), new_m01)
+                        PullApplyOutput::Nonbranching(align_with(&b01, &$bidx), m01)
                     }
                     (false, false) => {
-                        PullApplyOutput::Nonbranching(align_with(&new_b00, &$bidx), new_m00)
+                        PullApplyOutput::Nonbranching(align_with(&b00, &$bidx), m00)
                     }
                 }
             }
