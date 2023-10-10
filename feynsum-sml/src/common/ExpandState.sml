@@ -29,8 +29,42 @@ sig
 end =
 struct
 
-  val denseThreshold = Rat.fromReal denseThreshold
-  val pullThreshold = Rat.fromReal pullThreshold
+  (* 0 < r < 1
+   *
+   * I wish this wasn't so difficult
+   *
+   * The problem is that I can't always convert the IntInf into a real,
+   * because it might be too large.
+   *)
+  fun riMult (r: real) (i: IntInf.int) : IntInf.int =
+    if IntInf.abs i <= 1000000000000 then
+      Real.toLargeInt IEEEReal.TO_NEAREST
+        (r * Real.fromLargeInt (IntInf.toLarge i))
+    else
+      let
+        val digits = Real.fmt StringCvt.EXACT r
+        val digits =
+          if String.isPrefix "0." digits then String.extract (digits, 2, NONE)
+          else raise Fail "riMult: uh oh"
+
+        fun loop acc depth =
+          if depth >= String.size digits then
+            acc
+          else
+            let
+              val d = Char.ord (String.sub (digits, depth)) - Char.ord #"0"
+              val _ =
+                if 0 <= d andalso d <= 9 then ()
+                else raise Fail "riMult: bad digit"
+              val acc =
+                acc + (i * IntInf.fromInt d) div (IntInf.pow (10, depth + 1))
+            in
+              loop acc (depth + 1)
+            end
+      in
+        loop 0 0
+      end
+
 
   fun log2 x = Math.log10 x / Math.log10 2.0
 
@@ -359,10 +393,7 @@ struct
         (1.0, Real.fromInt nonZeroSize / Real.fromInt prevNonZeroSize)
       val expected = Real.ceil (rate * Real.fromInt nonZeroSize)
       val expected = IntInf.min (IntInf.fromInt expected, maxNumStates)
-
-      val expectedDensity = Rat.make (expected, maxNumStates)
-      val currentDensity = Rat.make (IntInf.fromInt nonZeroSize, maxNumStates)
-      val expectedCost = Rat.max (expectedDensity, currentDensity)
+      val expectedCost = IntInf.max (IntInf.fromInt nonZeroSize, expected)
 
       fun allGatesPullable () =
         Util.all (0, Seq.length gates) (G.pullable o Seq.nth gates)
@@ -376,12 +407,12 @@ struct
 
       val (method, {result, numGateApps}) =
         if
-          Rat.compare (expectedCost, denseThreshold) = LESS
+          expectedCost < riMult denseThreshold maxNumStates
         then
           ("push sparse", expandSparse args)
 
         else if
-          Rat.compare (expectedCost, pullThreshold) <> LESS
+          expectedCost >= riMult pullThreshold maxNumStates
           andalso allGatesPullable ()
         then
           ("pull dense", expandPullDense args)

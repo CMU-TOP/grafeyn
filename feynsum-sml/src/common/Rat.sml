@@ -6,7 +6,6 @@ sig
   (* make(n, d) ~> n/d *)
   val make: i * i -> t
   val view: t -> i * i
-  val fromReal: real -> t
 
   val normalize: t -> t
 
@@ -31,8 +30,6 @@ struct
 
   fun make (n, d) = (n, d)
   fun view (n, d) = (n, d)
-
-  fun fromReal r = raise Fail "Rat.fromReal: TODO"
 
   fun gcd (a, b) =
     if b = 0 then a else gcd (b, IntInf.mod (a, b))
