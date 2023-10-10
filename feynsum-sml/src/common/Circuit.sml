@@ -269,6 +269,8 @@ struct
             "rx(" ^ Real.toString rot ^ ") " ^ qi target
         | GateDefn.CSwap {control, target1, target2} =>
             "cswap " ^ qi control ^ ", " ^ qi target1 ^ ", " ^ qi target2
+        | GateDefn.Swap {target1, target2} =>
+            "swap " ^ qi target1 ^ ", " ^ qi target2
 
         | GateDefn.U {target, theta, phi, lambda} =>
             doOther
