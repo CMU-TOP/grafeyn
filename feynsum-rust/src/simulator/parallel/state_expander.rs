@@ -6,10 +6,10 @@ use rayon::prelude::*;
 
 use crate::circuit::{Gate, PullApplicable, PullApplyOutput, PushApplicable, PushApplyOutput};
 use crate::config::Config;
+use crate::simulator::Compactifiable;
 use crate::types::{BasisIdx, Complex, Real};
 use crate::utility;
 
-use super::super::Compactifiable;
 use super::state::{
     ConcurrentSparseStateTable, DenseStateTable, SparseStateTable, SparseStateTableInserion, State,
 };
@@ -297,7 +297,19 @@ fn expand_push_dense(gates: Vec<&Gate>, num_qubits: usize, state: State) -> Expa
                 apply_gates(&gates, &table, BasisIdx::from_idx(idx), weight)
             })
             .sum(),
-        State::ConcurrentSparse(_) => unimplemented!(),
+        // FIXME: There should be better way to parallelize iteration over nonzeros of State::Sparse
+        // FIXME: Refactor this iterator generation
+        State::ConcurrentSparse(prev_table) => prev_table
+            .nonzeros
+            .into_par_iter()
+            .map(move |i: usize| {
+                let idx = prev_table.keys[i].load(Ordering::Relaxed) as usize;
+                let weight =
+                    utility::unpack_complex(prev_table.packed_weights[i].load(Ordering::Relaxed));
+                (BasisIdx::from_idx(idx), weight)
+            })
+            .map(|(bidx, weight)| apply_gates(&gates, &table, bidx, weight))
+            .sum(),
     };
 
     let num_nonzeros = table.num_nonzeros();
