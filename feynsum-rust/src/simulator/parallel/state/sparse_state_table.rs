@@ -89,7 +89,7 @@ impl ConcurrentSparseStateTable {
                         self.put_value_at(i, v); // later: optimize by using non atomic add
                         break;
                     }
-                    Err(_) => panic!(),
+                    Err(_) => (),
                 }
             }
             assert!(k != y); // duplicate key
@@ -144,8 +144,7 @@ impl ConcurrentSparseStateTable {
                 return None;
             } else if k == y {
                 let old: u64 = self.packed_weights[i].load(Ordering::Relaxed);
-                let weight = utility::unpack_complex(old);
-                return Some(weight);
+                return Some(utility::unpack_complex(old));
             } else {
                 i += 1
             }
@@ -154,14 +153,12 @@ impl ConcurrentSparseStateTable {
     pub fn increase_capacity_by_factor(&self, alpha: f32) -> Self {
         let new_capacity = (alpha * self.keys.len() as f32).ceil() as usize;
         let new_table = Self::_new(new_capacity);
-        //keys.par_iter_mut().zip(&mut packed_weights.par_iter_mut()).for_each(|(k, w)| {
-        for i in 0..self.keys.len() {
-            let k = BasisIdx::from_u64(self.keys[i].load(Ordering::Relaxed));
-            let weight = utility::unpack_complex(self.packed_weights[i].load(Ordering::Relaxed));
-            if utility::is_nonzero(weight) {
-                new_table.force_insert_unique(k, weight)
+        self.keys.par_iter().zip(self.packed_weights.par_iter()).for_each(|(k, pw)| {
+            let w = utility::unpack_complex(pw.load(Ordering::Relaxed));
+            if utility::is_nonzero(w) {
+                new_table.force_insert_unique(BasisIdx::from_u64(k.load(Ordering::Relaxed)), w)
             }
-        }
+        });
         new_table
     }
     pub fn make_nonzero_shortcuts(&mut self) {
@@ -172,9 +169,7 @@ impl ConcurrentSparseStateTable {
                 if self.keys[i].load(Ordering::Relaxed) == BasisIdx::into_u64(EMPTY_KEY) {
                     return false;
                 }
-                let weight =
-                    utility::unpack_complex(self.packed_weights[i].load(Ordering::Relaxed));
-                utility::is_nonzero(weight)
+                utility::is_nonzero(utility::unpack_complex(self.packed_weights[i].load(Ordering::Relaxed)))
             })
             .collect();
         std::mem::swap(&mut self.nonzeros, &mut nonzeros);
