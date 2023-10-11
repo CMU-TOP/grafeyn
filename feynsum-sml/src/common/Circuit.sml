@@ -154,9 +154,20 @@ struct
           | ("rz", 1, 1) =>
               GateDefn.RZ {rot = evalExp (getParam 0), target = getArg 0}
 
+          | ("swap", 0, 2) =>
+              GateDefn.Swap {target1 = getArg 0, target2 = getArg 1}
+
           | ("cswap", 0, 3) =>
               GateDefn.CSwap
                 {control = getArg 0, target1 = getArg 1, target2 = getArg 2}
+
+          | ("fsim", 2, 2) =>
+              GateDefn.FSim
+                { theta = evalExp (getParam 0)
+                , phi = evalExp (getParam 1)
+                , left = getArg 0
+                , right = getArg 1
+                }
 
           | ("u", 3, 1) =>
               GateDefn.U
@@ -258,6 +269,8 @@ struct
             "rx(" ^ Real.toString rot ^ ") " ^ qi target
         | GateDefn.CSwap {control, target1, target2} =>
             "cswap " ^ qi control ^ ", " ^ qi target1 ^ ", " ^ qi target2
+        | GateDefn.Swap {target1, target2} =>
+            "swap " ^ qi target1 ^ ", " ^ qi target2
 
         | GateDefn.U {target, theta, phi, lambda} =>
             doOther

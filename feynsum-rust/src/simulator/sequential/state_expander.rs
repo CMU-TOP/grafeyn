@@ -1,7 +1,7 @@
 use std::cmp;
 use std::fmt::{self, Display, Formatter};
 
-use crate::circuit::{Gate, PullApplicable, PullApplyOutput, PushApplicable, PushApplyOutput};
+use crate::circuit::{Gate, PullApplyOutput, PushApplicable, PushApplyOutput};
 use crate::config::Config;
 use crate::types::{BasisIdx, Complex, Real};
 use crate::utility;
@@ -168,7 +168,7 @@ fn apply_pull_gates(
         return Ok((weight, 0));
     }
 
-    match gates[0].pull_apply(*bidx) {
+    match gates[0].pull_action.as_ref().unwrap()(*bidx) {
         // FIXME: No clone
         PullApplyOutput::Nonbranching(neighbor, multiplier) => {
             let (weight, num_gate_apps) = apply_pull_gates(&gates[1..], prev_state, &neighbor)?;

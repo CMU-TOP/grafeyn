@@ -4,7 +4,7 @@ use std::sync::{atomic::AtomicBool, atomic::Ordering};
 
 use rayon::prelude::*;
 
-use crate::circuit::{Gate, PullApplicable, PullApplyOutput, PushApplicable, PushApplyOutput};
+use crate::circuit::{Gate, PullApplyOutput, PushApplicable, PushApplyOutput};
 use crate::config::Config;
 use crate::simulator::Compactifiable;
 use crate::types::{BasisIdx, Complex, Real};
@@ -169,7 +169,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
     let n: usize = match state {
         State::ConcurrentSparse(prev_table) => prev_table.num_nonzeros(),
         State::Dense(prev_table) => prev_table.capacity(),
-        State::Sparse(_) => panic!()
+        State::Sparse(_) => panic!(),
     };
     let block_size = std::cmp::max(100, std::cmp::min(n / 1000, config.block_size));
     let num_blocks = (n as f64 / block_size as f64).ceil() as usize;
@@ -195,8 +195,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
 
     while !blocks.is_empty() {
         let mut full: AtomicBool = AtomicBool::new(false);
-        let mut blocks_next =
-            blocks
+        let mut blocks_next = blocks
             .iter()
             .cloned()
             // We process a given block b in two steps:
@@ -206,18 +205,20 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
                 let mut ps2 = ps.clone();
                 loop {
                     if full.load(Ordering::Relaxed) {
-                        return (b, s2, ps2)
+                        return (b, s2, ps2);
                     }
                     match ps2.pop() {
                         None => {
                             break;
                         }
                         Some((idx, weight, gatenum)) => {
-                            match apply_gates1(gatenum, &gates, &mut table, idx, weight, &mut full, 0) {
+                            match apply_gates1(
+                                gatenum, &gates, &mut table, idx, weight, &mut full, 0,
+                            ) {
                                 (_, SuccessorsResult::AllSucceeded) => {}
                                 (_, SuccessorsResult::SomeFailed(fs)) => {
                                     ps2.extend(fs);
-                                    return (b, s2, ps2)
+                                    return (b, s2, ps2);
                                 }
                             }
                         }
@@ -231,7 +232,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
                     }
                     let (idx, weight) = get(i);
                     match apply_gates1(0, &gates, &mut table, idx, weight, &mut full, 0) {
-                        (_, SuccessorsResult::AllSucceeded) => { }
+                        (_, SuccessorsResult::AllSucceeded) => {}
                         (_, SuccessorsResult::SomeFailed(fs)) => {
                             s2 = i + 1;
                             ps2.extend(fs);
@@ -244,10 +245,8 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
                 }
                 (b, s2, ps2)
             })
-            //We keep any block that is not fully processed.
-            .filter(|(b, s, ps)| {
-                s < &block_stop(*b) || !ps.is_empty()
-            })
+            // We keep any block that is not fully processed.
+            .filter(|(b, s, ps)| s < &block_stop(*b) || !ps.is_empty())
             .collect();
         std::mem::swap(&mut blocks, &mut blocks_next);
         if !blocks.is_empty() {
@@ -408,7 +407,7 @@ fn apply_pull_gates(gates: &[&Gate], prev_state: &State, bidx: BasisIdx) -> (Com
         return (weight, 0);
     }
 
-    match gates[0].pull_apply(bidx) {
+    match gates[0].pull_action.as_ref().unwrap()(bidx) {
         PullApplyOutput::Nonbranching(neighbor, multiplier) => {
             let (weight, num_gate_apps) = apply_pull_gates(&gates[1..], prev_state, neighbor);
             (weight * multiplier, 1 + num_gate_apps)

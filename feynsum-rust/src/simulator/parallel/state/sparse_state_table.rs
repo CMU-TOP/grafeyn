@@ -24,8 +24,6 @@ pub struct ConcurrentSparseStateTable {
     pub nonzeros: Vec<usize>,
 }
 
-unsafe impl Sync for ConcurrentSparseStateTable {}
-
 impl ConcurrentSparseStateTable {
     pub fn _new(capacity: usize) -> Self {
         let keys: Vec<AtomicU64> = 
