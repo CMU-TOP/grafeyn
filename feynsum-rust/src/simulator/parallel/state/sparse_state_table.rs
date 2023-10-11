@@ -23,8 +23,6 @@ pub struct ConcurrentSparseStateTable {
     pub nonzeros: Vec<usize>,
 }
 
-unsafe impl Sync for ConcurrentSparseStateTable {}
-
 impl ConcurrentSparseStateTable {
     pub fn new2(capacity: usize) -> Self {
         let mut keys = Vec::with_capacity(capacity);
