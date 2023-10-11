@@ -71,7 +71,7 @@ fn expected_cost(num_qubits: usize, num_nonzeros: usize, prev_num_nonzeros: usiz
 }
 
 fn try_put(
-    table: &mut ConcurrentSparseStateTable,
+    table: &ConcurrentSparseStateTable,
     bidx: BasisIdx,
     weight: Complex,
 ) -> SparseStateTableInserion {
@@ -91,10 +91,10 @@ pub enum SuccessorsResult {
 fn apply_gates1(
     gatenum: usize,
     gates: &[&Gate],
-    table: &mut ConcurrentSparseStateTable,
+    table: &ConcurrentSparseStateTable,
     bidx: BasisIdx,
     weight: Complex,
-    full: &mut AtomicBool,
+    full: &AtomicBool,
     apps: usize,
 ) -> (usize, SuccessorsResult) {
     if utility::is_zero(weight) {
@@ -144,12 +144,12 @@ fn apply_gates1(
 fn apply_gates2(
     gatenum: usize,
     gates: &[&Gate],
-    table: &mut ConcurrentSparseStateTable,
+    table: &ConcurrentSparseStateTable,
     bidx1: BasisIdx,
     weight1: Complex,
     bidx2: BasisIdx,
     weight2: Complex,
-    full: &mut AtomicBool,
+    full: &AtomicBool,
     apps: usize,
 ) -> (usize, SuccessorsResult) {
     match apply_gates1(gatenum, gates, table, bidx1, weight1, full, apps) {
@@ -194,9 +194,10 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
     };
 
     while !blocks.is_empty() {
-        let mut full: AtomicBool = AtomicBool::new(false);
-        let mut blocks_next = blocks
-            .iter()
+        let full: AtomicBool = AtomicBool::new(false);
+        let mut blocks_next = 
+            blocks
+            .par_iter()
             .cloned()
             // We process a given block b in two steps:
             .map(|(b, s, ps)| {
@@ -213,7 +214,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
                         }
                         Some((idx, weight, gatenum)) => {
                             match apply_gates1(
-                                gatenum, &gates, &mut table, idx, weight, &mut full, 0,
+                                gatenum, &gates, &table, idx, weight, &full, 0,
                             ) {
                                 (_, SuccessorsResult::AllSucceeded) => {}
                                 (_, SuccessorsResult::SomeFailed(fs)) => {
@@ -231,7 +232,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
                         break;
                     }
                     let (idx, weight) = get(i);
-                    match apply_gates1(0, &gates, &mut table, idx, weight, &mut full, 0) {
+                    match apply_gates1(0, &gates, &table, idx, weight, &full, 0) {
                         (_, SuccessorsResult::AllSucceeded) => {}
                         (_, SuccessorsResult::SomeFailed(fs)) => {
                             s2 = i + 1;
