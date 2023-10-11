@@ -57,7 +57,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
             .map(|idx| &circuit.gates[idx])
             .collect::<Vec<_>>();
 
-        debug!("applying gates: {:?}", these_gates);
+        // debug!("applying gates: {:?}", these_gates);
 
         if these_gates.is_empty() {
             break;

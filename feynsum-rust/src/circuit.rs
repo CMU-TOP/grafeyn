@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use crate::parser::{Argument, Expression, OpCode, QasmStatement};
 use crate::types::{QubitIndex, Real};
-pub use gate::{Gate, GateDefn, PullApplicable, PullApplyOutput, PushApplicable, PushApplyOutput};
+pub use gate::{Gate, GateDefn, PullApplyOutput, PushApplicable, PushApplyOutput};
 
 #[derive(Debug)]
 pub enum CircuitBuildError {
@@ -17,7 +17,6 @@ pub enum CircuitBuildError {
     UnsupportedOpcode,
 }
 
-#[derive(Debug)]
 pub struct Circuit {
     pub num_qubits: usize,
     pub gates: Vec<Gate>,

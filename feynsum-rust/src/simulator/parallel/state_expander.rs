@@ -4,7 +4,7 @@ use std::sync::{atomic::AtomicBool, atomic::Ordering};
 
 use rayon::prelude::*;
 
-use crate::circuit::{Gate, PullApplicable, PullApplyOutput, PushApplicable, PushApplyOutput};
+use crate::circuit::{Gate, PullApplyOutput, PushApplicable, PushApplyOutput};
 use crate::config::Config;
 use crate::simulator::Compactifiable;
 use crate::types::{BasisIdx, Complex, Real};
@@ -169,14 +169,15 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
     let n: usize = match state {
         State::ConcurrentSparse(prev_table) => prev_table.num_nonzeros(),
         State::Dense(prev_table) => prev_table.capacity(),
-        State::Sparse(_) => panic!()
+        State::Sparse(_) => panic!(),
     };
     let block_size = std::cmp::max(100, std::cmp::min(n / 1000, config.block_size));
     let num_blocks = (n as f64 / block_size as f64).ceil() as usize;
     let block_start = |b: usize| block_size * b;
     let block_stop = |b: usize| std::cmp::min(n, block_size + block_start(b));
-    let mut blocks: Vec<(usize, usize, Vec<(BasisIdx, Complex, usize)>)> = 
-        (0..num_blocks).map(|b| (b, block_start(b), vec![])).collect();
+    let mut blocks: Vec<(usize, usize, Vec<(BasisIdx, Complex, usize)>)> = (0..num_blocks)
+        .map(|b| (b, block_start(b), vec![]))
+        .collect();
     let get = |i: usize| match state {
         State::Dense(prev_table) => {
             let v = prev_table.array[i].load(Ordering::Relaxed);
@@ -195,40 +196,43 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
 
     while !blocks.is_empty() {
         let mut full: AtomicBool = AtomicBool::new(false);
-        let mut blocks_next =
-            blocks
+        let mut blocks_next = blocks
             .iter()
             .cloned()
             .map(|(b, s, ps)| {
                 let mut s2 = s;
                 let mut ps2 = ps.clone();
-                loop { // clear pending blocks
+                loop {
+                    // clear pending blocks
                     if full.load(Ordering::Relaxed) {
-                        return (b, s2, ps2)
+                        return (b, s2, ps2);
                     }
                     match ps2.pop() {
                         None => {
                             break;
                         }
                         Some((idx, weight, gatenum)) => {
-                            match apply_gates1(gatenum, &gates, &mut table, idx, weight, &mut full, 0) {
+                            match apply_gates1(
+                                gatenum, &gates, &mut table, idx, weight, &mut full, 0,
+                            ) {
                                 (_, SuccessorsResult::AllSucceeded) => {}
                                 (_, SuccessorsResult::SomeFailed(fs)) => {
                                     ps2.extend(fs);
-                                    return (b, s2, ps2)
+                                    return (b, s2, ps2);
                                 }
                             }
                         }
                     }
                 }
-                for i in s..block_stop(b) { // work on block b
+                for i in s..block_stop(b) {
+                    // work on block b
                     if full.load(Ordering::Relaxed) {
                         s2 = i;
                         break;
                     }
                     let (idx, weight) = get(i);
                     match apply_gates1(0, &gates, &mut table, idx, weight, &mut full, 0) {
-                        (_, SuccessorsResult::AllSucceeded) => { }
+                        (_, SuccessorsResult::AllSucceeded) => {}
                         (_, SuccessorsResult::SomeFailed(fs)) => {
                             s2 = i + 1;
                             ps2.extend(fs);
@@ -241,9 +245,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
                 }
                 (b, s2, ps2)
             })
-            .filter(|(b, s, ps)| {
-                s < &block_stop(*b) || !ps.is_empty()
-            })
+            .filter(|(b, s, ps)| s < &block_stop(*b) || !ps.is_empty())
             .collect();
         std::mem::swap(&mut blocks, &mut blocks_next);
         if !blocks.is_empty() {
@@ -404,7 +406,7 @@ fn apply_pull_gates(gates: &[&Gate], prev_state: &State, bidx: BasisIdx) -> (Com
         return (weight, 0);
     }
 
-    match gates[0].pull_apply(bidx) {
+    match gates[0].pull_action.as_ref().unwrap()(bidx) {
         PullApplyOutput::Nonbranching(neighbor, multiplier) => {
             let (weight, num_gate_apps) = apply_pull_gates(&gates[1..], prev_state, neighbor);
             (weight * multiplier, 1 + num_gate_apps)
