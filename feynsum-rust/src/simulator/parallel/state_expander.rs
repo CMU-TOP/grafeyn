@@ -198,15 +198,14 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
         let mut blocks_next = 
             blocks
             .par_iter()
-            .cloned()
             // We process a given block b in two steps:
             .map(|(b, s, ps)| {
                 // (1) we clear any gate applications postponed from resizing the state vector
-                let mut s2 = s;
+                let mut s2 = *s;
                 let mut ps2 = ps.clone();
                 loop {
                     if full.load(Ordering::Relaxed) {
-                        return (b, s2, ps2);
+                        return (*b, s2, ps2);
                     }
                     match ps2.pop() {
                         None => {
@@ -219,14 +218,14 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
                                 (_, SuccessorsResult::AllSucceeded) => {}
                                 (_, SuccessorsResult::SomeFailed(fs)) => {
                                     ps2.extend(fs);
-                                    return (b, s2, ps2);
+                                    return (*b, s2, ps2);
                                 }
                             }
                         }
                     }
                 }
                 // (2) we apply remaining gate applications in the block
-                for i in s..block_stop(b) {
+                for i in *s..block_stop(*b) {
                     if full.load(Ordering::Relaxed) {
                         s2 = i;
                         break;
@@ -240,11 +239,11 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
                             break;
                         }
                     }
-                    if i + 1 == block_stop(b) {
+                    if i + 1 == block_stop(*b) {
                         s2 = i + 1
                     }
                 }
-                (b, s2, ps2)
+                (*b, s2, ps2)
             })
             // We keep any block that is not fully processed.
             .filter(|(b, s, ps)| s < &block_stop(*b) || !ps.is_empty())
