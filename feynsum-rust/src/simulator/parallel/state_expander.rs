@@ -176,7 +176,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
     let block_start = |b: usize| block_size * b;
     let block_stop = |b: usize| std::cmp::min(n, block_size + block_start(b));
     let mut blocks: Vec<(usize, usize, Vec<(BasisIdx, Complex, usize)>)> = 
-        (0..num_blocks).map(|b| (b, block_start(b), vec![])).collect();
+        (0..num_blocks).into_par_iter().map(|b| (b, block_start(b), vec![])).collect();
     let get = |i: usize| match state {
         State::Dense(prev_table) => {
             let v = prev_table.array[i].load(Ordering::Relaxed);
@@ -199,10 +199,12 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
             blocks
             .iter()
             .cloned()
+            // We process a given block b in two steps:
             .map(|(b, s, ps)| {
+                // (1) we clear any gate applications postponed from resizing the state vector
                 let mut s2 = s;
                 let mut ps2 = ps.clone();
-                loop { // clear pending blocks
+                loop {
                     if full.load(Ordering::Relaxed) {
                         return (b, s2, ps2)
                     }
@@ -221,7 +223,8 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
                         }
                     }
                 }
-                for i in s..block_stop(b) { // work on block b
+                // (2) we apply remaining gate applications in the block
+                for i in s..block_stop(b) {
                     if full.load(Ordering::Relaxed) {
                         s2 = i;
                         break;
@@ -241,6 +244,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
                 }
                 (b, s2, ps2)
             })
+            //We keep any block that is not fully processed.
             .filter(|(b, s, ps)| {
                 s < &block_stop(*b) || !ps.is_empty()
             })

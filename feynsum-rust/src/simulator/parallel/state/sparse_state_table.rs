@@ -1,6 +1,7 @@
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use rayon::prelude::*;
 
 use crate::types::{BasisIdx, Complex};
 use crate::utility;
@@ -26,17 +27,17 @@ pub struct ConcurrentSparseStateTable {
 unsafe impl Sync for ConcurrentSparseStateTable {}
 
 impl ConcurrentSparseStateTable {
-    pub fn new2(capacity: usize) -> Self {
-        let mut keys = Vec::with_capacity(capacity);
-        for _i in 0..capacity {
-            keys.push(AtomicU64::new(BasisIdx::into_u64(EMPTY_KEY)));
-        }
-        let mut packed_weights = Vec::with_capacity(capacity);
-        for _i in 0..capacity {
-            packed_weights.push(AtomicU64::new(0));
-        }
-        assert!(keys.len() == capacity);
-        assert!(packed_weights.len() == capacity);
+    pub fn _new(capacity: usize) -> Self {
+        let keys: Vec<AtomicU64> = 
+            (0..capacity)
+            .into_par_iter()
+            .map(|_i| AtomicU64::new(BasisIdx::into_u64(EMPTY_KEY)))
+            .collect();
+        let packed_weights: Vec<AtomicU64> =
+            (0..capacity)
+            .into_par_iter()
+            .map(|_i| AtomicU64::new(0))
+            .collect();
         let nonzeros = Vec::new();
         Self {
             keys,
@@ -46,7 +47,7 @@ impl ConcurrentSparseStateTable {
     }
     pub fn new() -> Self {
         let capacity = 100;
-        Self::new2(capacity)
+        Self::_new(capacity)
     }
     pub fn singleton(bidx: BasisIdx, weight: Complex) -> Self {
         let mut t = ConcurrentSparseStateTable::new();
@@ -154,7 +155,8 @@ impl ConcurrentSparseStateTable {
     }
     pub fn increase_capacity_by_factor(&self, alpha: f32) -> Self {
         let new_capacity = (alpha * self.keys.len() as f32).ceil() as usize;
-        let new_table = Self::new2(new_capacity);
+        let new_table = Self::_new(new_capacity);
+        //keys.par_iter_mut().zip(&mut packed_weights.par_iter_mut()).for_each(|(k, w)| {
         for i in 0..self.keys.len() {
             let k = BasisIdx::from_u64(self.keys[i].load(Ordering::Relaxed));
             let weight = utility::unpack_complex(self.packed_weights[i].load(Ordering::Relaxed));
@@ -165,7 +167,9 @@ impl ConcurrentSparseStateTable {
         new_table
     }
     pub fn make_nonzero_shortcuts(&mut self) {
-        let mut nonzeros = (0..self.keys.len())
+        let mut nonzeros = 
+            (0..self.keys.len())
+            .into_par_iter()
             .filter(|&i| {
                 if self.keys[i].load(Ordering::Relaxed) == BasisIdx::into_u64(EMPTY_KEY) {
                     return false;
@@ -203,7 +207,7 @@ impl SparseStateTable {
             .filter(|(_, w)| utility::is_nonzero(**w))
             .count()
     }
-
+ 
     pub fn put(&mut self, bidx: BasisIdx, weight: Complex) {
         self.table
             .entry(bidx)
