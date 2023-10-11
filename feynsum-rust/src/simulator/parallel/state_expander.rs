@@ -196,7 +196,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
     while !blocks.is_empty() {
         let mut full: AtomicBool = AtomicBool::new(false);
         let mut blocks_next = blocks
-            .iter()
+            .into_par_iter()
             .cloned()
             // We process a given block b in two steps:
             .map(|(b, s, ps)| {
