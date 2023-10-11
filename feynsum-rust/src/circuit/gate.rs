@@ -603,29 +603,52 @@ macro_rules! push_to_pull {
                 let qi = touches[0];
                 let qj = touches[1];
 
-                let (b00, m00) = match $self.push_apply(BasisIdx::zeros(), Complex::new(1.0, 0.0)) {
+                let a00 = BasisIdx::zeros();
+                let a01 = BasisIdx::zeros().set(qj);
+                let a10 = BasisIdx::zeros().set(qi);
+                let a11 = BasisIdx::zeros().set(qi).set(qj);
+
+                let (b00, m00) = match $self.push_apply(a00, Complex::new(1.0, 0.0)) {
                     PushApplyOutput::Nonbranching(bidx, multiplier) => (bidx, multiplier),
                     _ => unreachable!("push_apply(BasisIdx::zeros(), Complex::new(1.0,0.0)) must return Nonbranching"),
                 };
 
                 let (b01, m01) =
-                    match $self.push_apply(BasisIdx::zeros().set(qj), Complex::new(1.0, 0.0)) {
+                    match $self.push_apply(a01, Complex::new(1.0, 0.0)) {
                         PushApplyOutput::Nonbranching(bidx, multiplier) => (bidx, multiplier),
                         _ => unreachable!("push_apply(BasisIdx::zeros().set(qj), Complex::new(1.0,0.0)) must return Nonbranching"),
                     };
 
                 let (b10, m10) =
-                    match $self.push_apply(BasisIdx::zeros().set(qi), Complex::new(1.0, 0.0)) {
+                    match $self.push_apply(a10, Complex::new(1.0, 0.0)) {
                         PushApplyOutput::Nonbranching(bidx, multiplier) => (bidx, multiplier),
                         _ => unreachable!("push_apply(BasisIdx::zeros().set(qi), Complex::new(1.0,0.0)) must return Nonbranching"),
                     };
 
                 let (b11, m11) = match $self
-                    .push_apply(BasisIdx::zeros().set(qi).set(qj), Complex::new(1.0, 0.0))
+                    .push_apply(a11, Complex::new(1.0, 0.0))
                 {
                     PushApplyOutput::Nonbranching(bidx, multiplier) => (bidx, multiplier),
                     _ => unreachable!("push_apply(BasisIdx::zeros().set(qi).set(qj), Complex::new(1.0,0.0)) must return Nonbranching"),
                 };
+
+                let apply_match = |left: bool, right: bool, bb: &BasisIdx| -> bool {
+                        left == bb.get(qi) && right == bb.get(qj)
+                    };
+                    let find = |left: bool, right: bool| -> (BasisIdx, Complex) {
+                        if apply_match(left, right, &b00) {
+                            (a00, m00.clone())
+                        } else if apply_match(left, right, &b01) {
+                            (a01, m01.clone())
+                        } else if apply_match(left, right, &b10) {
+                            (a10, m10.clone())
+                        } else if apply_match(left, right, &b11) {
+                            (a11, m11.clone())
+                        } else {
+                            unreachable!("apply_match must return true for one of the basis")
+                        }
+                    };
+
 
                 let align_with = |bb: &BasisIdx, bidx: &BasisIdx| -> BasisIdx {
                     match (bb.get(qi), bb.get(qj)) {
