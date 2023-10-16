@@ -20,18 +20,20 @@ struct
     type ord_key = (B.t * C.t)
     fun compare ((b1, c1), (b2, c2)) =
       let
-        val m1 = C.magnitude c1
-        val m2 = C.magnitude c2
+        (* bucket magnitudes to have a reasonable total order while also
+         * ignoring small differences due to floating-point error.
+         *)
+        val m1 = Real.round (100000000.0 * C.R.toLarge (C.magnitude c1))
+        val m2 = Real.round (100000000.0 * C.R.toLarge (C.magnitude c2))
       in
-        if C.R.< (C.R.abs (C.R.- (m1, m2)), C.zeroThreshold) then
-          (* reverse the comparison here so that the output fingerprint is
-           * sorted like normal binary numbers, for readability
-           *)
-          B.compare (b2, b1)
-        else if C.R.< (m1, m2) then
-          LESS
-        else
-          GREATER
+        case Int.compare (m1, m2) of
+          EQUAL =>
+            (* reverse the comparison here so that the output fingerprint is
+             * sorted like normal binary numbers, for readability
+             *)
+            B.compare (b2, b1)
+
+        | other => other
       end
   end
 

@@ -1,4 +1,5 @@
-structure GateSchedulerGreedyFinishQubit:
+functor GateSchedulerGreedyFinishQubit
+  (val maxBranchingStride: int val disableFusion: bool):
 sig
   val scheduler: GateScheduler.t
 end =
@@ -86,14 +87,14 @@ struct
       end
 
 
-  fun pickNext
+  fun peekNext
     (sched as S {numQubits, numGates, gateTouches, gateIsBranching, frontier}) =
     let
       fun makeProgressOnQubit qi =
         let
           val desiredGate = Array.sub (frontier, qi)
         in
-          if tryVisit sched desiredGate then
+          if okayToVisit sched desiredGate then
             desiredGate
           else
             (* Find which qubit is not ready to do this gate yet, and make
@@ -112,7 +113,7 @@ struct
                 SOME i => makeProgressOnQubit (Seq.nth touches i)
               | NONE =>
                   raise Fail
-                    "GateSchedulerGreedyFinishQubit.pickNext.makeProgressOnQubit: error"
+                    "GateSchedulerGreedyFinishQubit.peekNext.makeProgressOnQubit: error"
             end
         end
 
@@ -120,9 +121,53 @@ struct
         Array.sub (frontier, qi) < numGates)
     in
       case unfinishedQubit of
-        NONE => Seq.empty ()
-      | SOME qi => Seq.singleton (makeProgressOnQubit qi)
+        NONE => NONE
+      | SOME qi => SOME (makeProgressOnQubit qi)
     end
+
+
+  fun pickNextNoFusion sched =
+    case peekNext sched of
+      NONE => Seq.empty ()
+    | SOME gidx =>
+        ( if tryVisit sched gidx then
+            ()
+          else
+            raise Fail
+              "GateSchedulerGreedyFinishQubit.pickNextNoFusion: visit failed (should be impossible)"
+        ; Seq.singleton gidx
+        )
+
+
+  fun pickNext (sched as S {gateIsBranching, ...}) =
+    if disableFusion then
+      pickNextNoFusion sched
+    else
+      let
+        fun loop acc numBranchingSoFar =
+          if numBranchingSoFar >= maxBranchingStride then
+            acc
+          else
+            case peekNext sched of
+              NONE => acc
+            | SOME gidx =>
+                let
+                  val numBranchingSoFar' =
+                    numBranchingSoFar + (if gateIsBranching gidx then 1 else 0)
+                in
+                  if tryVisit sched gidx then
+                    ()
+                  else
+                    raise Fail
+                      "GateSchedulerGreedyFinishQubit.pickNext.loop: visit failed (should be impossible)";
+
+                  loop (gidx :: acc) numBranchingSoFar'
+                end
+
+        val acc = loop [] 0
+      in
+        Seq.fromRevList acc
+      end
 
 
   fun scheduler args =

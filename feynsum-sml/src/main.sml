@@ -22,7 +22,7 @@ val _ = print
   ("measure-zeros? " ^ (if doMeasureZeros then "yes" else "no") ^ "\n")
 
 (* gate scheduler name *)
-val schedulerName = CLA.parseString "scheduler" "greedy-nonbranching"
+val schedulerName = CLA.parseString "scheduler" "gfq"
 val _ = print ("scheduler " ^ schedulerName ^ "\n")
 
 (* input circuit *)
@@ -35,27 +35,31 @@ val _ = print ("input " ^ inputName ^ "\n")
 
 
 local
-  val gnbDisableFusion = CLA.parseFlag "scheduler-gnb-disable-fusion"
-  val gnbMaxBranchingStride =
-    CLA.parseInt "scheduler-gnb-max-branching-stride" 2
+  val disableFusion = CLA.parseFlag "scheduler-disable-fusion"
+  val maxBranchingStride = CLA.parseInt "scheduler-max-branching-stride" 2
 in
   structure GNB =
     GateSchedulerGreedyNonBranching
-      (val maxBranchingStride = gnbMaxBranchingStride
-       val disableFusion = gnbDisableFusion)
+      (val maxBranchingStride = maxBranchingStride
+       val disableFusion = disableFusion)
 
-  fun print_gnb_info () =
+  structure GFQ =
+    GateSchedulerGreedyFinishQubit
+      (val maxBranchingStride = maxBranchingStride
+       val disableFusion = disableFusion)
+
+  fun print_sched_info () =
     let
       val _ = print
         ("-------------------------------------\n\
          \--- scheduler-specific args\n\
          \-------------------------------------\n")
       val _ = print
-        ("scheduler-gnb-max-branching-stride "
-         ^ Int.toString gnbMaxBranchingStride ^ "\n")
+        ("scheduler-max-branching-stride " ^ Int.toString maxBranchingStride
+         ^ "\n")
       val _ = print
-        ("scheduler-gnb-disable-fusion? "
-         ^ (if gnbDisableFusion then "yes" else "no") ^ "\n")
+        ("scheduler-disable-fusion? " ^ (if disableFusion then "yes" else "no")
+         ^ "\n")
       val _ = print ("-------------------------------------\n")
     in
       ()
@@ -70,11 +74,11 @@ val gateScheduler =
   | "greedy-branching" => GateSchedulerGreedyBranching.scheduler
   | "gb" => GateSchedulerGreedyBranching.scheduler
 
-  | "greedy-nonbranching" => (print_gnb_info (); GNB.scheduler)
-  | "gnb" => (print_gnb_info (); GNB.scheduler)
+  | "greedy-nonbranching" => (print_sched_info (); GNB.scheduler)
+  | "gnb" => (print_sched_info (); GNB.scheduler)
 
-  | "greedy-finish-qubit" => GateSchedulerGreedyFinishQubit.scheduler
-  | "gfq" => GateSchedulerGreedyFinishQubit.scheduler
+  | "greedy-finish-qubit" => (print_sched_info (); GFQ.scheduler)
+  | "gfq" => (print_sched_info (); GFQ.scheduler)
 
   | _ =>
       Util.die

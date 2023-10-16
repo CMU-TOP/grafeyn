@@ -110,7 +110,7 @@ in
   structure GateSchedulerNaive
   functor GateSchedulerGreedyNonBranching
   structure GateSchedulerGreedyBranching
-  structure GateSchedulerGreedyFinishQubit
+  functor GateSchedulerGreedyFinishQubit
 
   functor RedBlackMapFn
   functor RedBlackSetFn
