@@ -470,6 +470,23 @@ struct
     end
 
 
+  fun phase {target, rot} =
+    let
+      val rot = R.fromLarge rot
+      val mult = C.rotateBy rot
+
+      fun apply (bidx, weight) =
+        let
+          val weight =
+            if not (B.get bidx target) then weight else C.* (mult, weight)
+        in
+          (bidx, weight)
+        end
+    in
+      makePushPull {touches = Seq.singleton target, action = NonBranching apply}
+    end
+
+
   fun cphase {control, target, rot} =
     let
       val rot = R.fromLarge rot
@@ -536,7 +553,7 @@ struct
         end
 
       fun pullApply bidx =
-        if B.get bidx target then (bidx, rot0) else (bidx, rot1)
+        if B.get bidx target then (bidx, rot1) else (bidx, rot0)
     in
       { touches = Seq.singleton target
       , action = NonBranching apply
@@ -852,6 +869,7 @@ struct
     | GateDefn.CX xx => cx xx
     | GateDefn.CZ xx => cz xx
     | GateDefn.CCX xx => ccx xx
+    | GateDefn.Phase xx => phase xx
     | GateDefn.CPhase xx => cphase xx
     | GateDefn.FSim xx => fsim xx
     | GateDefn.RX xx => rx xx

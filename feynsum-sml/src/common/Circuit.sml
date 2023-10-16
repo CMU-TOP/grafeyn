@@ -137,6 +137,11 @@ struct
               GateDefn.CCX
                 {control1 = getArg 0, control2 = getArg 1, target = getArg 2}
 
+          | ("phase", 0, 1) =>
+              let val rot = evalExp (getParam 0)
+              in GateDefn.Phase {rot = rot, target = getArg 0}
+              end
+
           | ("cphase", 1, 2) =>
               let
                 val rot = evalExp (getParam 0)
@@ -256,6 +261,8 @@ struct
         | GateDefn.CZ {control, target} => "cz " ^ qi control ^ ", " ^ qi target
         | GateDefn.CCX {control1, control2, target} =>
             "ccx " ^ qi control1 ^ ", " ^ qi control2 ^ ", " ^ qi target
+        | GateDefn.Phase {target, rot} =>
+            "phase(" ^ Real.toString rot ^ ") " ^ qi target
         | GateDefn.CPhase {control, target, rot} =>
             "cphase(" ^ Real.toString rot ^ ") " ^ qi control ^ ", " ^ qi target
         | GateDefn.FSim {left, right, theta, phi} =>

@@ -17,6 +17,7 @@ struct
   | CX of {control: qubit_idx, target: qubit_idx}
   | CZ of {control: qubit_idx, target: qubit_idx}
   | CCX of {control1: qubit_idx, control2: qubit_idx, target: qubit_idx}
+  | Phase of {target: qubit_idx, rot: real}
   | CPhase of
       { control: qubit_idx
       , target: qubit_idx
