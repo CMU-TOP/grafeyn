@@ -26,6 +26,8 @@ sig
   val zero: t
   val i: t
 
+  val magnitude: t -> r
+
   val ~ : t -> t
   val - : t * t -> t
   val + : t * t -> t
@@ -45,10 +47,16 @@ struct
 
   datatype t = C of {re: real, im: real}
 
-  val rtos = fmt (StringCvt.FIX (SOME 4))
+  val rtos = fmt (StringCvt.FIX (SOME 8))
 
   fun toString (C {re, im}) =
-    rtos re ^ " + " ^ rtos im ^ "i"
+    let
+      val (front, re) = if Int.< (R.sign re, 0) then ("-", R.~ re) else ("", re)
+      val (middle, im) =
+        if Int.< (R.sign im, 0) then ("-", R.~ im) else ("+", im)
+    in
+      front ^ rtos re ^ middle ^ rtos im ^ "i"
+    end
 
   fun make (re, im) = C {re = re, im = im}
 
@@ -56,6 +64,9 @@ struct
 
   val zeroThreshold = fromLarge 0.00000001
   fun realIsZero x = R.abs x < zeroThreshold
+
+  fun magnitude (C {re, im}) =
+    R.Math.sqrt (R.+ (R.* (re, re), R.* (im, im)))
 
   fun isZero (C {re, im}) = realIsZero re andalso realIsZero im
 

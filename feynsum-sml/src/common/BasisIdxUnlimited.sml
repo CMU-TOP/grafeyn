@@ -201,20 +201,18 @@ struct
   (* TODO: could be more efficient *)
   fun compare (bidx1, bidx2) =
     let
-      val firstDiff =
-        FindFirst.findFirst 1000
-          (0, 8 * Int.max (Seq.length bidx1, Seq.length bidx2))
-          (fn qi =>
-             let
-               val b1 = get bidx1 qi
-               val b2 = get bidx2 qi
-             in
-               b1 <> b2
-             end)
+      val hi = 8 * Int.max (Seq.length bidx1, Seq.length bidx2)
+      val firstDiff = FindFirst.findFirst 1000 (0, hi) (fn i =>
+        let
+          val b1 = get bidx1 (hi - i - 1)
+          val b2 = get bidx2 (hi - i - 1)
+        in
+          b1 <> b2
+        end)
     in
       case firstDiff of
         NONE => EQUAL
-      | SOME qi => if get bidx1 qi then GREATER else LESS
+      | SOME i => if get bidx1 (hi - i - 1) then GREATER else LESS
     end
 
 
@@ -249,9 +247,10 @@ struct
   fun toDenseIndex _ =
     raise Fail "BasisIdxUnlimited.toDenseIndex: not yet implemented"
 
-  fun toString {numQubits} bidx =
-    "|"
+  fun toString {numQubits, pretty} bidx =
+    (if pretty then "|" else "")
     ^
     CharVector.tabulate (numQubits, fn i =>
-      if get bidx (numQubits - i - 1) then #"1" else #"0") ^ "⟩"
+      if get bidx (numQubits - i - 1) then #"1" else #"0")
+    ^ (if pretty then "⟩" else "")
 end

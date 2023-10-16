@@ -40,8 +40,17 @@ struct
        val denseThreshold = denseThreshold
        val pullThreshold = pullThreshold)
 
+
+  structure F = Fingerprint (structure B = B structure C = C)
+
+
+  (* =======================================================================
+   * main
+   *)
+
   fun main (inputName, circuit) =
     let
+      val numQubits = Circuit.numQubits circuit
       val impl = CLA.parseString "impl" "lockfree"
       val output = CLA.parseString "output" ""
       val outputDensities = CLA.parseString "output-densities" ""
@@ -60,7 +69,7 @@ struct
       val {result, counts} = Benchmark.run "full-sim-bfs" (fn _ => sim circuit)
       val counts = Seq.map IntInf.fromInt counts
 
-      val maxNumStates = IntInf.pow (2, Circuit.numQubits circuit)
+      val maxNumStates = IntInf.pow (2, numQubits)
       val numRounds = IntInf.fromInt (Seq.length counts)
 
       val avgDensity = Rat.normalize (Rat.make
@@ -75,12 +84,24 @@ struct
         ("max-density "
          ^ Real.fmt (StringCvt.FIX (SOME 12)) (Rat.approx maxDensity) ^ "\n")
 
+      val (fp, tm) = Util.getTime (fn _ => F.fingerprint result)
+      val _ = print ("computed fingerprint in " ^ Time.fmt 4 tm ^ "s\n")
+
+      val _ = Util.for (0, Seq.length fp) (fn i =>
+        let
+          val (b, c) = Seq.nth fp i
+        in
+          print
+            ("fp" ^ Int.toString i ^ " "
+             ^ B.toString {numQubits = numQubits, pretty = false} b ^ " "
+             ^ C.toString c ^ "\n")
+        end)
+
       val _ =
         if output = "" then
           print ("use -output FILE to see output state vector\n")
         else
           let
-            val numQubits = Circuit.numQubits circuit
             val _ = print ("writing to " ^ output ^ "\n")
             val outstream = TextIO.openOut output
           in
@@ -88,13 +109,14 @@ struct
               case DelayedSeq.nth result i of
                 NONE => ()
               | SOME (bidx, weight) =>
-                  let in
+                  if C.isZero weight then
+                    ()
+                  else
                     TextIO.output
                       ( outstream
-                      , B.toString {numQubits = numQubits} bidx ^ " "
-                        ^ C.toString weight ^ "\n"
-                      )
-                  end);
+                      , B.toString {numQubits = numQubits, pretty = false} bidx
+                        ^ " " ^ C.toString weight ^ "\n"
+                      ));
             TextIO.closeOut outstream;
             print ("output written to " ^ output ^ "\n")
           end

@@ -4,6 +4,7 @@ local
     $(SML_LIB)/smlnj-lib/Util/smlnj-lib.mlb
   in
     functor RedBlackMapFn
+    functor RedBlackSetFn
   end
   ../lib/github.com/mpllang/mpllib/sources.$(COMPILER).mlb
 
@@ -58,6 +59,8 @@ local
   GateSchedulerGreedyNonBranching.sml
   GateSchedulerGreedyBranching.sml
   GateSchedulerGreedyFinishQubit.sml
+
+  Fingerprint.sml
 in
   structure HashTable
   structure ApplyUntilFailure
@@ -110,4 +113,7 @@ in
   structure GateSchedulerGreedyFinishQubit
 
   functor RedBlackMapFn
+  functor RedBlackSetFn
+
+  functor Fingerprint
 end

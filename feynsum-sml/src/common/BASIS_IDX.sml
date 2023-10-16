@@ -4,7 +4,10 @@ sig
 
   val maxNumQubits: int option (* NONE: unlimited *)
 
-  val toString: {numQubits: int} -> t -> string
+  (* pretty=true:  |010111000...⟩
+   * pretty=false:  010111000...
+   *)
+  val toString: {numQubits: int, pretty: bool} -> t -> string
 
   val zeros: t
 

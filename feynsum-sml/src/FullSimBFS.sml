@@ -71,7 +71,7 @@ struct
         | SOME (bidx, weight) =>
             let in
               print
-                (B.toString {numQubits = numQubits} bidx ^ " "
+                (B.toString {numQubits = numQubits, pretty = true} bidx ^ " "
                  ^ C.toString weight ^ "\n")
             end)
     end
