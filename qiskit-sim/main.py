@@ -4,14 +4,20 @@ import sys
 import time
 import numpy
 import resource
+import argparse
+import multiprocessing
+NCPU = multiprocessing.cpu_count()
 
-cfile = sys.argv[1]
-doOutput = False if len(sys.argv) <= 2 else bool(sys.argv[2])
+parser = argparse.ArgumentParser()
+parser.add_argument('FILE', help='input .qasm file')
+parser.add_argument('-t', '--threads', dest='threads', type=int, default=NCPU, help='number of CPU threads (defaults to max)')
+parser.add_argument('--no-fingerprint', dest='no_fingerprint', action='store_true')
+args = parser.parse_args()
 
-circ = qiskit.QuantumCircuit.from_qasm_file(cfile)
+circ = qiskit.QuantumCircuit.from_qasm_file(args.FILE)
 
 sim = qiskit.Aer.get_backend('aer_simulator_statevector')
-sim.set_options(max_parallel_threads=144)
+sim.set_options(max_parallel_threads=args.threads)
 circ = qiskit.transpile(circ, sim)
 # print(circ.qasm())
 circ.save_statevector()
@@ -34,14 +40,14 @@ def fmt_complex(c):
   aimag = abs(c.imag)
   return f'{c.real:.8f}{mid}{aimag:.8f}i'
 
-if doOutput:
-  mags = numpy.abs(result)
-  if len(mags) <= 10:
-    for i in range(len(result)):
-      if mags[i] > 0.00000001:
-        print('{} {}'.format(basisidx(i), fmt_complex(result[i])))
-  else:
-    ind = numpy.argpartition(mags, -10)[-10:]
-    for i in ind:
-      if mags[i] > 0.00000001:
-        print('{} {}'.format(basisidx(i), fmt_complex(result[i])))
+if args.no_fingerprint:
+  pass
+else:
+  ### TODO: faster method than stable sort??
+  neg_mags = -numpy.round(numpy.abs(result), 8)
+  ind = numpy.argsort(neg_mags, kind='stable')
+  limit = min(10, len(result))
+  for fpi in range(0, limit):
+    i = ind[fpi]
+    if -neg_mags[i] >= 0.00000001:
+      print('fp{} {} {}'.format(fpi, basisidx(i), fmt_complex(result[i])))
