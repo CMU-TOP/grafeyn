@@ -116,10 +116,12 @@ def qsim(inputFile, threads):
     'machine': args.machine_name
   }
 
-rows = \
-  [mplsim(f, t, s) for f in inputFiles for t in threadList for s in ['gfq']] \
-  + [qiskitsim(f, t) for f in inputFiles for t in threadList] \
-  + [qsim(f, t) for f in inputFiles for t in threadList]
+rows = [
+  row
+  for f in inputFiles
+  for t in threadList
+  for row in [mplsim(f,t,'gfq'), qiskitsim(f,t), qsim(f,t)]
+]
 
 for r in rows:
   if args.bare:
