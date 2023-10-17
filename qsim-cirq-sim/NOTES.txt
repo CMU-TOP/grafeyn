@@ -1,1 +1,5 @@
 https://quantumai.google/cirq
+https://quantumai.google/reference/python/qsimcirq
+
+qsim integrates with cirq but is not a Google-sponsored project (?)
+https://github.com/quantumlib/qsim
