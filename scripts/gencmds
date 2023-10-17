@@ -89,7 +89,7 @@ def mplsim(inputFile, threads, scheduler):
   }
 
 def qiskitsim_cmd(inputFile, threads):
-  return f'python main.py {absolute_input_path(inputFile)} --threads {threads}'
+  return f'python3 main.py {absolute_input_path(inputFile)} --threads {threads}'
 
 def qiskitsim(inputFile, threads):
   return {
@@ -103,7 +103,7 @@ def qiskitsim(inputFile, threads):
   }
 
 def qsim_cmd(inputFile, threads):
-  return f'python main.py {absolute_input_path(inputFile)} --threads {threads}'
+  return f'python3 main.py {absolute_input_path(inputFile)} --threads {threads}'
 
 def qsim(inputFile, threads):
   return {
