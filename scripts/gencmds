@@ -37,34 +37,34 @@ try:
 except Exception as e:
   sys.exit(f'{e}\nERROR: could not parse argument: -t {args.threads}')
 
-inputFiles = \
-  [ 'bv_n30.qasm'
-  , 'ising_n26.qasm'
-  , 'knn_n31.qasm'
-  , 'adder_n28.qasm'
-  , 'qft_n29.qasm'
-  , 'multiplier_n45.qasm'
-  , 'qram_n20.qasm'
-  , 'qugan_n39_transpiled.qasm'
-  , 'wstate_n36.qasm'
-  , 'dj_indep_qiskit_62.qasm'
-  , 'dj_indep_qiskit_30.qasm'
-  , 'knn_n41.qasm'
-  , 'qv_n32.qasm'
-  , 'cat_n35.qasm'
-  , 'vqe_uccsd_n28_transpiled.qasm'
-  , 'dnn_n33_transpiled.qasm'
-  , 'swap_test_n41.qasm'
-  , 'ghz_n40.qasm'
-  , 'ising_n34.qasm'
-  , 'bv_n70.qasm'
-  , 'bv_n280.qasm'
-  , 'adder_n433.qasm'
-  , 'cat_n260.qasm'
-  , 'ghz_n255.qasm'
-  , 'multiplier_n400.qasm'
-  , 'dj_indep_qiskit_130.qasm'
-  ]
+inputFiles = [ 
+  'qram_n20.qasm',
+  'ising_n26.qasm',
+  'adder_n28.qasm',
+  'vqe_uccsd_n28_transpiled.qasm',
+  'qft_n29.qasm',
+  'bv_n30.qasm',
+  'dj_indep_qiskit_30.qasm',
+  'knn_n31.qasm',
+  'qv_n32.qasm',
+  'dnn_n33_transpiled.qasm',
+  'ising_n34.qasm',
+  'cat_n35.qasm',
+  'wstate_n36.qasm',
+  'qugan_n39_transpiled.qasm',
+  'ghz_n40.qasm',
+  'knn_n41.qasm',
+  'swap_test_n41.qasm',
+  'multiplier_n45.qasm',
+  'dj_indep_qiskit_62.qasm',
+  'bv_n70.qasm',
+  'dj_indep_qiskit_130.qasm',
+  'ghz_n255.qasm',
+  'cat_n260.qasm',
+  'bv_n280.qasm',
+  'multiplier_n400.qasm',
+  'adder_n433.qasm'
+]
 
 def absolute_input_path(inputFile):
   return os.path.join(args.bench_dir, 'qasm-src', inputFile)
@@ -102,9 +102,24 @@ def qiskitsim(inputFile, threads):
     'machine': args.machine_name
   }
 
+def qsim_cmd(inputFile, threads):
+  return f'python main.py {absolute_input_path(inputFile)} --threads {threads}'
+
+def qsim(inputFile, threads):
+  return {
+    'cmd': qsim_cmd(inputFile, threads),
+    'cwd': 'qsim-cirq-sim',
+    'simulator': 'qsim',
+    'simulator_options': None,
+    'threads': threads,
+    'input': inputFile,
+    'machine': args.machine_name
+  }
+
 rows = \
   [mplsim(f, t, s) for f in inputFiles for t in threadList for s in ['gfq']] \
-  + [qiskitsim(f, t) for f in inputFiles for t in threadList]
+  + [qiskitsim(f, t) for f in inputFiles for t in threadList] \
+  + [qsim(f, t) for f in inputFiles for t in threadList]
 
 for r in rows:
   if args.bare:
