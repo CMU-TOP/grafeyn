@@ -1,0 +1,361 @@
+#!/usr/bin/env python3
+
+import subprocess, re, argparse, os, sys, json
+
+def ensureFigDir():
+  if not os.path.isdir("figures"):
+    os.mkdir("figures")
+
+def getGitRoot():
+  return subprocess.Popen(['git', 'rev-parse', '--show-toplevel'],
+    stdout=subprocess.PIPE, text=True).communicate()[0].rstrip()
+
+ROOT = getGitRoot()
+
+def mostRecentResultsFile(suffix=""):
+  files = os.listdir(os.path.join(ROOT, "results"))
+  pattern = r'\d{6}-\d{6}'
+  if suffix != "":
+    pattern = pattern + "-" + suffix + "$"
+  else:
+    pattern = pattern + "$"
+  # A bit of a hack. Filenames are ...YYMMDD-hhmmss, so lexicographic string
+  # comparison is correct for finding the most recent (i.e. maximum) file
+  mostRecent = max(p for p in files if re.match(pattern, p))
+  return mostRecent
+
+def json_careful_loads(s):
+  try:
+    return json.loads(s)
+  except Exception as e:
+    sys.exit("[ERR] Error while parsing json: {}\n".format(e))
+
+def json_careful_readlines(f):
+  return [ json_careful_loads(line.rstrip('\n')) for line in f ]
+
+# ===========================================================================
+# ===========================================================================
+# ===========================================================================
+
+def safediv(x, y):
+  try:
+    return round(x / y, 2)
+  except:
+    return None
+
+
+def rounder(x):
+  try:
+    if x >= 1000:
+      return round(x, 0)
+    if x >= 100:
+      return round(x, 1)
+    if x >= 10:
+      return round(x, 2)
+    if x >= 1:
+      return round(x, 3)
+    if x >= 0.1:
+      return round(x, 4)
+    else:
+      return round(x, 5)
+  except:
+    return None
+
+
+def check_value(row, key, value):
+  return key in row and row[key] == value
+
+
+def parse_time(row):
+  try:
+    pat = re.compile(r"^time\s+(\d+.\d+).*$", re.MULTILINE)
+    return rounder(float(pat.search(row['stdout'] + row['stderr']).group(1)))
+  except Exception as e:
+    # print(f'parse_time: {e}\n  row = {row}')
+    return None
+
+
+def parse_maxrss(row):
+  try:
+    pat = re.compile(r"^maxrss\s+(\d+)\s+kb.*$", re.MULTILINE)
+    kb = int(pat.search(row['stdout'] + row['stderr']).group(1))
+    gb = rounder(float(kb) / 1000000.0)
+    return gb
+  except Exception as e:
+    # print(f'parse_time: {e}\n  row = {row}')
+    return None
+
+
+def parse_returncode(row):
+  try:
+    return row['returncode']
+  except Exception as e:
+    return None
+
+
+def most_recent_row(data, simulator, threads, inp):
+  try:
+    rows = [
+      row for row in data
+      if check_value(row, 'simulator', simulator) and
+        check_value(row, 'threads', threads) and
+        check_value(row, 'input', inp)
+    ]
+    return rows[-1]
+  except:
+    return None
+
+
+def get_time(data, simulator, threads, inp):
+  return parse_time(most_recent_row(data, simulator, threads, inp))
+def get_maxrss(data, simulator, threads, inp):
+  return parse_maxrss(most_recent_row(data, simulator, threads, inp))
+def get_returncode(data, simulator, threads, inp):
+  return parse_returncode(most_recent_row(data, simulator, threads, inp))
+  
+
+def all_input_names(data):
+  return sorted(list(set([row['input'] for row in data if 'input' in row])))
+def all_simulator_names(data):
+  return sorted(list(set([row['simulator'] for row in data if 'simulator' in row])))
+def all_thread_counts(data):
+  return sorted(list(set([row['threads'] for row in data if 'threads' in row])))
+
+
+def python_sim_stderr_output_contains_text(data, simulator, threads, inp, text):
+  # only Python-based simulators could possibly have this error
+  if not (simulator == "qsim" or simulator == "qiskit"):
+    return False
+  try:
+    row = most_recent_row(data, simulator, threads, inp)
+    # we look for the text exactly in stderr
+    pat = re.compile(text)
+    return row['returncode'] != 0 and pat.search(row['stderr'])
+  except:
+    return False
+
+def definitely_has_numpy_ndarray_error(data, simulator, threads, inp):
+  return python_sim_stderr_output_contains_text(data, simulator, threads, inp,
+    "ValueError: maximum supported dimension for an ndarray is"
+  )
+
+def definitely_has_qasm_exception_unknown_gate_error(data, simulator, threads, inp):
+  return python_sim_stderr_output_contains_text(data, simulator, threads, inp,
+    "QasmException: Unknown gate"
+  )
+
+def definitely_has_insufficient_memory_error(data, simulator, threads, inp):
+  return python_sim_stderr_output_contains_text(data, simulator, threads, inp,
+    "Insufficient memory to run circuit"
+  )
+
+# ===========================================================================
+# ===========================================================================
+# ===========================================================================
+
+delimWidth = 2
+
+def makeline(row, widths, align):
+  bits = []
+  i = 0
+  while i < len(row):
+    j = i+1
+    while j < len(row) and (row[j] is None):
+      j += 1
+    availableWidth = int(sum(widths[i:j]) + delimWidth*(j-i-1))
+    s = str(row[i])
+    w = " " * (availableWidth - len(row[i]))
+    aa = align(i)
+    if aa == "l":
+      ln = s + w
+    elif aa == "r":
+      ln = w + s
+    elif aa == "c":
+      ln = w[:len(w)/2] + s + w[len(w)/2:]
+    else:
+      raise ValueError("invalid formatter: {}".format(aa))
+    bits.append(ln)
+    i = j
+  return (" " * delimWidth).join(bits)
+
+def table(rows, align=None):
+  numCols = max(len(row) for row in rows if not isinstance(row, str))
+
+  widths = [0] * numCols
+  for row in rows:
+    # string rows are used for formatting
+    if isinstance(row, str):
+      continue
+
+    i = 0
+    while i < len(row):
+      j = i+1
+      while j < len(row) and (row[j] is None):
+        j += 1
+      # rw = len(stripANSI(str(row[i])))
+      # rw = len(str(row[i]))
+      rw = len(row[i])
+      for k in range(i, j):
+        w = (rw / (j-i)) + (1 if k < rw % (j-i) else 0)
+        widths[k] = max(widths[k], w)
+      i = j
+
+  totalWidth = int(sum(widths) + delimWidth*(numCols-1))
+
+  def aa(i):
+    try:
+      return align(i)
+    except:
+      return "l"
+
+  output = []
+  for row in rows:
+    if row == "-" or row == "=":
+      output.append(row * totalWidth)
+      continue
+    elif isinstance(row, str):
+      raise ValueError("bad row: {}".format(row))
+    output.append(makeline(row, widths, aa))
+
+  return "\n".join(output)
+
+
+def defaultAlign(i):
+  return "r" if i == 0 else "l"
+
+# ===========================================================================
+# ===========================================================================
+# ===========================================================================
+
+
+
+# ===========================================================================
+# ===========================================================================
+# ===========================================================================
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--no-plots', action='store_true', dest='no_plots')
+parser.add_argument('input_file', nargs='?', metavar='RESULTS_FILE')
+args = parser.parse_args()
+
+if args.input_file:
+  inputFile = args.input_file
+else:
+  print("[INFO] no results file argument; finding most recent")
+  try:
+    mostRecent = mostRecentResultsFile()
+  except:
+    sys.exit("[ERR] could not find most recent results file\n " + \
+            "  check that these are formatted as 'YYMMSS-hhmmss'")
+  inputFile = os.path.join(ROOT, 'results', mostRecent)
+
+print("[INFO] reading {}".format(inputFile))
+with open(inputFile, 'r') as f:
+  data = json_careful_readlines(f)
+
+input_names = all_input_names(data)
+simulator_names = all_simulator_names(data)
+max_threads = max(all_thread_counts(data))
+
+def fmt(x):
+  if x is None:
+    return '--'
+  if type(x) == str:
+    return x
+  else:
+    return str(x)
+
+def main_table():
+  error_reference = [False, False, False]
+
+  h1 = [''] + [x for s in simulator_names for x in [f'---- {s} ----'.center(27, '-'), None, None]]
+  h2 = ['Input'] + [x for s in simulator_names for x in ['err?', 'time(s)', 'mem(GB)']]
+  tt = [h1, h2, "="]
+  for inp in input_names:
+    ttrow = [inp.rstrip('.qasm')]
+
+    for s in simulator_names:
+      ret = get_returncode(data, s, max_threads, inp)
+      retstr = ""
+
+      if ret == 9 or definitely_has_insufficient_memory_error(data, s, max_threads, inp):
+        retstr = "oom"
+      elif ret == -9:
+        retstr = "kill"
+      elif abs(ret) == 11:
+        retstr = "segfault"
+      elif definitely_has_numpy_ndarray_error(data, s, max_threads, inp):
+        error_reference[0] = True
+        retstr = "(*)"
+      elif definitely_has_qasm_exception_unknown_gate_error(data, s, max_threads, inp):
+        error_reference[1] = True
+        retstr = "(!)"
+
+      if retstr == "" and ret != 0:
+        retstr = str(ret)
+
+      ttrow.append(retstr)
+      ttrow.append(get_time(data, s, max_threads, inp))
+      ttrow.append(get_maxrss(data, s, max_threads, inp))
+
+    ttrow = [fmt(x) for x in ttrow]
+    tt.append(ttrow)
+
+  print("RESULTS")
+  print(table(tt, defaultAlign))
+  if any(error_reference):
+    print("\nError reference:")
+    if error_reference[0]:
+      print("  (*) exceeded numpy ndarray max dimension")
+    if error_reference[1]:
+      print("  (!) unknown gate")
+    if error_reference[2]:
+      print("  ($) insufficient memory")
+  print("")
+
+main_table()
+
+
+# ===========================================================================
+# ===========================================================================
+# ===========================================================================
+
+
+def improvement_table():
+  simulator_cols = [s for s in simulator_names if s != "feynsum-sml"]
+  h1 = [''] + [x for s in simulator_cols for x in [f'---- {s} ----'.center(15, '-'), None]]
+  h2 = ['Input'] + [x for s in simulator_cols for x in ['time', 'mem']]
+  tt = [h1, h2, "="]
+  for inp in input_names:
+    stats = {
+      s: {
+        'ret': get_returncode(data, s, max_threads, inp),
+        'time': get_time(data, s, max_threads, inp),
+        'mem': get_maxrss(data, s, max_threads, inp)
+      }
+      for s in simulator_names
+    }
+    def ok(s, k):
+      return stats[s]['ret'] == 0 and stats[s][k] is not None
+    keep = \
+      (ok('feynsum-sml', 'time') or ok('feynsum-sml', 'mem')) and \
+      any(ok(s,k) for s in simulator_cols for k in ['time','mem'])
+    if not keep:
+      continue
+    row = [
+      x
+      for s in simulator_cols
+      for x in [
+        safediv(stats[s]['time'], stats['feynsum-sml']['time']),
+        safediv(stats[s]['mem'], stats['feynsum-sml']['mem'])
+      ]
+    ]
+    row = [inp] + [fmt(x) for x in row]
+    tt.append(row)
+  
+  print("")
+  print("IMPROVEMENT FACTOR OF SPARSE-SIM (feynsum-sml)")
+  print(table(tt, defaultAlign))
+  print("")
+
+improvement_table()
