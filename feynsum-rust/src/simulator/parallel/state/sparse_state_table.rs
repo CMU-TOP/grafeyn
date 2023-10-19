@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use rayon::prelude::*;
 
-use crate::types::{BasisIdx, Complex};
+use crate::types::{BasisIdx, Complex, AtomicReal, AtomicComplex};
 use crate::utility;
 
 use std::sync::{atomic::AtomicU64, atomic::Ordering};
@@ -20,8 +20,8 @@ fn calculate_hash<T: Hash>(t: &T) -> u64 {
 
 pub struct ConcurrentSparseStateTable {
     pub keys: Vec<AtomicU64>,
-    pub packed_weights: Vec<AtomicU64>,
-    pub nonzeros: Vec<usize>,
+    pub weights: Vec<AtomicComplex>,
+    pub nonzeros: Vec<usize>, // indices of keys with nonzero weights
 }
 
 impl ConcurrentSparseStateTable {
@@ -31,15 +31,15 @@ impl ConcurrentSparseStateTable {
             .into_par_iter()
             .map(|_i| AtomicU64::new(BasisIdx::into_u64(EMPTY_KEY)))
             .collect();
-        let packed_weights: Vec<AtomicU64> =
+        let weights: Vec<AtomicComplex> =
             (0..capacity)
             .into_par_iter()
-            .map(|_i| AtomicU64::new(0))
+            .map(|_i| (AtomicReal::new(0.0), AtomicReal::new(0.0)))
             .collect();
         let nonzeros = Vec::new();
         Self {
             keys,
-            packed_weights,
+            weights,
             nonzeros,
         }
     }
@@ -60,17 +60,11 @@ impl ConcurrentSparseStateTable {
         self.nonzeros.len()
     }
     fn put_value_at(&self, i: usize, v: Complex) {
-        loop {
-            let old: u64 = self.packed_weights[i].load(Ordering::Relaxed);
-            let weight = utility::unpack_complex(old);
-            let new = utility::pack_complex(Complex::new(weight.re + v.re, weight.im + v.im));
-            if self.packed_weights[i]
-                .compare_exchange(old, new, Ordering::SeqCst, Ordering::Acquire)
-                .is_ok()
-            {
-                return;
-            }
-        }
+        self.weights[i].0.fetch_add(v.re, Ordering::SeqCst);
+        self.weights[i].1.fetch_add(v.im, Ordering::SeqCst);
+    }
+    pub fn get_value_at(weights: &Vec<AtomicComplex>, i : usize) -> Complex {
+        Complex::new(weights[i].0.load(Ordering::Relaxed), weights[i].1.load(Ordering::Relaxed))
     }
     fn force_insert_unique(&self, x: BasisIdx, v: Complex) {
         let n = self.keys.len();
@@ -143,8 +137,7 @@ impl ConcurrentSparseStateTable {
             if k == BasisIdx::into_u64(EMPTY_KEY) {
                 return None;
             } else if k == y {
-                let old: u64 = self.packed_weights[i].load(Ordering::Relaxed);
-                return Some(utility::unpack_complex(old));
+                return Some(ConcurrentSparseStateTable::get_value_at(&self.weights, i))
             } else {
                 i += 1
             }
@@ -153,8 +146,8 @@ impl ConcurrentSparseStateTable {
     pub fn increase_capacity_by_factor(&self, alpha: f32) -> Self {
         let new_capacity = (alpha * self.keys.len() as f32).ceil() as usize;
         let new_table = Self::_new(new_capacity);
-        self.keys.par_iter().zip(self.packed_weights.par_iter()).for_each(|(k, pw)| {
-            let w = utility::unpack_complex(pw.load(Ordering::Relaxed));
+        self.keys.par_iter().zip(self.weights.par_iter()).for_each(|(k, pw)| {
+            let w = Complex::new(pw.0.load(Ordering::Relaxed), pw.1.load(Ordering::Relaxed));
             if utility::is_nonzero(w) {
                 new_table.force_insert_unique(BasisIdx::from_u64(k.load(Ordering::Relaxed)), w)
             }
@@ -169,7 +162,7 @@ impl ConcurrentSparseStateTable {
                 if self.keys[i].load(Ordering::Relaxed) == BasisIdx::into_u64(EMPTY_KEY) {
                     return false;
                 }
-                utility::is_nonzero(utility::unpack_complex(self.packed_weights[i].load(Ordering::Relaxed)))
+                utility::is_nonzero(ConcurrentSparseStateTable::get_value_at(&self.weights, i))
             })
             .collect();
         std::mem::swap(&mut self.nonzeros, &mut nonzeros);

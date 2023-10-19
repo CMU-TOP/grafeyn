@@ -186,8 +186,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
         State::ConcurrentSparse(prev_table) => {
             let j = prev_table.nonzeros[i];
             let idx = BasisIdx::from_u64(prev_table.keys[j].load(Ordering::Relaxed));
-            let weight =
-                utility::unpack_complex(prev_table.packed_weights[j].load(Ordering::Relaxed));
+            let weight = ConcurrentSparseStateTable::get_value_at(&prev_table.weights, j);
             (idx, weight)
         }
         State::Sparse(_) => panic!(),
@@ -308,8 +307,7 @@ fn expand_push_dense(gates: Vec<&Gate>, num_qubits: usize, state: State) -> Expa
             .into_par_iter()
             .map(move |i: usize| {
                 let idx = prev_table.keys[i].load(Ordering::Relaxed) as usize;
-                let weight =
-                    utility::unpack_complex(prev_table.packed_weights[i].load(Ordering::Relaxed));
+                let weight = ConcurrentSparseStateTable::get_value_at(&prev_table.weights, i);
                 (BasisIdx::from_idx(idx), weight)
             })
             .map(|(bidx, weight)| apply_gates(&gates, &table, bidx, weight))

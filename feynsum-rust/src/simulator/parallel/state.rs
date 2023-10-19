@@ -53,8 +53,7 @@ impl Compactifiable for State {
             State::ConcurrentSparse(table) => {
                 Box::new(table.nonzeros.into_iter().map(move |i: usize| {
                     let idx = table.keys[i].load(Ordering::Relaxed) as usize;
-                    let weight =
-                        utility::unpack_complex(table.packed_weights[i].load(Ordering::Relaxed));
+                    let weight = ConcurrentSparseStateTable::get_value_at(&table.weights, i);
                     (BasisIdx::from_idx(idx), weight)
                 }))
             }
