@@ -1,3 +1,4 @@
+use derivative::Derivative;
 use log::debug;
 
 use crate::{
@@ -106,9 +107,12 @@ pub trait PushApplicable {
 
 type PullAction = Box<dyn Fn(BasisIdx) -> PullApplyOutput + Send + Sync>;
 
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct Gate {
     defn: GateDefn,
     pub touches: Vec<QubitIndex>,
+    #[derivative(Debug = "ignore")]
     pub pull_action: Option<PullAction>,
 }
 
