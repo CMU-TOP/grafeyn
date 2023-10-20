@@ -1,5 +1,6 @@
 mod circuit;
 mod config;
+mod fingerprint;
 mod gate_scheduler;
 mod options;
 mod parser;
@@ -16,6 +17,7 @@ use structopt::StructOpt;
 
 use circuit::Circuit;
 use config::Config;
+use fingerprint::Fingerprint;
 use options::Options;
 use simulator::Compactifiable;
 use types::{BasisIdx, Complex};
@@ -70,11 +72,7 @@ fn main() -> io::Result<()> {
 
     let result = run(options.parallelism, config, circuit);
 
-    if let Some(output) = options.output {
-        info!("dumping densities to: {}", output.display());
-        dump_densities(&output, result, num_qubits)?;
-        info!("output written to: {}", output.display());
-    };
+    process_output(result, options.output, options.fingerprint, num_qubits)?;
 
     info!("simulation complete");
 
@@ -105,19 +103,39 @@ fn run(
     }
 }
 
-fn dump_densities(
-    path: &PathBuf,
+fn process_output(
     densities: Box<dyn Iterator<Item = (BasisIdx, Complex)>>,
+    output: Option<PathBuf>,
+    print_fingerprint: bool,
     bidx_width: usize,
 ) -> io::Result<()> {
-    let mut file = fs::File::create(path)?;
-    for (bidx, weight) in densities {
-        file.write_fmt(format_args!(
-            "{:0width$} {:.10}\n",
-            bidx,
-            weight,
-            width = bidx_width,
-        ))?;
+    if let Some(path) = output.as_ref() {
+        info!("writing output to file {}", path.display());
     }
+
+    let mut file = output.map(fs::File::create).transpose()?;
+    let mut fingerprint = Fingerprint::new(10);
+
+    for (bidx, weight) in densities {
+        if print_fingerprint {
+            fingerprint.insert(bidx, weight);
+        }
+        if let Some(f) = file.as_mut() {
+            f.write_fmt(format_args!(
+                "{:0width$} {:.10}\n",
+                bidx,
+                weight,
+                width = bidx_width,
+            ))?;
+        }
+    }
+
+    if print_fingerprint {
+        println!("fingerprint:");
+        fingerprint.iter().for_each(|(bidx, weight)| {
+            println!("{:0width$} {:.10}", bidx, weight, width = bidx_width,);
+        });
+    }
+
     Ok(())
 }
