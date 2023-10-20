@@ -68,7 +68,7 @@ fn main() -> io::Result<()> {
         .build_global()
         .unwrap();
 
-    let result = run(options.parallelism, &config, circuit);
+    let result = run(options.parallelism, config, circuit);
 
     if let Some(output) = options.output {
         info!("dumping densities to: {}", output.display());
@@ -83,7 +83,7 @@ fn main() -> io::Result<()> {
 
 fn run(
     parallelism: usize,
-    config: &Config,
+    config: Config,
     circuit: Circuit,
 ) -> Box<dyn Iterator<Item = (BasisIdx, Complex)>> {
     if parallelism > 1 {
