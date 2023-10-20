@@ -116,11 +116,27 @@ def qsim(inputFile, threads):
     'machine': args.machine_name
   }
 
+def rust_cmd(inputFile, threads):
+  return f'cargo run --release -- --input {absolute_input_path(inputFile)} --scheduler gfq --parallelism {threads}'
+
+def rustsim(inputFile, threads):
+    return {
+    'cmd': rust_cmd(inputFile, threads),
+    'cwd': 'feynsum-rust',
+    'simulator': 'feynsum-rust',
+    'simulator_options': None,
+    'threads': threads,
+    'input': inputFile,
+    'machine': args.machine_name
+    }
+
+
+
 rows = [
   row
   for f in inputFiles
   for t in threadList
-  for row in [mplsim(f,t,'gfq'), qiskitsim(f,t), qsim(f,t)]
+  for row in [mplsim(f,t,'gfq'), qiskitsim(f,t), qsim(f,t), rustsim(f,t)]
 ]
 
 for r in rows:
