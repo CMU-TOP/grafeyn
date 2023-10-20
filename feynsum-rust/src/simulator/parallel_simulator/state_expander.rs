@@ -16,7 +16,6 @@ use super::state::{
 
 pub enum ExpandMethod {
     Sparse,
-    ConcurrentSparse,
     PushDense,
     PullDense,
 }
@@ -25,7 +24,6 @@ impl Display for ExpandMethod {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             ExpandMethod::Sparse => write!(f, "push sparse"),
-            ExpandMethod::ConcurrentSparse => write!(f, "push (concurrent) sparse"),
             ExpandMethod::PushDense => write!(f, "push dense"),
             ExpandMethod::PullDense => write!(f, "pull dense"),
         }
@@ -262,7 +260,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
         state: State::ConcurrentSparse(table),
         num_nonzeros,
         num_gate_apps,
-        method: ExpandMethod::ConcurrentSparse,
+        method: ExpandMethod::Sparse,
     }
 }
 
