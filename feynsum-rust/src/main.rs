@@ -88,7 +88,7 @@ fn run(
 ) -> Box<dyn Iterator<Item = (BasisIdx, Complex)>> {
     if parallelism > 1 {
         info!("using parallel simulator");
-        match simulator::parallel::bfs_simulator::run(&config, circuit) {
+        match simulator::parallel_simulator::run(&config, circuit) {
             Ok(result) => result.compactify(),
             Err(err) => {
                 panic!("failed to run simulator: {:?}", err);
@@ -96,7 +96,7 @@ fn run(
         }
     } else {
         info!("using sequential simulator");
-        match simulator::sequential::bfs_simulator::run(&config, circuit) {
+        match simulator::sequential_simulator::run(&config, circuit) {
             Ok(result) => result.compactify(),
             Err(err) => {
                 panic!("failed to run simulator: {:?}", err);
