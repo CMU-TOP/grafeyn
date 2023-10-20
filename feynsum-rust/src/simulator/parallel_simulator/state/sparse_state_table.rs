@@ -1,14 +1,14 @@
+use rayon::prelude::*;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use rayon::prelude::*;
 
 use crate::types::{BasisIdx, Complex};
 use crate::utility;
 
 use std::sync::{atomic::AtomicU64, atomic::Ordering};
 
-use super::SparseStateTableInserion;
+use super::SparseStateTableInsertion;
 
 const EMPTY_KEY: BasisIdx = BasisIdx::flip_unsafe(&BasisIdx::from_u64(0), 63);
 
@@ -26,13 +26,11 @@ pub struct ConcurrentSparseStateTable {
 
 impl ConcurrentSparseStateTable {
     pub fn _new(capacity: usize) -> Self {
-        let keys: Vec<AtomicU64> = 
-            (0..capacity)
+        let keys: Vec<AtomicU64> = (0..capacity)
             .into_par_iter()
             .map(|_i| AtomicU64::new(BasisIdx::into_u64(EMPTY_KEY)))
             .collect();
-        let packed_weights: Vec<AtomicU64> =
-            (0..capacity)
+        let packed_weights: Vec<AtomicU64> = (0..capacity)
             .into_par_iter()
             .map(|_i| AtomicU64::new(0))
             .collect();
@@ -102,14 +100,14 @@ impl ConcurrentSparseStateTable {
         tolerance: usize,
         x: BasisIdx,
         v: Complex,
-    ) -> SparseStateTableInserion {
+    ) -> SparseStateTableInsertion {
         let n = self.keys.len();
         let mut i: usize = calculate_hash(&x) as usize % n;
         let y = x.into_u64();
         let mut probes: usize = 0;
         loop {
             if probes >= tolerance {
-                return SparseStateTableInserion::Full;
+                return SparseStateTableInsertion::Full;
             }
             if i >= n {
                 i = 0;
@@ -132,7 +130,7 @@ impl ConcurrentSparseStateTable {
                 probes += 1;
             }
         }
-        SparseStateTableInserion::Success
+        SparseStateTableInsertion::Success
     }
     pub fn get(&self, x: &BasisIdx) -> Option<Complex> {
         let n = self.keys.len();
@@ -153,23 +151,27 @@ impl ConcurrentSparseStateTable {
     pub fn increase_capacity_by_factor(&self, alpha: f32) -> Self {
         let new_capacity = (alpha * self.keys.len() as f32).ceil() as usize;
         let new_table = Self::_new(new_capacity);
-        self.keys.par_iter().zip(self.packed_weights.par_iter()).for_each(|(k, pw)| {
-            let w = utility::unpack_complex(pw.load(Ordering::Relaxed));
-            if utility::is_nonzero(w) {
-                new_table.force_insert_unique(BasisIdx::from_u64(k.load(Ordering::Relaxed)), w)
-            }
-        });
+        self.keys
+            .par_iter()
+            .zip(self.packed_weights.par_iter())
+            .for_each(|(k, pw)| {
+                let w = utility::unpack_complex(pw.load(Ordering::Relaxed));
+                if utility::is_nonzero(w) {
+                    new_table.force_insert_unique(BasisIdx::from_u64(k.load(Ordering::Relaxed)), w)
+                }
+            });
         new_table
     }
     pub fn make_nonzero_shortcuts(&mut self) {
-        let mut nonzeros = 
-            (0..self.keys.len())
+        let mut nonzeros = (0..self.keys.len())
             .into_par_iter()
             .filter(|&i| {
                 if self.keys[i].load(Ordering::Relaxed) == BasisIdx::into_u64(EMPTY_KEY) {
                     return false;
                 }
-                utility::is_nonzero(utility::unpack_complex(self.packed_weights[i].load(Ordering::Relaxed)))
+                utility::is_nonzero(utility::unpack_complex(
+                    self.packed_weights[i].load(Ordering::Relaxed),
+                ))
             })
             .collect();
         std::mem::swap(&mut self.nonzeros, &mut nonzeros);
@@ -200,7 +202,7 @@ impl SparseStateTable {
             .filter(|(_, w)| utility::is_nonzero(**w))
             .count()
     }
- 
+
     pub fn put(&mut self, bidx: BasisIdx, weight: Complex) {
         self.table
             .entry(bidx)

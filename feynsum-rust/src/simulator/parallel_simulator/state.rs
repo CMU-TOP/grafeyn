@@ -62,7 +62,7 @@ impl Compactifiable for State {
     }
 }
 
-pub enum SparseStateTableInserion {
+pub enum SparseStateTableInsertion {
     Success,
     Full,
 }
