@@ -91,7 +91,7 @@ fn run(
         match simulator::parallel::bfs_simulator::run(&config, circuit) {
             Ok(result) => result.compactify(),
             Err(err) => {
-                panic!("Failed to run simulator: {:?}", err);
+                panic!("failed to run simulator: {:?}", err);
             }
         }
     } else {
@@ -99,7 +99,7 @@ fn run(
         match simulator::sequential::bfs_simulator::run(&config, circuit) {
             Ok(result) => result.compactify(),
             Err(err) => {
-                panic!("Failed to run simulator: {:?}", err);
+                panic!("failed to run simulator: {:?}", err);
             }
         }
     }
