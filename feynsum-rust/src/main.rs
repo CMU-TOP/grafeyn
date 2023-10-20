@@ -18,6 +18,7 @@ use circuit::Circuit;
 use config::Config;
 use options::Options;
 use simulator::Compactifiable;
+use types::{BasisIdx, Complex};
 
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
@@ -67,32 +68,12 @@ fn main() -> io::Result<()> {
         .build_global()
         .unwrap();
 
-    if options.parallelism > 1 {
-        info!("using parallel simulator");
-        let result = match simulator::parallel::bfs_simulator::run(&config, circuit) {
-            Ok(result) => result,
-            Err(err) => {
-                panic!("Failed to run simulator: {:?}", err);
-            }
-        };
-        if let Some(output) = options.output {
-            info!("dumping densities to: {}", output.display());
-            dump_densities(&output, result, num_qubits)?;
-            info!("output written to: {}", output.display());
-        };
-    } else {
-        info!("using sequential simulator");
-        let result = match simulator::sequential::bfs_simulator::run(&config, circuit) {
-            Ok(result) => result,
-            Err(err) => {
-                panic!("Failed to run simulator: {:?}", err);
-            }
-        };
-        if let Some(output) = options.output {
-            info!("dumping densities to: {}", output.display());
-            dump_densities(&output, result, num_qubits)?;
-            info!("output written to: {}", output.display());
-        };
+    let result = run(options.parallelism, &config, circuit);
+
+    if let Some(output) = options.output {
+        info!("dumping densities to: {}", output.display());
+        dump_densities(&output, result, num_qubits)?;
+        info!("output written to: {}", output.display());
     };
 
     info!("simulation complete");
@@ -100,9 +81,37 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-fn dump_densities(path: &PathBuf, state: impl Compactifiable, bidx_width: usize) -> io::Result<()> {
+fn run(
+    parallelism: usize,
+    config: &Config,
+    circuit: Circuit,
+) -> Box<dyn Iterator<Item = (BasisIdx, Complex)>> {
+    if parallelism > 1 {
+        info!("using parallel simulator");
+        match simulator::parallel::bfs_simulator::run(&config, circuit) {
+            Ok(result) => result.compactify(),
+            Err(err) => {
+                panic!("Failed to run simulator: {:?}", err);
+            }
+        }
+    } else {
+        info!("using sequential simulator");
+        match simulator::sequential::bfs_simulator::run(&config, circuit) {
+            Ok(result) => result.compactify(),
+            Err(err) => {
+                panic!("Failed to run simulator: {:?}", err);
+            }
+        }
+    }
+}
+
+fn dump_densities(
+    path: &PathBuf,
+    densities: Box<dyn Iterator<Item = (BasisIdx, Complex)>>,
+    bidx_width: usize,
+) -> io::Result<()> {
     let mut file = fs::File::create(path)?;
-    for (bidx, weight) in state.compactify() {
+    for (bidx, weight) in densities {
         file.write_fmt(format_args!(
             "{:0width$} {:.10}\n",
             bidx,
