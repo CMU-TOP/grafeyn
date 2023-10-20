@@ -63,7 +63,7 @@ def rounder(x):
 
 
 def check_value(row, key, value):
-  return key in row and row[key] == value
+  return value is None or (key in row and row[key] == value)
 
 
 def parse_time(row):
@@ -93,6 +93,31 @@ def parse_returncode(row):
     return None
 
 
+def parse_num_qubits(row):
+  try:
+    pat = re.compile(r"^qubits\s+(\d+)$", re.MULTILINE)
+    return int(pat.search(row['stdout']).group(1))
+  except:
+    return None
+
+
+def parse_num_gates(row):
+  try:
+    pat = re.compile(r"^gates\s+(\d+)$", re.MULTILINE)
+    # print(f'looking for num gates in {row["input"]}')
+    return int(pat.search(row['stdout']).group(1))
+  except:
+    return None
+
+
+def parse_nonzero_counts(row):
+  try:
+    pat = re.compile(r"^.*gate\s+\d+\s+density\s+\d+\.\d+\s+nonzero\s+(\d+).*$", re.MULTILINE)
+    return list(map(int, pat.findall(row['stdout'])))
+  except:
+    return None
+
+
 def most_recent_row(data, simulator, threads, inp):
   try:
     rows = [
@@ -103,9 +128,40 @@ def most_recent_row(data, simulator, threads, inp):
     ]
     return rows[-1]
   except:
+    print(f"[WARN] couldn't find row for: simulator={simulator} threads={threads} input={inp}")
     return None
 
 
+def get_total_nonzero_count(data, inp):
+  try:
+    cs = parse_nonzero_counts(most_recent_row(data, 'feynsum-sml', None, inp))
+    return int(sum(cs))
+  except:
+    return None
+
+def get_avg_density(data, inp):
+  try:
+    row = most_recent_row(data, 'feynsum-sml', None, inp)
+    cs = parse_nonzero_counts(row)
+    gs = parse_num_gates(row)
+    n = parse_num_qubits(row)
+    return sum(cs) / (2.0**n * len(cs))
+  except:
+    return None
+
+def get_max_density(data, inp):
+  try:
+    row = most_recent_row(data, 'feynsum-sml', None, inp)
+    cs = parse_nonzero_counts(row)
+    n = parse_num_qubits(row)
+    return max(cs) / (2.0**n)
+  except Exception as e:
+    return None
+
+def get_num_qubits(data, inp):
+  return parse_num_qubits(most_recent_row(data, "feynsum-sml", None, inp))
+def get_num_gates(data, inp):
+  return parse_num_gates(most_recent_row(data, "feynsum-sml", None, inp))
 def get_time(data, simulator, threads, inp):
   return parse_time(most_recent_row(data, simulator, threads, inp))
 def get_maxrss(data, simulator, threads, inp):
@@ -257,6 +313,8 @@ input_names = all_input_names(data)
 simulator_names = all_simulator_names(data)
 max_threads = max(all_thread_counts(data))
 
+inputs_sorted_by_avg_density = sorted(input_names, key=(lambda inp: (get_avg_density(data, inp), inp)))
+
 def fmt(x):
   if x is None:
     return '--'
@@ -265,14 +323,27 @@ def fmt(x):
   else:
     return str(x)
 
+def pct(x):
+  try:
+    p = round(100.0 * x, 1)
+    return f'{p}%'
+  except:
+    return None
+
 def main_table():
   error_reference = [False, False, False]
 
-  h1 = [''] + [x for s in simulator_names for x in [f'---- {s} ----'.center(27, '-'), None, None]]
-  h2 = ['Input'] + [x for s in simulator_names for x in ['err?', 'time(s)', 'mem(GB)']]
+  h1 = ['', '', '', ' density '.center(13, '-'), None] + [x for s in simulator_names for x in [f' {s} '.center(27, '-'), None, None]]
+  h2 = ['input', 'qubits', 'gates', 'avg', 'max'] + [x for s in simulator_names for x in ['err?', 'time(s)', 'mem(GB)']]
   tt = [h1, h2, "="]
-  for inp in input_names:
-    ttrow = [inp.rstrip('.qasm')]
+  for inp in inputs_sorted_by_avg_density:
+    ttrow = [
+      inp.rstrip('.qasm'),
+      get_num_qubits(data, inp),
+      get_num_gates(data, inp),
+      pct(get_avg_density(data, inp)),
+      pct(get_max_density(data, inp))
+    ]
 
     for s in simulator_names:
       ret = get_returncode(data, s, max_threads, inp)
@@ -323,10 +394,10 @@ main_table()
 
 def improvement_table():
   simulator_cols = [s for s in simulator_names if s != "feynsum-sml"]
-  h1 = [''] + [x for s in simulator_cols for x in [f'---- {s} ----'.center(15, '-'), None]]
-  h2 = ['Input'] + [x for s in simulator_cols for x in ['time', 'mem']]
+  h1 = ['', '', '', '--- density ---', None] + [x for s in simulator_cols for x in [f'- vs {s} -'.center(17, '-'), None]]
+  h2 = ['input', 'qubits', 'gates', 'avg', 'max'] + [x for s in simulator_cols for x in ['time', 'mem']]
   tt = [h1, h2, "="]
-  for inp in input_names:
+  for inp in inputs_sorted_by_avg_density:
     stats = {
       s: {
         'ret': get_returncode(data, s, max_threads, inp),
@@ -342,7 +413,16 @@ def improvement_table():
       any(ok(s,k) for s in simulator_cols for k in ['time','mem'])
     if not keep:
       continue
+
     row = [
+      inp.rstrip('.qasm'),
+      get_num_qubits(data, inp),
+      get_num_gates(data, inp),
+      pct(get_avg_density(data, inp)),
+      pct(get_max_density(data, inp))
+    ]
+
+    row += [
       x
       for s in simulator_cols
       for x in [
@@ -350,7 +430,8 @@ def improvement_table():
         safediv(stats[s]['mem'], stats['feynsum-sml']['mem'])
       ]
     ]
-    row = [inp] + [fmt(x) for x in row]
+    
+    row = list(map(fmt, row))
     tt.append(row)
   
   print("")
