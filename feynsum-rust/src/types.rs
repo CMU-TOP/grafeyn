@@ -1,5 +1,5 @@
-use num::complex;
 use atomic_float::AtomicF32;
+use num::complex;
 
 pub type QubitIndex = usize;
 pub type GateIndex = usize;

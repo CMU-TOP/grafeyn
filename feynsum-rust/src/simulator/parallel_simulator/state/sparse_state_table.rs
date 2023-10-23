@@ -3,7 +3,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
-use crate::types::{BasisIdx, Complex, AtomicReal, AtomicComplex};
+use crate::types::{AtomicComplex, AtomicReal, BasisIdx, Complex};
 use crate::utility;
 
 use std::sync::{atomic::AtomicU64, atomic::Ordering};
@@ -30,8 +30,7 @@ impl ConcurrentSparseStateTable {
             .into_par_iter()
             .map(|_i| AtomicU64::new(BasisIdx::into_u64(EMPTY_KEY)))
             .collect();
-        let weights: Vec<AtomicComplex> =
-            (0..capacity)
+        let weights: Vec<AtomicComplex> = (0..capacity)
             .into_par_iter()
             .map(|_i| (AtomicReal::new(0.0), AtomicReal::new(0.0)))
             .collect();
@@ -62,8 +61,11 @@ impl ConcurrentSparseStateTable {
         self.weights[i].0.fetch_add(v.re, Ordering::SeqCst);
         self.weights[i].1.fetch_add(v.im, Ordering::SeqCst);
     }
-    pub fn get_value_at(weights: &Vec<AtomicComplex>, i : usize) -> Complex {
-        Complex::new(weights[i].0.load(Ordering::Relaxed), weights[i].1.load(Ordering::Relaxed))
+    pub fn get_value_at(weights: &Vec<AtomicComplex>, i: usize) -> Complex {
+        Complex::new(
+            weights[i].0.load(Ordering::Relaxed),
+            weights[i].1.load(Ordering::Relaxed),
+        )
     }
     fn force_insert_unique(&self, x: BasisIdx, v: Complex) {
         let n = self.keys.len();
@@ -136,7 +138,7 @@ impl ConcurrentSparseStateTable {
             if k == BasisIdx::into_u64(EMPTY_KEY) {
                 return None;
             } else if k == y {
-                return Some(ConcurrentSparseStateTable::get_value_at(&self.weights, i))
+                return Some(ConcurrentSparseStateTable::get_value_at(&self.weights, i));
             } else {
                 i += 1
             }
@@ -145,12 +147,15 @@ impl ConcurrentSparseStateTable {
     pub fn increase_capacity_by_factor(&self, alpha: f32) -> Self {
         let new_capacity = (alpha * self.keys.len() as f32).ceil() as usize;
         let new_table = Self::_new(new_capacity);
-        self.keys.par_iter().zip(self.weights.par_iter()).for_each(|(k, pw)| {
-            let w = Complex::new(pw.0.load(Ordering::Relaxed), pw.1.load(Ordering::Relaxed));
-            if utility::is_nonzero(w) {
-                new_table.force_insert_unique(BasisIdx::from_u64(k.load(Ordering::Relaxed)), w)
-            }
-        });
+        self.keys
+            .par_iter()
+            .zip(self.weights.par_iter())
+            .for_each(|(k, pw)| {
+                let w = Complex::new(pw.0.load(Ordering::Relaxed), pw.1.load(Ordering::Relaxed));
+                if utility::is_nonzero(w) {
+                    new_table.force_insert_unique(BasisIdx::from_u64(k.load(Ordering::Relaxed)), w)
+                }
+            });
         new_table
     }
     pub fn make_nonzero_shortcuts(&mut self) {
