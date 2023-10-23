@@ -1,5 +1,5 @@
-pub mod parallel;
-pub mod sequential;
+pub mod parallel_simulator;
+pub mod sequential_simulator;
 
 use crate::types::{BasisIdx, Complex};
 

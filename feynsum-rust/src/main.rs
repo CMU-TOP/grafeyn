@@ -1,5 +1,6 @@
 mod circuit;
 mod config;
+mod fingerprint;
 mod gate_scheduler;
 mod options;
 mod parser;
@@ -16,8 +17,10 @@ use structopt::StructOpt;
 
 use circuit::Circuit;
 use config::Config;
+use fingerprint::Fingerprint;
 use options::Options;
 use simulator::Compactifiable;
+use types::{BasisIdx, Complex};
 
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
@@ -67,48 +70,72 @@ fn main() -> io::Result<()> {
         .build_global()
         .unwrap();
 
-    if options.parallelism > 1 {
-        info!("using parallel simulator");
-        let result = match simulator::parallel::bfs_simulator::run(&config, circuit) {
-            Ok(result) => result,
-            Err(err) => {
-                panic!("Failed to run simulator: {:?}", err);
-            }
-        };
-        if let Some(output) = options.output {
-            info!("dumping densities to: {}", output.display());
-            dump_densities(&output, result, num_qubits)?;
-            info!("output written to: {}", output.display());
-        };
-    } else {
-        info!("using sequential simulator");
-        let result = match simulator::sequential::bfs_simulator::run(&config, circuit) {
-            Ok(result) => result,
-            Err(err) => {
-                panic!("Failed to run simulator: {:?}", err);
-            }
-        };
-        if let Some(output) = options.output {
-            info!("dumping densities to: {}", output.display());
-            dump_densities(&output, result, num_qubits)?;
-            info!("output written to: {}", output.display());
-        };
-    };
+    let result = run(options.parallelism, config, circuit);
+
+    process_output(result, options.output, options.fingerprint, num_qubits)?;
 
     info!("simulation complete");
 
     Ok(())
 }
 
-fn dump_densities(path: &PathBuf, state: impl Compactifiable, bidx_width: usize) -> io::Result<()> {
-    let mut file = fs::File::create(path)?;
-    for (bidx, weight) in state.compactify() {
-        file.write_fmt(format_args!(
-            "{:0width$} {:.10}\n",
-            bidx,
-            weight,
-            width = bidx_width,
-        ))?;
+fn run(
+    parallelism: usize,
+    config: Config,
+    circuit: Circuit,
+) -> Box<dyn Iterator<Item = (BasisIdx, Complex)>> {
+    if parallelism > 1 {
+        info!("using parallel simulator");
+        match simulator::parallel_simulator::run(&config, circuit) {
+            Ok(result) => result.compactify(),
+            Err(err) => {
+                panic!("failed to run simulator: {:?}", err);
+            }
+        }
+    } else {
+        info!("using sequential simulator");
+        match simulator::sequential_simulator::run(&config, circuit) {
+            Ok(result) => result.compactify(),
+            Err(err) => {
+                panic!("failed to run simulator: {:?}", err);
+            }
+        }
     }
+}
+
+fn process_output(
+    densities: Box<dyn Iterator<Item = (BasisIdx, Complex)>>,
+    output: Option<PathBuf>,
+    print_fingerprint: bool,
+    bidx_width: usize,
+) -> io::Result<()> {
+    if let Some(path) = output.as_ref() {
+        info!("writing output to file {}", path.display());
+    }
+
+    let mut file = output.map(fs::File::create).transpose()?;
+    let mut fingerprint = Fingerprint::new(10);
+
+    for (bidx, weight) in densities {
+        if print_fingerprint {
+            fingerprint.insert(bidx, weight);
+        }
+        if let Some(f) = file.as_mut() {
+            f.write_fmt(format_args!(
+                "{:0width$} {:.10}\n",
+                bidx,
+                weight,
+                width = bidx_width,
+            ))?;
+        }
+    }
+
+    if print_fingerprint {
+        println!("fingerprint:");
+        fingerprint.iter().for_each(|(bidx, weight)| {
+            println!("{:0width$} {:.10}", bidx, weight, width = bidx_width,);
+        });
+    }
+
     Ok(())
 }

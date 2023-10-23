@@ -1,3 +1,6 @@
+mod state;
+mod state_expander;
+
 use log::{debug, error, info};
 
 use crate::circuit::Circuit;
@@ -7,9 +10,9 @@ use crate::profile;
 use crate::types::basis_idx::MAX_QUBITS;
 use crate::types::{BasisIdx, Complex, Real};
 
-use super::super::SimulatorError;
-use super::state::{SparseStateTable, State};
-use super::state_expander::{self, ExpandResult};
+use super::SimulatorError;
+use state::{SparseStateTable, State};
+use state_expander::ExpandResult;
 
 pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
     let num_gates = circuit.num_gates();
@@ -57,7 +60,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
             .map(|idx| &circuit.gates[idx])
             .collect::<Vec<_>>();
 
-        // FIXME: debug!("applying gates: {:?}", these_gates);
+        debug!("applying gates: {:?}", these_gates);
 
         if these_gates.is_empty() {
             break;

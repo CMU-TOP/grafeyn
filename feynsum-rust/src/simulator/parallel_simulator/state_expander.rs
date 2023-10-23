@@ -11,12 +11,11 @@ use crate::types::{BasisIdx, Complex, Real};
 use crate::utility;
 
 use super::state::{
-    ConcurrentSparseStateTable, DenseStateTable, SparseStateTable, SparseStateTableInserion, State,
+    ConcurrentSparseStateTable, DenseStateTable, SparseStateTable, SparseStateTableInsertion, State,
 };
 
 pub enum ExpandMethod {
     Sparse,
-    ConcurrentSparse,
     PushDense,
     PullDense,
 }
@@ -25,7 +24,6 @@ impl Display for ExpandMethod {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             ExpandMethod::Sparse => write!(f, "push sparse"),
-            ExpandMethod::ConcurrentSparse => write!(f, "push (concurrent) sparse"),
             ExpandMethod::PushDense => write!(f, "push dense"),
             ExpandMethod::PullDense => write!(f, "pull dense"),
         }
@@ -74,7 +72,7 @@ fn try_put(
     table: &ConcurrentSparseStateTable,
     bidx: BasisIdx,
     weight: Complex,
-) -> SparseStateTableInserion {
+) -> SparseStateTableInsertion {
     let max_load: Real = 0.9;
     let n = table.capacity();
     let probably_longest_probe =
@@ -103,8 +101,10 @@ fn apply_gates1(
     if gatenum >= gates.len() {
         if !full.load(Ordering::Relaxed) {
             match try_put(table, bidx, weight) {
-                SparseStateTableInserion::Success => return (apps, SuccessorsResult::AllSucceeded),
-                SparseStateTableInserion::Full => (),
+                SparseStateTableInsertion::Success => {
+                    return (apps, SuccessorsResult::AllSucceeded)
+                }
+                SparseStateTableInsertion::Full => (),
             }
         }
         if !full.load(Ordering::Relaxed) {
@@ -175,8 +175,10 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
     let num_blocks = (n as f64 / block_size as f64).ceil() as usize;
     let block_start = |b: usize| block_size * b;
     let block_stop = |b: usize| std::cmp::min(n, block_size + block_start(b));
-    let mut blocks: Vec<(usize, usize, Vec<(BasisIdx, Complex, usize)>)> = 
-        (0..num_blocks).into_par_iter().map(|b| (b, block_start(b), vec![])).collect();
+    let mut blocks: Vec<(usize, usize, Vec<(BasisIdx, Complex, usize)>)> = (0..num_blocks)
+        .into_par_iter()
+        .map(|b| (b, block_start(b), vec![]))
+        .collect();
     let get = |i: usize| match state {
         State::Dense(prev_table) => {
             let v = prev_table.array[i].load(Ordering::Relaxed);
@@ -194,8 +196,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
 
     while !blocks.is_empty() {
         let full: AtomicBool = AtomicBool::new(false);
-        let mut blocks_next = 
-            blocks
+        let mut blocks_next = blocks
             .par_iter()
             // We process a given block b in two steps:
             .map(|(b, s, ps)| {
@@ -211,9 +212,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
                             break;
                         }
                         Some((idx, weight, gatenum)) => {
-                            match apply_gates1(
-                                gatenum, &gates, &table, idx, weight, &full, 0,
-                            ) {
+                            match apply_gates1(gatenum, &gates, &table, idx, weight, &full, 0) {
                                 (_, SuccessorsResult::AllSucceeded) => {}
                                 (_, SuccessorsResult::SomeFailed(fs)) => {
                                     ps2.extend(fs);
@@ -260,7 +259,7 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
         state: State::ConcurrentSparse(table),
         num_nonzeros,
         num_gate_apps,
-        method: ExpandMethod::ConcurrentSparse,
+        method: ExpandMethod::Sparse,
     }
 }
 

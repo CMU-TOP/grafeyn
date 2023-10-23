@@ -1,3 +1,4 @@
+use derivative::Derivative;
 use log::debug;
 
 use crate::{
@@ -106,9 +107,12 @@ pub trait PushApplicable {
 
 type PullAction = Box<dyn Fn(BasisIdx) -> PullApplyOutput + Send + Sync>;
 
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct Gate {
     defn: GateDefn,
     pub touches: Vec<QubitIndex>,
+    #[derivative(Debug = "ignore")]
     pub pull_action: Option<PullAction>,
 }
 
@@ -746,13 +750,13 @@ fn push_to_pull(defn: &GateDefn, touches: &[QubitIndex]) -> Option<PullAction> {
             };
             let find = |left: bool, right: bool| -> (BasisIdx, Complex) {
                 if apply_match(left, right, &b00) {
-                    (a00, m00.clone())
+                    (a00, m00)
                 } else if apply_match(left, right, &b01) {
-                    (a01, m01.clone())
+                    (a01, m01)
                 } else if apply_match(left, right, &b10) {
-                    (a10, m10.clone())
+                    (a10, m10)
                 } else if apply_match(left, right, &b11) {
-                    (a11, m11.clone())
+                    (a11, m11)
                 } else {
                     unreachable!("apply_match must return true for one of the basis")
                 }
