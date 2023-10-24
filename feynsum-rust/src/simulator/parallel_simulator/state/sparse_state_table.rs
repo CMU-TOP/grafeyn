@@ -79,12 +79,12 @@ impl ConcurrentSparseStateTable {
             }
             let k = self.keys[i].load(Ordering::Relaxed);
             if k == BasisIdx::into_u64(EMPTY_KEY) {
-                match self.keys[i].compare_exchange(k, y, Ordering::SeqCst, Ordering::Acquire) {
-                    Ok(_) => {
-                        self.put_value_at(i, v); // later: optimize by using non atomic add
-                        break;
-                    }
-                    Err(_) => (),
+                if self.keys[i]
+                    .compare_exchange(k, y, Ordering::SeqCst, Ordering::Acquire)
+                    .is_ok()
+                {
+                    self.put_value_at(i, v); // later: optimize by using non atomic add
+                    break;
                 }
             }
             assert!(k != y); // duplicate key
