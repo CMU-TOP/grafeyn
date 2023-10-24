@@ -179,17 +179,15 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
         .into_par_iter()
         .map(|b| (b, block_start(b), vec![]))
         .collect();
-    let get = |i: usize| match state {
-        State::Dense(prev_table) => {
+    let get: Box<dyn Fn(usize) -> (BasisIdx, Complex) + Sync> = match state {
+        State::Dense(prev_table) => Box::new(|i: usize| {
             let v = prev_table.array[i].load(Ordering::Relaxed);
             let weight = utility::unpack_complex(v);
             (BasisIdx::from_idx(i), weight)
-        }
+        }),
         State::ConcurrentSparse(prev_table) => {
-            let j = prev_table.nonzeros[i];
-            let idx = BasisIdx::from_u64(prev_table.keys[j].load(Ordering::Relaxed));
-            let weight = ConcurrentSparseStateTable::get_value_at(&prev_table.weights, j);
-            (idx, weight)
+            let nonzeros = prev_table.nonzeros();
+            Box::new(move |i: usize| nonzeros[i])
         }
         State::Sparse(_) => panic!(),
     };
@@ -252,7 +250,6 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, state: &State) -> ExpandRe
             std::mem::swap(&mut table, &mut table2);
         }
     }
-    table.make_nonzero_shortcuts();
     let num_nonzeros = table.num_nonzeros();
     let num_gate_apps = 0;
     ExpandResult {
@@ -302,13 +299,8 @@ fn expand_push_dense(gates: Vec<&Gate>, num_qubits: usize, state: State) -> Expa
         // FIXME: There should be better way to parallelize iteration over nonzeros of State::Sparse
         // FIXME: Refactor this iterator generation
         State::ConcurrentSparse(prev_table) => prev_table
-            .nonzeros
+            .nonzeros()
             .into_par_iter()
-            .map(move |i: usize| {
-                let idx = prev_table.keys[i].load(Ordering::Relaxed) as usize;
-                let weight = ConcurrentSparseStateTable::get_value_at(&prev_table.weights, i);
-                (BasisIdx::from_idx(idx), weight)
-            })
             .map(|(bidx, weight)| apply_gates(&gates, &table, bidx, weight))
             .sum(),
     };
