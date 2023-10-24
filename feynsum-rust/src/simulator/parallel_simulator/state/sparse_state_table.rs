@@ -21,7 +21,6 @@ fn calculate_hash<T: Hash>(t: &T) -> u64 {
 pub struct ConcurrentSparseStateTable {
     pub keys: Vec<AtomicU64>,
     pub weights: Vec<AtomicComplex>,
-    pub nonzeros: Vec<usize>, // indices of keys with nonzero weights
 }
 
 impl ConcurrentSparseStateTable {
@@ -34,37 +33,38 @@ impl ConcurrentSparseStateTable {
             .into_par_iter()
             .map(|_i| (AtomicReal::new(0.0), AtomicReal::new(0.0)))
             .collect();
-        let nonzeros = Vec::new();
-        Self {
-            keys,
-            weights,
-            nonzeros,
-        }
+        Self { keys, weights }
     }
     pub fn new() -> Self {
         let capacity = 100;
         Self::new_with_capacity(capacity)
     }
     pub fn singleton(bidx: BasisIdx, weight: Complex) -> Self {
-        let mut t = ConcurrentSparseStateTable::new();
+        let t = ConcurrentSparseStateTable::new();
         t.force_insert_unique(bidx, weight);
-        t.make_nonzero_shortcuts();
         t
     }
     pub fn capacity(&self) -> usize {
         self.keys.len()
     }
     pub fn num_nonzeros(&self) -> usize {
-        self.nonzeros.len()
+        self.keys
+            .iter()
+            .enumerate()
+            .filter(|&(i, k)| {
+                let k = k.load(Ordering::Relaxed);
+                k != BasisIdx::into_u64(EMPTY_KEY) && utility::is_nonzero(self.get_value_at(i))
+            })
+            .count()
     }
     fn put_value_at(&self, i: usize, v: Complex) {
         self.weights[i].0.fetch_add(v.re, Ordering::SeqCst);
         self.weights[i].1.fetch_add(v.im, Ordering::SeqCst);
     }
-    pub fn get_value_at(weights: &[AtomicComplex], i: usize) -> Complex {
+    pub fn get_value_at(&self, i: usize) -> Complex {
         Complex::new(
-            weights[i].0.load(Ordering::Relaxed),
-            weights[i].1.load(Ordering::Relaxed),
+            self.weights[i].0.load(Ordering::Relaxed),
+            self.weights[i].1.load(Ordering::Relaxed),
         )
     }
     fn force_insert_unique(&self, x: BasisIdx, v: Complex) {
@@ -137,7 +137,7 @@ impl ConcurrentSparseStateTable {
             if k == BasisIdx::into_u64(EMPTY_KEY) {
                 return None;
             } else if k == y {
-                return Some(ConcurrentSparseStateTable::get_value_at(&self.weights, i));
+                return Some(self.get_value_at(i));
             } else {
                 i += 1
             }
@@ -157,17 +157,16 @@ impl ConcurrentSparseStateTable {
             });
         new_table
     }
-    pub fn make_nonzero_shortcuts(&mut self) {
-        let mut nonzeros = (0..self.keys.len())
+    pub fn nonzeros(&self) -> Vec<(BasisIdx, Complex)> {
+        (0..self.capacity())
             .into_par_iter()
-            .filter(|&i| {
-                if self.keys[i].load(Ordering::Relaxed) == BasisIdx::into_u64(EMPTY_KEY) {
-                    return false;
-                }
-                utility::is_nonzero(ConcurrentSparseStateTable::get_value_at(&self.weights, i))
+            .map(|i| {
+                let bidx = BasisIdx::from_u64(self.keys[i].load(Ordering::Relaxed));
+                let weight = self.get_value_at(i);
+                (bidx, weight)
             })
-            .collect();
-        std::mem::swap(&mut self.nonzeros, &mut nonzeros);
+            .filter(|(bidx, weight)| bidx != &EMPTY_KEY && utility::is_nonzero(*weight))
+            .collect()
     }
 }
 
