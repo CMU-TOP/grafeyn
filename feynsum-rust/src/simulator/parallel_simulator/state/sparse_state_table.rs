@@ -40,7 +40,7 @@ impl ConcurrentSparseStateTable {
         Self::new_with_capacity(capacity)
     }
     pub fn singleton(bidx: BasisIdx, weight: Complex) -> Self {
-        let mut t = ConcurrentSparseStateTable::new();
+        let t = ConcurrentSparseStateTable::new();
         t.force_insert_unique(bidx, weight);
         t
     }
