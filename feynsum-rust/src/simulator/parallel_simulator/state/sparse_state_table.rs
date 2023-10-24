@@ -61,7 +61,7 @@ impl ConcurrentSparseStateTable {
         self.weights[i].0.fetch_add(v.re, Ordering::SeqCst);
         self.weights[i].1.fetch_add(v.im, Ordering::SeqCst);
     }
-    pub fn get_value_at(weights: &Vec<AtomicComplex>, i: usize) -> Complex {
+    pub fn get_value_at(weights: &[AtomicComplex], i: usize) -> Complex {
         Complex::new(
             weights[i].0.load(Ordering::Relaxed),
             weights[i].1.load(Ordering::Relaxed),
