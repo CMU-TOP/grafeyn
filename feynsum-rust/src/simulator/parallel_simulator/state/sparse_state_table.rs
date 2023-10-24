@@ -61,10 +61,10 @@ impl ConcurrentSparseStateTable {
         self.weights[i].0.fetch_add(v.re, Ordering::SeqCst);
         self.weights[i].1.fetch_add(v.im, Ordering::SeqCst);
     }
-    pub fn get_value_at(weights: &[AtomicComplex], i: usize) -> Complex {
+    pub fn get_value_at(&self, i: usize) -> Complex {
         Complex::new(
-            weights[i].0.load(Ordering::Relaxed),
-            weights[i].1.load(Ordering::Relaxed),
+            self.weights[i].0.load(Ordering::Relaxed),
+            self.weights[i].1.load(Ordering::Relaxed),
         )
     }
     fn force_insert_unique(&self, x: BasisIdx, v: Complex) {
@@ -137,7 +137,7 @@ impl ConcurrentSparseStateTable {
             if k == BasisIdx::into_u64(EMPTY_KEY) {
                 return None;
             } else if k == y {
-                return Some(ConcurrentSparseStateTable::get_value_at(&self.weights, i));
+                return Some(self.get_value_at(i));
             } else {
                 i += 1
             }
@@ -162,7 +162,7 @@ impl ConcurrentSparseStateTable {
             .into_par_iter()
             .map(|i| {
                 let bidx = BasisIdx::from_u64(self.keys[i].load(Ordering::Relaxed));
-                let weight = ConcurrentSparseStateTable::get_value_at(&self.weights, i);
+                let weight = self.get_value_at(i);
                 (bidx, weight)
             })
             .filter(|(bidx, weight)| bidx != &EMPTY_KEY && utility::is_nonzero(*weight))
