@@ -25,7 +25,7 @@ pub struct ConcurrentSparseStateTable {
 }
 
 impl ConcurrentSparseStateTable {
-    pub fn _new(capacity: usize) -> Self {
+    fn new_with_capacity(capacity: usize) -> Self {
         let keys: Vec<AtomicU64> = (0..capacity)
             .into_par_iter()
             .map(|_i| AtomicU64::new(BasisIdx::into_u64(EMPTY_KEY)))
@@ -43,7 +43,7 @@ impl ConcurrentSparseStateTable {
     }
     pub fn new() -> Self {
         let capacity = 100;
-        Self::_new(capacity)
+        Self::new_with_capacity(capacity)
     }
     pub fn singleton(bidx: BasisIdx, weight: Complex) -> Self {
         let mut t = ConcurrentSparseStateTable::new();
@@ -146,7 +146,7 @@ impl ConcurrentSparseStateTable {
     }
     pub fn increase_capacity_by_factor(&self, alpha: f32) -> Self {
         let new_capacity = (alpha * self.keys.len() as f32).ceil() as usize;
-        let new_table = Self::_new(new_capacity);
+        let new_table = Self::new_with_capacity(new_capacity);
         self.keys
             .par_iter()
             .zip(self.weights.par_iter())
