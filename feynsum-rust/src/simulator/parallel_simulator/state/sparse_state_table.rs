@@ -3,7 +3,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
-use crate::types::{AtomicComplex, AtomicReal, BasisIdx, Complex};
+use crate::types::{AtomicComplex, AtomicReal, BasisIdx, Real, Complex};
 use crate::utility;
 
 use std::sync::{atomic::AtomicU64, atomic::Ordering};
@@ -35,12 +35,12 @@ impl ConcurrentSparseStateTable {
             .collect();
         Self { keys, weights }
     }
-    pub fn new() -> Self {
-        let capacity = 100;
+    pub fn new(maxload: Real, expected: i64) -> Self {
+        let capacity = (1.1 * (1.0 / maxload) * (expected as Real)).ceil() as usize;
         Self::new_with_capacity(capacity)
     }
-    pub fn singleton(bidx: BasisIdx, weight: Complex) -> Self {
-        let t = ConcurrentSparseStateTable::new();
+    pub fn singleton(bidx: BasisIdx, weight: Complex, maxload: Real, expected: i64) -> Self {
+        let t = ConcurrentSparseStateTable::new(maxload, expected);
         t.force_insert_unique(bidx, weight);
         t
     }

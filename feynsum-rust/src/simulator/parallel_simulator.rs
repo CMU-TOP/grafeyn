@@ -29,6 +29,8 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
     let mut state = State::ConcurrentSparse(ConcurrentSparseStateTable::singleton(
         BasisIdx::zeros(),
         Complex::new(1.0, 0.0),
+        config.maxload,
+        1,
     )); // initial state
     let mut num_nonzeros = 1;
     let mut num_gate_apps = 0;
