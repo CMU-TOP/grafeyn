@@ -20,7 +20,7 @@ use config::Config;
 use fingerprint::Fingerprint;
 use options::Options;
 use simulator::Compactifiable;
-use types::{BasisIdx, Complex};
+use types::{BasisIdx64, Complex};
 
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
@@ -83,7 +83,7 @@ fn run(
     parallelism: usize,
     config: Config,
     circuit: Circuit,
-) -> Box<dyn Iterator<Item = (BasisIdx, Complex)>> {
+) -> Box<dyn Iterator<Item = (BasisIdx64, Complex)>> {
     if parallelism > 1 {
         info!("using parallel simulator");
         match simulator::parallel_simulator::run(&config, circuit) {
@@ -104,7 +104,7 @@ fn run(
 }
 
 fn process_output(
-    densities: Box<dyn Iterator<Item = (BasisIdx, Complex)>>,
+    densities: Box<dyn Iterator<Item = (BasisIdx64, Complex)>>,
     output: Option<PathBuf>,
     print_fingerprint: bool,
     bidx_width: usize,

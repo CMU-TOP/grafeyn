@@ -3,7 +3,7 @@ use std::fmt::{self, Display, Formatter};
 
 use crate::circuit::{Gate, PullApplyOutput, PushApplicable, PushApplyOutput};
 use crate::config::Config;
-use crate::types::{BasisIdx, Complex, Real};
+use crate::types::{BasisIdx64, Complex, Real};
 use crate::utility;
 
 use super::super::{Compactifiable, SimulatorError};
@@ -115,7 +115,7 @@ fn expand_pull_dense(
 
     let (num_gate_apps, num_nonzeros) =
         (0..capacity).try_fold((0, 0), |(num_gate_apps, num_nonzeros), idx| {
-            let bidx = BasisIdx::from_idx(idx);
+            let bidx = BasisIdx64::from_idx(idx);
             let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, &bidx)?;
 
             let num_nonzeros_here = if utility::is_nonzero(weight) { 1 } else { 0 };
@@ -135,7 +135,7 @@ fn expand_pull_dense(
     })
 }
 
-fn apply_gates(gates: &[&Gate], table: &mut impl Table, bidx: BasisIdx, weight: Complex) -> usize {
+fn apply_gates(gates: &[&Gate], table: &mut impl Table, bidx: BasisIdx64, weight: Complex) -> usize {
     if utility::is_zero(weight) {
         return 0;
     }
@@ -159,7 +159,7 @@ fn apply_gates(gates: &[&Gate], table: &mut impl Table, bidx: BasisIdx, weight: 
 fn apply_pull_gates(
     gates: &[&Gate],
     prev_state: &State,
-    bidx: &BasisIdx,
+    bidx: &BasisIdx64,
 ) -> Result<(Complex, usize), SimulatorError> {
     if gates.is_empty() {
         let weight = prev_state

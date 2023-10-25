@@ -1,4 +1,4 @@
-use crate::types::{BasisIdx, Complex};
+use crate::types::{BasisIdx64, Complex};
 
 mod dense_state_table;
 mod sparse_state_table;
@@ -9,7 +9,7 @@ pub use sparse_state_table::SparseStateTable;
 use super::super::Compactifiable;
 
 pub trait Table {
-    fn put(&mut self, bidx: BasisIdx, weight: Complex);
+    fn put(&mut self, bidx: BasisIdx64, weight: Complex);
 }
 
 #[derive(Debug)]
@@ -26,7 +26,7 @@ impl State {
         }
     }
 
-    pub fn get(&self, bidx: &BasisIdx) -> Option<&Complex> {
+    pub fn get(&self, bidx: &BasisIdx64) -> Option<&Complex> {
         match self {
             State::Sparse(table) => table.get(bidx),
             State::Dense(table) => table.get(bidx),
@@ -35,7 +35,7 @@ impl State {
 }
 
 impl Compactifiable for State {
-    fn compactify(self) -> Box<dyn Iterator<Item = (BasisIdx, Complex)>> {
+    fn compactify(self) -> Box<dyn Iterator<Item = (BasisIdx64, Complex)>> {
         match self {
             State::Sparse(table) => Box::new(table.table.into_iter()),
             State::Dense(table) => Box::new(
@@ -43,7 +43,7 @@ impl Compactifiable for State {
                     .array
                     .into_iter()
                     .enumerate()
-                    .map(|(idx, c)| (BasisIdx::from_idx(idx), c)),
+                    .map(|(idx, c)| (BasisIdx64::from_idx(idx), c)),
             ),
         }
     }
