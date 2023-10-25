@@ -13,7 +13,7 @@ use crate::types::basis_idx::MAX_QUBITS;
 use crate::types::{BasisIdx, Complex, Real};
 
 use super::SimulatorError;
-use state::ConcurrentSparseStateTable;
+use state::SparseStateTable;
 use state_expander::ExpandResult;
 
 pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
@@ -26,7 +26,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
     }
 
     let mut num_gates_visited = 0;
-    let mut state = State::ConcurrentSparse(ConcurrentSparseStateTable::singleton(
+    let mut state = State::Sparse(SparseStateTable::singleton(
         BasisIdx::zeros(),
         Complex::new(1.0, 0.0),
         config.maxload,
@@ -243,7 +243,7 @@ h q0[28];
 
         let table = match state {
             //State::Sparse(table) => table,
-            State::ConcurrentSparse(table) => table,
+            State::Sparse(table) => table,
             _ => panic!(),
         };
 
