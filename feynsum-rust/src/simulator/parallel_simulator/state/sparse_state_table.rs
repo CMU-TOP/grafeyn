@@ -61,6 +61,11 @@ impl ConcurrentSparseStateTable {
         self.weights[i].0.fetch_add(v.re, Ordering::SeqCst);
         self.weights[i].1.fetch_add(v.im, Ordering::SeqCst);
     }
+    fn put_value_at_nonatomic(&self, i: usize, v: Complex) {
+        let v0 = self.get_value_at(i);
+        self.weights[i].0.store(v0.re + v.re, Ordering::Relaxed);
+        self.weights[i].1.store(v0.im + v.im, Ordering::Relaxed);
+    }
     pub fn get_value_at(&self, i: usize) -> Complex {
         Complex::new(
             self.weights[i].0.load(Ordering::Relaxed),
@@ -83,7 +88,7 @@ impl ConcurrentSparseStateTable {
                     .compare_exchange(k, y, Ordering::SeqCst, Ordering::Acquire)
                     .is_ok()
             {
-                self.put_value_at(i, v); // later: optimize by using non atomic add
+                self.put_value_at_nonatomic(i, v);
                 break;
             }
             assert!(k != y); // duplicate key
