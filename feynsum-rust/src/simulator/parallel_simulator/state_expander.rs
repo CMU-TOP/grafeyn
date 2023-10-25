@@ -6,13 +6,10 @@ use rayon::prelude::*;
 
 use crate::circuit::{Gate, PullApplyOutput, PushApplicable, PushApplyOutput};
 use crate::config::Config;
-use crate::simulator::Compactifiable;
 use crate::types::{BasisIdx, Complex, Real};
 use crate::utility;
 
-use super::state::{
-    ConcurrentSparseStateTable, DenseStateTable, SparseStateTable, SparseStateTableInsertion, State,
-};
+use super::state::{DenseStateTable, SparseStateTable, SparseStateTableInsertion, State};
 
 pub enum ExpandMethod {
     Sparse,
@@ -44,7 +41,8 @@ pub fn expand(
     prev_num_nonzeros: usize,
     state: State,
 ) -> ExpandResult {
-    let (expected_cost, expected) = expected_cost(num_qubits, state.num_nonzeros(), prev_num_nonzeros);
+    let (expected_cost, expected) =
+        expected_cost(num_qubits, state.num_nonzeros(), prev_num_nonzeros);
 
     let all_gates_pullable = gates.iter().all(|gate| gate.is_pullable());
 
@@ -69,10 +67,10 @@ fn expected_cost(num_qubits: usize, num_nonzeros: usize, prev_num_nonzeros: usiz
 }
 
 fn try_put(
-    table: &ConcurrentSparseStateTable,
+    table: &SparseStateTable,
     bidx: BasisIdx,
     weight: Complex,
-    maxload: Real
+    maxload: Real,
 ) -> SparseStateTableInsertion {
     let n = table.capacity();
     let probably_longest_probe =
@@ -89,12 +87,12 @@ pub enum SuccessorsResult {
 fn apply_gates1(
     gatenum: usize,
     gates: &[&Gate],
-    table: &ConcurrentSparseStateTable,
+    table: &SparseStateTable,
     bidx: BasisIdx,
     weight: Complex,
     full: &AtomicBool,
     apps: usize,
-    maxload: Real
+    maxload: Real,
 ) -> (usize, SuccessorsResult) {
     if utility::is_zero(weight) {
         return (apps, SuccessorsResult::AllSucceeded);
@@ -147,14 +145,14 @@ fn apply_gates1(
 fn apply_gates2(
     gatenum: usize,
     gates: &[&Gate],
-    table: &ConcurrentSparseStateTable,
+    table: &SparseStateTable,
     bidx1: BasisIdx,
     weight1: Complex,
     bidx2: BasisIdx,
     weight2: Complex,
     full: &AtomicBool,
     apps: usize,
-    maxload: Real
+    maxload: Real,
 ) -> (usize, SuccessorsResult) {
     match apply_gates1(gatenum, gates, table, bidx1, weight1, full, apps, maxload) {
         (apps, SuccessorsResult::AllSucceeded) => {
@@ -168,13 +166,16 @@ fn apply_gates2(
     }
 }
 
-fn expand_sparse2(gates: Vec<&Gate>, config: &Config, expected: i64, state: &State) -> ExpandResult {
-    
-    let mut table = ConcurrentSparseStateTable::new(config.maxload, expected);
+fn expand_sparse2(
+    gates: Vec<&Gate>,
+    config: &Config,
+    expected: i64,
+    state: &State,
+) -> ExpandResult {
+    let mut table = SparseStateTable::new(config.maxload, expected);
     let n: usize = match state {
-        State::ConcurrentSparse(prev_table) => prev_table.num_nonzeros(),
+        State::Sparse(prev_table) => prev_table.num_nonzeros(),
         State::Dense(prev_table) => prev_table.capacity(),
-        State::Sparse(_) => panic!(),
     };
     let block_size = std::cmp::max(100, std::cmp::min(n / 1000, config.block_size));
     let num_blocks = (n as f64 / block_size as f64).ceil() as usize;
@@ -185,16 +186,15 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, expected: i64, state: &Sta
         .map(|b| (b, block_start(b), vec![]))
         .collect();
     let get: Box<dyn Fn(usize) -> (BasisIdx, Complex) + Sync> = match state {
+        State::Sparse(prev_table) => {
+            let nonzeros = prev_table.nonzeros();
+            Box::new(move |i: usize| nonzeros[i])
+        }
         State::Dense(prev_table) => Box::new(|i: usize| {
             let v = prev_table.array[i].load(Ordering::Relaxed);
             let weight = utility::unpack_complex(v);
             (BasisIdx::from_idx(i), weight)
         }),
-        State::ConcurrentSparse(prev_table) => {
-            let nonzeros = prev_table.nonzeros();
-            Box::new(move |i: usize| nonzeros[i])
-        }
-        State::Sparse(_) => panic!(),
     };
 
     while !blocks.is_empty() {
@@ -215,7 +215,16 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, expected: i64, state: &Sta
                             break;
                         }
                         Some((idx, weight, gatenum)) => {
-                            match apply_gates1(gatenum, &gates, &table, idx, weight, &full, 0, config.maxload) {
+                            match apply_gates1(
+                                gatenum,
+                                &gates,
+                                &table,
+                                idx,
+                                weight,
+                                &full,
+                                0,
+                                config.maxload,
+                            ) {
                                 (_, SuccessorsResult::AllSucceeded) => {}
                                 (_, SuccessorsResult::SomeFailed(fs)) => {
                                     ps2.extend(fs);
@@ -258,24 +267,6 @@ fn expand_sparse2(gates: Vec<&Gate>, config: &Config, expected: i64, state: &Sta
     let num_nonzeros = table.num_nonzeros();
     let num_gate_apps = 0;
     ExpandResult {
-        state: State::ConcurrentSparse(table),
-        num_nonzeros,
-        num_gate_apps,
-        method: ExpandMethod::Sparse,
-    }
-}
-
-fn expand_sparse(gates: Vec<&Gate>, state: State) -> ExpandResult {
-    let mut table = SparseStateTable::new();
-
-    let num_gate_apps = state
-        .compactify()
-        .map(|(bidx, weight)| apply_gates_seq(&gates, &mut table, bidx, weight))
-        .sum();
-
-    let num_nonzeros = table.num_nonzeros();
-
-    ExpandResult {
         state: State::Sparse(table),
         num_nonzeros,
         num_gate_apps,
@@ -287,8 +278,10 @@ fn expand_push_dense(gates: Vec<&Gate>, num_qubits: usize, state: State) -> Expa
     let table = DenseStateTable::new(num_qubits);
 
     let num_gate_apps = match state {
+        // FIXME: There should be better way to parallelize iteration over nonzeros of State::Sparse
+        // FIXME: Refactor this iterator generation
         State::Sparse(prev_table) => prev_table
-            .table
+            .nonzeros()
             .into_par_iter()
             .map(|(bidx, weight)| apply_gates(&gates, &table, bidx, weight))
             .sum(),
@@ -300,13 +293,6 @@ fn expand_push_dense(gates: Vec<&Gate>, num_qubits: usize, state: State) -> Expa
                 let weight = utility::unpack_complex(v.load(Ordering::Relaxed));
                 apply_gates(&gates, &table, BasisIdx::from_idx(idx), weight)
             })
-            .sum(),
-        // FIXME: There should be better way to parallelize iteration over nonzeros of State::Sparse
-        // FIXME: Refactor this iterator generation
-        State::ConcurrentSparse(prev_table) => prev_table
-            .nonzeros()
-            .into_par_iter()
-            .map(|(bidx, weight)| apply_gates(&gates, &table, bidx, weight))
             .sum(),
     };
 
@@ -345,32 +331,6 @@ fn expand_pull_dense(gates: Vec<&Gate>, num_qubits: usize, state: State) -> Expa
         num_nonzeros,
         num_gate_apps,
         method: ExpandMethod::PullDense,
-    }
-}
-
-// NOTE: Some gate applications are still performed in a sequential manner
-fn apply_gates_seq(
-    gates: &[&Gate],
-    table: &mut SparseStateTable,
-    bidx: BasisIdx,
-    weight: Complex,
-) -> usize {
-    if gates.is_empty() {
-        if !utility::is_zero(weight) {
-            table.put(bidx, weight);
-        }
-        return 0;
-    }
-
-    match gates[0].push_apply(bidx, weight) {
-        PushApplyOutput::Nonbranching(new_bidx, new_weight) => {
-            1 + apply_gates_seq(&gates[1..], table, new_bidx, new_weight)
-        }
-        PushApplyOutput::Branching((new_bidx1, new_weight1), (new_bidx2, new_weight2)) => {
-            let num_gate_apps_1 = apply_gates_seq(&gates[1..], table, new_bidx1, new_weight1);
-            let num_gate_apps_2 = apply_gates_seq(&gates[1..], table, new_bidx2, new_weight2);
-            1 + num_gate_apps_1 + num_gate_apps_2
-        }
     }
 }
 

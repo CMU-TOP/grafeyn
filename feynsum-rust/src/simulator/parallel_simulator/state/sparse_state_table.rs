@@ -1,9 +1,8 @@
 use rayon::prelude::*;
 use std::collections::hash_map::DefaultHasher;
-use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
-use crate::types::{AtomicComplex, AtomicReal, BasisIdx, Real, Complex};
+use crate::types::{AtomicComplex, AtomicReal, BasisIdx, Complex, Real};
 use crate::utility;
 
 use std::sync::{atomic::AtomicU64, atomic::Ordering};
@@ -18,12 +17,12 @@ fn calculate_hash<T: Hash>(t: &T) -> u64 {
     s.finish()
 }
 
-pub struct ConcurrentSparseStateTable {
+pub struct SparseStateTable {
     pub keys: Vec<AtomicU64>,
     pub weights: Vec<AtomicComplex>,
 }
 
-impl ConcurrentSparseStateTable {
+impl SparseStateTable {
     fn new_with_capacity(capacity: usize) -> Self {
         let keys: Vec<AtomicU64> = (0..capacity)
             .into_par_iter()
@@ -40,7 +39,7 @@ impl ConcurrentSparseStateTable {
         Self::new_with_capacity(capacity)
     }
     pub fn singleton(bidx: BasisIdx, weight: Complex, maxload: Real, expected: i64) -> Self {
-        let t = ConcurrentSparseStateTable::new(maxload, expected);
+        let t = SparseStateTable::new(maxload, expected);
         t.force_insert_unique(bidx, weight);
         t
     }
@@ -144,7 +143,7 @@ impl ConcurrentSparseStateTable {
             } else if k == y {
                 return Some(self.get_value_at(i));
             } else {
-                i += 1
+                i = (i + 1) % n
             }
         }
     }
@@ -172,42 +171,5 @@ impl ConcurrentSparseStateTable {
             })
             .filter(|(bidx, weight)| bidx != &EMPTY_KEY && utility::is_nonzero(*weight))
             .collect()
-    }
-}
-
-#[derive(Debug)]
-pub struct SparseStateTable {
-    pub table: HashMap<BasisIdx, Complex>,
-}
-
-impl SparseStateTable {
-    pub fn singleton(bidx: BasisIdx, weight: Complex) -> Self {
-        Self {
-            table: HashMap::from([(bidx, weight)]),
-        }
-    }
-
-    pub fn new() -> Self {
-        Self {
-            table: HashMap::new(),
-        }
-    }
-
-    pub fn num_nonzeros(&self) -> usize {
-        self.table
-            .iter()
-            .filter(|(_, w)| utility::is_nonzero(**w))
-            .count()
-    }
-
-    pub fn put(&mut self, bidx: BasisIdx, weight: Complex) {
-        self.table
-            .entry(bidx)
-            .and_modify(|w| *w += weight)
-            .or_insert(weight);
-    }
-
-    pub fn get(&self, bidx: &BasisIdx) -> Option<Complex> {
-        self.table.get(bidx).map(Clone::clone)
     }
 }
