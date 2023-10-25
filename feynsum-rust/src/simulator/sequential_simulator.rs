@@ -8,7 +8,7 @@ use crate::config::Config;
 use crate::gate_scheduler;
 use crate::profile;
 use crate::types::basis_idx::MAX_QUBITS;
-use crate::types::{BasisIdx, Complex, Real};
+use crate::types::{BasisIdx64, Complex, Real};
 
 use super::SimulatorError;
 use state::{SparseStateTable, State};
@@ -25,7 +25,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
 
     let mut num_gates_visited = 0;
     let mut state = State::Sparse(SparseStateTable::singleton(
-        BasisIdx::zeros(),
+        BasisIdx64::zeros(),
         Complex::new(1.0, 0.0),
     )); // initial state
     let mut num_nonzeros = 1;
@@ -244,7 +244,7 @@ h q0[28];
 
         assert_eq!(table.num_nonzeros(), 2);
         let nonzero_field_1 = table
-            .get(&BasisIdx::new("11111111000101010110110110001"))
+            .get(&BasisIdx64::new("11111111000101010110110110001"))
             .unwrap();
         assert!(abs_diff_eq!(
             nonzero_field_1.re,
@@ -253,7 +253,7 @@ h q0[28];
         ));
 
         let nonzero_field_2 = table
-            .get(&BasisIdx::new("111111111000101010110110110001"))
+            .get(&BasisIdx64::new("111111111000101010110110110001"))
             .unwrap();
         assert!(abs_diff_eq!(
             nonzero_field_2.re,

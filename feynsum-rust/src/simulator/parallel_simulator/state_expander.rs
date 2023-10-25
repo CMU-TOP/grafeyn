@@ -6,7 +6,7 @@ use rayon::prelude::*;
 
 use crate::circuit::{Gate, PullApplyOutput, PushApplicable, PushApplyOutput};
 use crate::config::Config;
-use crate::types::{BasisIdx, Complex, Real};
+use crate::types::{BasisIdx64, Complex, Real};
 use crate::utility;
 
 use super::state::{DenseStateTable, SparseStateTable, SparseStateTableInsertion, State};
@@ -68,7 +68,7 @@ fn expected_cost(num_qubits: usize, num_nonzeros: usize, prev_num_nonzeros: usiz
 
 fn try_put(
     table: &SparseStateTable,
-    bidx: BasisIdx,
+    bidx: BasisIdx64,
     weight: Complex,
     maxload: Real,
 ) -> SparseStateTableInsertion {
@@ -81,14 +81,14 @@ fn try_put(
 
 pub enum SuccessorsResult {
     AllSucceeded,
-    SomeFailed(Vec<(BasisIdx, Complex, usize)>),
+    SomeFailed(Vec<(BasisIdx64, Complex, usize)>),
 }
 
 fn apply_gates1(
     gatenum: usize,
     gates: &[&Gate],
     table: &SparseStateTable,
-    bidx: BasisIdx,
+    bidx: BasisIdx64,
     weight: Complex,
     full: &AtomicBool,
     apps: usize,
@@ -146,9 +146,9 @@ fn apply_gates2(
     gatenum: usize,
     gates: &[&Gate],
     table: &SparseStateTable,
-    bidx1: BasisIdx,
+    bidx1: BasisIdx64,
     weight1: Complex,
-    bidx2: BasisIdx,
+    bidx2: BasisIdx64,
     weight2: Complex,
     full: &AtomicBool,
     apps: usize,
@@ -181,11 +181,11 @@ fn expand_sparse2(
     let num_blocks = (n as f64 / block_size as f64).ceil() as usize;
     let block_start = |b: usize| block_size * b;
     let block_stop = |b: usize| std::cmp::min(n, block_size + block_start(b));
-    let mut blocks: Vec<(usize, usize, Vec<(BasisIdx, Complex, usize)>)> = (0..num_blocks)
+    let mut blocks: Vec<(usize, usize, Vec<(BasisIdx64, Complex, usize)>)> = (0..num_blocks)
         .into_par_iter()
         .map(|b| (b, block_start(b), vec![]))
         .collect();
-    let get: Box<dyn Fn(usize) -> (BasisIdx, Complex) + Sync> = match state {
+    let get: Box<dyn Fn(usize) -> (BasisIdx64, Complex) + Sync> = match state {
         State::Sparse(prev_table) => {
             let nonzeros = prev_table.nonzeros();
             Box::new(move |i: usize| nonzeros[i])
@@ -193,7 +193,7 @@ fn expand_sparse2(
         State::Dense(prev_table) => Box::new(|i: usize| {
             let v = prev_table.array[i].load(Ordering::Relaxed);
             let weight = utility::unpack_complex(v);
-            (BasisIdx::from_idx(i), weight)
+            (BasisIdx64::from_idx(i), weight)
         }),
     };
 
@@ -291,7 +291,7 @@ fn expand_push_dense(gates: Vec<&Gate>, num_qubits: usize, state: State) -> Expa
             .enumerate()
             .map(|(idx, v)| {
                 let weight = utility::unpack_complex(v.load(Ordering::Relaxed));
-                apply_gates(&gates, &table, BasisIdx::from_idx(idx), weight)
+                apply_gates(&gates, &table, BasisIdx64::from_idx(idx), weight)
             })
             .sum(),
     };
@@ -315,7 +315,7 @@ fn expand_pull_dense(gates: Vec<&Gate>, num_qubits: usize, state: State) -> Expa
         .fold(
             || (0, 0),
             |acc, idx| {
-                let bidx = BasisIdx::from_idx(idx);
+                let bidx = BasisIdx64::from_idx(idx);
                 let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, bidx);
                 table.atomic_put(bidx, weight);
                 (
@@ -334,7 +334,12 @@ fn expand_pull_dense(gates: Vec<&Gate>, num_qubits: usize, state: State) -> Expa
     }
 }
 
-fn apply_gates(gates: &[&Gate], table: &DenseStateTable, bidx: BasisIdx, weight: Complex) -> usize {
+fn apply_gates(
+    gates: &[&Gate],
+    table: &DenseStateTable,
+    bidx: BasisIdx64,
+    weight: Complex,
+) -> usize {
     if utility::is_zero(weight) {
         return 0;
     }
@@ -355,7 +360,7 @@ fn apply_gates(gates: &[&Gate], table: &DenseStateTable, bidx: BasisIdx, weight:
     }
 }
 
-fn apply_pull_gates(gates: &[&Gate], prev_state: &State, bidx: BasisIdx) -> (Complex, usize) {
+fn apply_pull_gates(gates: &[&Gate], prev_state: &State, bidx: BasisIdx64) -> (Complex, usize) {
     if gates.is_empty() {
         let weight = prev_state.get(&bidx).unwrap_or(Complex::new(0.0, 0.0));
         return (weight, 0);

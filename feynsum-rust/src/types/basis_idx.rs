@@ -3,11 +3,11 @@ use std::fmt::{self, Display, Formatter};
 pub const MAX_QUBITS: usize = 63;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub struct BasisIdx {
+pub struct BasisIdx64 {
     bits: u64,
 }
 
-impl Display for BasisIdx {
+impl Display for BasisIdx64 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match f.width() {
             Some(width) => format!("{:0width$b}", self.bits, width = width).fmt(f),
@@ -16,19 +16,19 @@ impl Display for BasisIdx {
     }
 }
 
-impl BasisIdx {
+impl BasisIdx64 {
     pub fn get(&self, qi: usize) -> bool {
         self.bits & (1 << qi) != 0
     }
 
     pub const fn flip_unsafe(&self, qi: usize) -> Self {
-        BasisIdx {
+        BasisIdx64 {
             bits: self.bits ^ (1 << qi),
         }
     }
 
     pub fn flip(&self, qi: usize) -> Self {
-        BasisIdx {
+        BasisIdx64 {
             bits: self.bits ^ (1 << qi),
         }
     }
@@ -57,7 +57,7 @@ impl BasisIdx {
         }
     }
 
-    // NOTE: DenseStateTable uses BasisIdx as an index into its array
+    // NOTE: DenseStateTable uses BasisIdx64 as an index into its array
     pub fn into_idx(self) -> usize {
         self.bits as usize
     }
@@ -88,7 +88,7 @@ mod tests {
 
     #[test]
     fn test_get() {
-        let bidx = BasisIdx { bits: 0b1010 };
+        let bidx = BasisIdx64 { bits: 0b1010 };
         assert!(!bidx.get(0));
         assert!(bidx.get(1));
         assert!(!bidx.get(2));
@@ -97,20 +97,20 @@ mod tests {
 
     #[test]
     fn test_flip() {
-        let bidx = BasisIdx { bits: 0b1010 };
+        let bidx = BasisIdx64 { bits: 0b1010 };
         let bidx = bidx.flip(0);
         assert_eq!(bidx.bits, 0b1011);
     }
 
     #[test]
     fn test_zeros() {
-        let bidx = BasisIdx::zeros();
+        let bidx = BasisIdx64::zeros();
         assert_eq!(bidx.bits, 0);
     }
 
     #[test]
     fn test_set() {
-        let bidx = BasisIdx::zeros();
+        let bidx = BasisIdx64::zeros();
         let bidx1 = bidx.set(0);
         assert_eq!(bidx1.bits, 1);
 
@@ -120,7 +120,7 @@ mod tests {
 
     #[test]
     fn test_unset() {
-        let bidx = BasisIdx { bits: 0b1010 };
+        let bidx = BasisIdx64 { bits: 0b1010 };
         let bidx = bidx.unset(0);
         assert_eq!(bidx.bits, 0b1010);
 
@@ -130,7 +130,7 @@ mod tests {
 
     #[test]
     fn test_swap() {
-        let bidx = BasisIdx { bits: 0b1010 };
+        let bidx = BasisIdx64 { bits: 0b1010 };
         let bidx = bidx.swap(0, 1);
         assert_eq!(bidx.bits, 0b1001);
     }

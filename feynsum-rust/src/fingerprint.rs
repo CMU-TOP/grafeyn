@@ -1,10 +1,10 @@
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 
-use crate::types::{BasisIdx, Complex};
+use crate::types::{BasisIdx64, Complex};
 
 #[derive(PartialEq)]
-struct Entry(BasisIdx, Complex);
+struct Entry(BasisIdx64, Complex);
 
 impl Eq for Entry {}
 
@@ -46,14 +46,14 @@ impl Fingerprint {
         }
     }
 
-    pub fn insert(&mut self, bidx: BasisIdx, weight: Complex) {
+    pub fn insert(&mut self, bidx: BasisIdx64, weight: Complex) {
         self.entries.insert(Entry(bidx, weight));
         if self.entries.len() > self.num_entries {
             self.entries.pop_first();
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (BasisIdx, Complex)> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = (BasisIdx64, Complex)> + '_ {
         // reverse the comparison here so that the output fingerprint is sorted
         // like normal binary numbers, for readability
         self.entries
