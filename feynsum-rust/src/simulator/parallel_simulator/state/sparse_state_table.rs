@@ -138,7 +138,7 @@ impl SparseStateTable {
             } else if k == y {
                 return Some(self.get_value_at(i));
             } else {
-                i += 1
+                i = (i + 1) % n
             }
         }
     }
