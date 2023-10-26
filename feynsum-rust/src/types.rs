@@ -17,4 +17,4 @@ pub mod constants {
 
 pub mod basis_idx;
 
-pub use basis_idx::BasisIdx64;
+pub use basis_idx::{AtomicBasisIdx, BasisIdx, BasisIdx64};
