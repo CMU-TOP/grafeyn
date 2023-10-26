@@ -3,10 +3,10 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
-use crate::types::{AtomicComplex, AtomicReal, BasisIdx, BasisIdx64, Complex, Real};
+use crate::types::{AtomicBasisIdx, AtomicComplex, AtomicReal, BasisIdx, Complex, Real};
 use crate::utility;
 
-use std::sync::{atomic::AtomicU64, atomic::Ordering};
+use std::sync::atomic::Ordering;
 
 use super::SparseStateTableInsertion;
 
@@ -16,17 +16,17 @@ fn calculate_hash<T: Hash>(t: &T) -> u64 {
     s.finish()
 }
 
-pub struct SparseStateTable<B: BasisIdx> {
-    pub keys: Vec<AtomicU64>,
+pub struct SparseStateTable<B: BasisIdx, AB: AtomicBasisIdx<B>> {
+    pub keys: Vec<AB>,
     pub weights: Vec<AtomicComplex>,
     _mark: PhantomData<B>,
 }
 
-impl<B: BasisIdx> SparseStateTable<B> {
+impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
     fn new_with_capacity(capacity: usize) -> Self {
-        let keys: Vec<AtomicU64> = (0..capacity)
+        let keys: Vec<AB> = (0..capacity)
             .into_par_iter()
-            .map(|_i| AtomicU64::new(B::empty_key().into_u64()))
+            .map(|_i| AB::empty_key())
             .collect();
         let weights: Vec<AtomicComplex> = (0..capacity)
             .into_par_iter()
@@ -55,8 +55,8 @@ impl<B: BasisIdx> SparseStateTable<B> {
             .iter()
             .enumerate()
             .filter(|&(i, k)| {
-                let k = k.load(Ordering::Relaxed);
-                k != B::empty_key().into_u64() && utility::is_nonzero(self.get_value_at(i))
+                let k = k.load();
+                k != B::empty_key() && utility::is_nonzero(self.get_value_at(i))
             })
             .count()
     }
@@ -75,22 +75,18 @@ impl<B: BasisIdx> SparseStateTable<B> {
             self.weights[i].1.load(Ordering::Relaxed),
         )
     }
-    fn force_insert_unique(&self, x: impl BasisIdx, v: Complex) {
+    fn force_insert_unique(&self, x: B, v: Complex) {
         let n = self.keys.len();
         let start = calculate_hash(&x) as usize % n;
         let mut i: usize = start;
-        let y = x.into_u64();
+        let y = x;
         loop {
             if i >= n {
                 i = 0;
                 continue;
             }
-            let k = self.keys[i].load(Ordering::Relaxed);
-            if k == B::empty_key().into_u64()
-                && self.keys[i]
-                    .compare_exchange(k, y, Ordering::SeqCst, Ordering::Acquire)
-                    .is_ok()
-            {
+            let k = self.keys[i].load();
+            if k == B::empty_key() && self.keys[i].compare_exchange(k, y).is_ok() {
                 self.put_value_at_nonatomic(i, v);
                 break;
             }
@@ -107,7 +103,7 @@ impl<B: BasisIdx> SparseStateTable<B> {
     ) -> SparseStateTableInsertion {
         let n = self.keys.len();
         let mut i: usize = calculate_hash(&x) as usize % n;
-        let y = x.into_u64();
+        let y = x;
         let mut probes: usize = 0;
         loop {
             if probes >= tolerance {
@@ -117,9 +113,9 @@ impl<B: BasisIdx> SparseStateTable<B> {
                 i = 0;
                 continue;
             }
-            let k = self.keys[i].load(Ordering::Relaxed);
-            if k == B::empty_key().into_u64() {
-                match self.keys[i].compare_exchange(k, y, Ordering::SeqCst, Ordering::Acquire) {
+            let k = self.keys[i].load();
+            if k == B::empty_key() {
+                match self.keys[i].compare_exchange(k, y) {
                     Ok(_) => {
                         self.put_value_at(i, v);
                         break;
@@ -139,12 +135,12 @@ impl<B: BasisIdx> SparseStateTable<B> {
     pub fn get(&self, x: &B) -> Option<Complex> {
         let n = self.keys.len();
         let mut i: usize = calculate_hash(&x) as usize % n;
-        let y = x.into_u64();
+        let y = x;
         loop {
-            let k = self.keys[i].load(Ordering::Relaxed);
-            if k == B::empty_key().into_u64() {
+            let k = self.keys[i].load();
+            if k == B::empty_key() {
                 return None;
-            } else if k == y {
+            } else if k == *y {
                 return Some(self.get_value_at(i));
             } else {
                 i = (i + 1) % n
@@ -160,8 +156,7 @@ impl<B: BasisIdx> SparseStateTable<B> {
             .for_each(|(k, pw)| {
                 let w = Complex::new(pw.0.load(Ordering::Relaxed), pw.1.load(Ordering::Relaxed));
                 if utility::is_nonzero(w) {
-                    new_table
-                        .force_insert_unique(BasisIdx64::from_u64(k.load(Ordering::Relaxed)), w)
+                    new_table.force_insert_unique(k.load(), w)
                 }
             });
         new_table
@@ -170,7 +165,7 @@ impl<B: BasisIdx> SparseStateTable<B> {
         (0..self.capacity())
             .into_par_iter()
             .map(|i| {
-                let bidx = B::from_u64(self.keys[i].load(Ordering::Relaxed));
+                let bidx = self.keys[i].load();
                 let weight = self.get_value_at(i);
                 (bidx, weight)
             })

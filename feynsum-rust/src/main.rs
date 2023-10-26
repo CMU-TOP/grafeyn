@@ -14,6 +14,7 @@ use rayon::ThreadPoolBuilder;
 use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
+use std::sync::atomic::AtomicU64;
 use structopt::StructOpt;
 
 use circuit::Circuit;
@@ -21,7 +22,7 @@ use config::Config;
 use fingerprint::Fingerprint;
 use options::Options;
 use simulator::Compactifiable;
-use types::{BasisIdx, BasisIdx64, Complex};
+use types::{AtomicBasisIdx, BasisIdx, BasisIdx64, Complex};
 
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
@@ -58,19 +59,19 @@ fn main() -> io::Result<()> {
     info!("parse complete. starting circuit construction.");
 
     if circuit::num_qubits(&program) <= BASIS_IDX_64_OKAY_THRESHOLD {
-        build_circuit_and_run::<BasisIdx64>(options, config, program)
+        build_circuit_and_run::<BasisIdx64, AtomicU64>(options, config, program)
     } else {
         // TODO: use BasisIdxUnlimited
-        build_circuit_and_run::<BasisIdx64>(options, config, program)
+        build_circuit_and_run::<BasisIdx64, AtomicU64>(options, config, program)
     }
 }
 
-fn build_circuit_and_run<B: BasisIdx>(
+fn build_circuit_and_run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
     options: Options,
     config: Config,
     program: Vec<QasmStatement>,
 ) -> io::Result<()> {
-    let circuit = match Circuit::<BasisIdx64>::new(program) {
+    let circuit = match Circuit::<B>::new(program) {
         Ok(circuit) => circuit,
         Err(err) => {
             panic!("Failed to construct circuit: {:?}", err);
@@ -86,7 +87,7 @@ fn build_circuit_and_run<B: BasisIdx>(
         .build_global()
         .unwrap();
 
-    let result = run(options.parallelism, config, circuit);
+    let result = run::<B, AB>(options.parallelism, config, circuit);
 
     process_output(result, options.output, options.fingerprint, num_qubits)?;
 
@@ -95,14 +96,14 @@ fn build_circuit_and_run<B: BasisIdx>(
     Ok(())
 }
 
-fn run<B: BasisIdx>(
+fn run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
     parallelism: usize,
     config: Config,
     circuit: Circuit<B>,
 ) -> Box<dyn Iterator<Item = (B, Complex)>> {
     if parallelism > 1 {
         info!("using parallel simulator");
-        match simulator::parallel_simulator::run(&config, circuit) {
+        match simulator::parallel_simulator::run::<B, AB>(&config, circuit) {
             Ok(result) => result.compactify(),
             Err(err) => {
                 panic!("failed to run simulator: {:?}", err);
@@ -110,7 +111,7 @@ fn run<B: BasisIdx>(
         }
     } else {
         info!("using sequential simulator");
-        match simulator::sequential_simulator::run(&config, circuit) {
+        match simulator::sequential_simulator::run::<B>(&config, circuit) {
             Ok(result) => result.compactify(),
             Err(err) => {
                 panic!("failed to run simulator: {:?}", err);
@@ -119,8 +120,8 @@ fn run<B: BasisIdx>(
     }
 }
 
-fn process_output(
-    densities: Box<dyn Iterator<Item = (BasisIdx64, Complex)>>,
+fn process_output<B: BasisIdx>(
+    densities: Box<dyn Iterator<Item = (B, Complex)>>,
     output: Option<PathBuf>,
     print_fingerprint: bool,
     bidx_width: usize,

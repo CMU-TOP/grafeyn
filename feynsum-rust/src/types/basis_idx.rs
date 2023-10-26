@@ -1,4 +1,4 @@
-use std::hash::Hash;
+use std::{fmt::Display, hash::Hash};
 
 pub const MAX_QUBITS: usize = 63;
 
@@ -6,7 +6,7 @@ mod basis_idx_64;
 
 pub use basis_idx_64::BasisIdx64;
 
-pub trait BasisIdx: Eq + Hash + Sync + Send + Clone + Copy + 'static {
+pub trait BasisIdx: Eq + Hash + Sync + Send + Clone + Copy + 'static + Display {
     fn get(&self, qi: usize) -> bool;
     fn flip(&self, qi: usize) -> Self;
     fn zeros() -> Self;
@@ -22,6 +22,9 @@ pub trait BasisIdx: Eq + Hash + Sync + Send + Clone + Copy + 'static {
 
 // represents a type that is used to store a BasisIdx type in a concurrent data
 // structure.
-pub trait AtomicBasisIdx {
+pub trait AtomicBasisIdx<B: BasisIdx>: Sync + Send {
     // TODO: Add methods
+    fn empty_key() -> Self;
+    fn load(&self) -> B;
+    fn compare_exchange(&self, current: B, new: B) -> Result<B, ()>;
 }

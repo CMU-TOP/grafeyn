@@ -10,14 +10,16 @@ use crate::config::Config;
 use crate::gate_scheduler;
 use crate::profile;
 use crate::types::basis_idx::MAX_QUBITS;
-use crate::types::BasisIdx;
-use crate::types::{Complex, Real};
+use crate::types::{AtomicBasisIdx, BasisIdx, Complex, Real};
 
 use super::SimulatorError;
 use state::SparseStateTable;
 use state_expander::ExpandResult;
 
-pub fn run<B: BasisIdx>(config: &Config, circuit: Circuit<B>) -> Result<State<B>, SimulatorError> {
+pub fn run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
+    config: &Config,
+    circuit: Circuit<B>,
+) -> Result<State<B, AB>, SimulatorError> {
     let num_gates = circuit.num_gates();
     let num_qubits = circuit.num_qubits;
 
@@ -139,6 +141,7 @@ mod tests {
     use crate::types::constants;
     use crate::types::BasisIdx64;
     use approx::abs_diff_eq;
+    use std::sync::atomic::AtomicU64;
 
     #[test]
     fn test_run() {
@@ -237,7 +240,7 @@ h q0[28];
         )
         .unwrap();
 
-        let state = run(&config, circuit).unwrap();
+        let state = run::<BasisIdx64, AtomicU64>(&config, circuit).unwrap();
 
         //        println!("{:?}", state);
 
