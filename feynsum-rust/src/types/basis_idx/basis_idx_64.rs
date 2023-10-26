@@ -1,0 +1,139 @@
+use std::fmt::{self, Display, Formatter};
+use std::hash::Hash;
+use std::sync::atomic::AtomicU64;
+
+use super::{AtomicBasisIdx, BasisIdx};
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct BasisIdx64 {
+    bits: u64,
+}
+
+impl Display for BasisIdx64 {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match f.width() {
+            Some(width) => format!("{:0width$b}", self.bits, width = width).fmt(f),
+            None => format!("{:b}", self.bits).fmt(f),
+        }
+    }
+}
+
+impl BasisIdx64 {
+    #[cfg(test)]
+    pub fn new(bits: &str) -> Self {
+        Self {
+            bits: u64::from_str_radix(bits, 2).unwrap(),
+        }
+    }
+}
+
+impl BasisIdx for BasisIdx64 {
+    fn get(&self, qi: usize) -> bool {
+        self.bits & (1 << qi) != 0
+    }
+
+    fn flip(&self, qi: usize) -> Self {
+        BasisIdx64 {
+            bits: self.bits ^ (1 << qi),
+        }
+    }
+
+    fn zeros() -> Self {
+        Self { bits: 0 }
+    }
+
+    fn set(&self, qi: usize) -> Self {
+        Self {
+            bits: self.bits | (1 << qi),
+        }
+    }
+
+    fn unset(&self, qi: usize) -> Self {
+        Self {
+            bits: self.bits & !(1 << qi),
+        }
+    }
+
+    fn swap(&self, qi1: usize, qi2: usize) -> Self {
+        let tmp = ((self.bits >> qi1) ^ (self.bits >> qi2)) & 1;
+
+        Self {
+            bits: self.bits ^ (tmp << qi1) ^ (tmp << qi2),
+        }
+    }
+
+    fn from_idx(idx: usize) -> Self {
+        Self { bits: idx as u64 }
+    }
+
+    fn into_idx(self) -> usize {
+        self.bits as usize
+    }
+
+    fn into_u64(self) -> u64 {
+        self.bits
+    }
+
+    fn from_u64(u: u64) -> Self {
+        Self { bits: u }
+    }
+    fn empty_key() -> Self {
+        Self { bits: (1 << 63) }
+    }
+}
+
+impl AtomicBasisIdx for AtomicU64 {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get() {
+        let bidx = BasisIdx64 { bits: 0b1010 };
+        assert!(!bidx.get(0));
+        assert!(bidx.get(1));
+        assert!(!bidx.get(2));
+        assert!(bidx.get(3));
+    }
+
+    #[test]
+    fn test_flip() {
+        let bidx = BasisIdx64 { bits: 0b1010 };
+        let bidx = bidx.flip(0);
+        assert_eq!(bidx.bits, 0b1011);
+    }
+
+    #[test]
+    fn test_zeros() {
+        let bidx = BasisIdx64::zeros();
+        assert_eq!(bidx.bits, 0);
+    }
+
+    #[test]
+    fn test_set() {
+        let bidx = BasisIdx64::zeros();
+        let bidx1 = bidx.set(0);
+        assert_eq!(bidx1.bits, 1);
+
+        let bidx2 = bidx.set(2);
+        assert_eq!(bidx2.bits, 4);
+    }
+
+    #[test]
+    fn test_unset() {
+        let bidx = BasisIdx64 { bits: 0b1010 };
+        let bidx = bidx.unset(0);
+        assert_eq!(bidx.bits, 0b1010);
+
+        let bidx = bidx.unset(1);
+        assert_eq!(bidx.bits, 0b1000);
+    }
+
+    #[test]
+    fn test_swap() {
+        let bidx = BasisIdx64 { bits: 0b1010 };
+        let bidx = bidx.swap(0, 1);
+        assert_eq!(bidx.bits, 0b1001);
+    }
+}
