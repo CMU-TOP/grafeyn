@@ -17,6 +17,16 @@ pub enum CircuitBuildError {
     UnsupportedOpcode,
 }
 
+pub fn num_qubits(statments: &[QasmStatement]) -> usize {
+    statments
+        .iter()
+        .map(|statement| match statement {
+            QasmStatement::QReg { size, .. } => *size,
+            _ => 0,
+        })
+        .sum()
+}
+
 pub struct Circuit<B: BasisIdx> {
     pub num_qubits: usize,
     pub gates: Vec<Gate<B>>,

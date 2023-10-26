@@ -9,6 +9,7 @@ mod types;
 mod utility;
 
 use log::info;
+use parser::QasmStatement;
 use rayon::ThreadPoolBuilder;
 use std::fs;
 use std::io::{self, Write};
@@ -24,6 +25,8 @@ use types::{BasisIdx, BasisIdx64, Complex};
 
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
+const BASIS_IDX_64_OKAY_THRESHOLD: usize = 62;
 
 fn main() -> io::Result<()> {
     env_logger::init();
@@ -54,6 +57,19 @@ fn main() -> io::Result<()> {
     };
     info!("parse complete. starting circuit construction.");
 
+    if circuit::num_qubits(&program) <= BASIS_IDX_64_OKAY_THRESHOLD {
+        build_circuit_and_run::<BasisIdx64>(options, config, program)
+    } else {
+        // TODO: use BasisIdxUnlimited
+        build_circuit_and_run::<BasisIdx64>(options, config, program)
+    }
+}
+
+fn build_circuit_and_run<B: BasisIdx>(
+    options: Options,
+    config: Config,
+    program: Vec<QasmStatement>,
+) -> io::Result<()> {
     let circuit = match Circuit::<BasisIdx64>::new(program) {
         Ok(circuit) => circuit,
         Err(err) => {
