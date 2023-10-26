@@ -1,14 +1,14 @@
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 
-use crate::types::{BasisIdx64, Complex};
+use crate::types::{BasisIdx, Complex};
 
 #[derive(PartialEq)]
-struct Entry(BasisIdx64, Complex);
+struct Entry<B: BasisIdx>(B, Complex);
 
-impl Eq for Entry {}
+impl<B: BasisIdx> Eq for Entry<B> {}
 
-impl PartialOrd for Entry {
+impl<B: BasisIdx> PartialOrd for Entry<B> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         // FIXME: bucket magnitude?
         if self.1.norm() < other.1.norm() {
@@ -21,7 +21,7 @@ impl PartialOrd for Entry {
     }
 }
 
-impl Ord for Entry {
+impl<B: BasisIdx> Ord for Entry<B> {
     fn cmp(&self, other: &Self) -> Ordering {
         if self.1.norm() < other.1.norm() {
             Ordering::Less
@@ -33,12 +33,12 @@ impl Ord for Entry {
     }
 }
 
-pub struct Fingerprint {
+pub struct Fingerprint<B: BasisIdx> {
     num_entries: usize,
-    entries: BTreeSet<Entry>,
+    entries: BTreeSet<Entry<B>>,
 }
 
-impl Fingerprint {
+impl<B: BasisIdx> Fingerprint<B> {
     pub fn new(num_entries: usize) -> Self {
         Self {
             num_entries,
@@ -46,14 +46,14 @@ impl Fingerprint {
         }
     }
 
-    pub fn insert(&mut self, bidx: BasisIdx64, weight: Complex) {
+    pub fn insert(&mut self, bidx: B, weight: Complex) {
         self.entries.insert(Entry(bidx, weight));
         if self.entries.len() > self.num_entries {
             self.entries.pop_first();
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (BasisIdx64, Complex)> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = (B, Complex)> + '_ {
         // reverse the comparison here so that the output fingerprint is sorted
         // like normal binary numbers, for readability
         self.entries

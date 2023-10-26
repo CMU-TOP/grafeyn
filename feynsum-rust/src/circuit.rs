@@ -4,7 +4,7 @@ use log::error;
 use std::collections::HashMap;
 
 use crate::parser::{Argument, Expression, OpCode, QasmStatement};
-use crate::types::{QubitIndex, Real};
+use crate::types::{BasisIdx, QubitIndex, Real};
 pub use gate::{Gate, GateDefn, PullApplyOutput, PushApplicable, PushApplyOutput};
 
 #[derive(Debug)]
@@ -17,16 +17,16 @@ pub enum CircuitBuildError {
     UnsupportedOpcode,
 }
 
-pub struct Circuit {
+pub struct Circuit<B: BasisIdx> {
     pub num_qubits: usize,
-    pub gates: Vec<Gate>,
+    pub gates: Vec<Gate<B>>,
 }
 
-impl Circuit {
+impl<B: BasisIdx> Circuit<B> {
     pub fn new(statements: Vec<QasmStatement>) -> Result<Self, CircuitBuildError> {
         let mut num_qubits_so_far: usize = 0;
         let mut qregs = HashMap::<String, (QubitIndex, QubitIndex)>::new();
-        let mut gates = Vec::<Gate>::new();
+        let mut gates = Vec::<Gate<B>>::new();
 
         for statement in statements {
             match statement {
@@ -209,6 +209,7 @@ fn eval(exp: Expression) -> Result<Real, CircuitBuildError> {
 mod tests {
     use super::*;
     use crate::parser;
+    use crate::types::BasisIdx64;
 
     #[test]
     fn test_circuit_from_source() {
@@ -232,7 +233,7 @@ mod tests {
 
         let program = parser::parse_program(&source).unwrap();
 
-        let circuit = Circuit::new(program).unwrap();
+        let circuit = Circuit::<BasisIdx64>::new(program).unwrap();
         assert_eq!(circuit.gates.len(), 12);
         assert_eq!(
             circuit

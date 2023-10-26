@@ -8,13 +8,13 @@ use crate::config::Config;
 use crate::gate_scheduler;
 use crate::profile;
 use crate::types::basis_idx::MAX_QUBITS;
-use crate::types::{BasisIdx64, Complex, Real};
+use crate::types::{BasisIdx, Complex, Real};
 
 use super::SimulatorError;
 use state::{SparseStateTable, State};
 use state_expander::ExpandResult;
 
-pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
+pub fn run<B: BasisIdx>(config: &Config, circuit: Circuit<B>) -> Result<State<B>, SimulatorError> {
     let num_gates = circuit.num_gates();
     let num_qubits = circuit.num_qubits;
 
@@ -25,7 +25,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
 
     let mut num_gates_visited = 0;
     let mut state = State::Sparse(SparseStateTable::singleton(
-        BasisIdx64::zeros(),
+        B::zeros(),
         Complex::new(1.0, 0.0),
     )); // initial state
     let mut num_nonzeros = 1;
@@ -131,7 +131,7 @@ pub fn run(config: &Config, circuit: Circuit) -> Result<State, SimulatorError> {
 mod tests {
     use super::*;
     use crate::parser;
-    use crate::types::constants;
+    use crate::types::{constants, BasisIdx64};
     use approx::abs_diff_eq;
 
     #[test]
@@ -231,7 +231,7 @@ h q0[28];
         )
         .unwrap();
 
-        let state = run(&config, circuit).unwrap();
+        let state = run::<BasisIdx64>(&config, circuit).unwrap();
 
         println!("{:?}", state);
 

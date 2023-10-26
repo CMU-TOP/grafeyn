@@ -1,4 +1,4 @@
-use crate::types::{BasisIdx64, Complex};
+use crate::types::{BasisIdx, Complex};
 use crate::utility;
 
 use super::Table;
@@ -24,13 +24,13 @@ impl DenseStateTable {
             .count()
     }
 
-    pub fn get(&self, bidx: &BasisIdx64) -> Option<&Complex> {
+    pub fn get<B: BasisIdx>(&self, bidx: &B) -> Option<&Complex> {
         self.array.get(bidx.into_idx())
     }
 }
 
-impl Table for DenseStateTable {
-    fn put(&mut self, bidx: BasisIdx64, weight: Complex) {
+impl<B: BasisIdx> Table<B> for DenseStateTable {
+    fn put(&mut self, bidx: B, weight: Complex) {
         let idx = bidx.into_idx();
 
         self.array[idx] += weight;

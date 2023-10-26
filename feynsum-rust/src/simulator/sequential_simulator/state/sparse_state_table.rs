@@ -1,17 +1,17 @@
 use std::collections::HashMap;
 
-use crate::types::{BasisIdx64, Complex};
+use crate::types::{BasisIdx, Complex};
 use crate::utility;
 
 use super::Table;
 
 #[derive(Debug)]
-pub struct SparseStateTable {
-    pub table: HashMap<BasisIdx64, Complex>,
+pub struct SparseStateTable<B: BasisIdx> {
+    pub table: HashMap<B, Complex>,
 }
 
-impl SparseStateTable {
-    pub fn singleton(bidx: BasisIdx64, weight: Complex) -> Self {
+impl<B: BasisIdx> SparseStateTable<B> {
+    pub fn singleton(bidx: B, weight: Complex) -> Self {
         Self {
             table: HashMap::from([(bidx, weight)]),
         }
@@ -30,13 +30,13 @@ impl SparseStateTable {
             .count()
     }
 
-    pub fn get(&self, bidx: &BasisIdx64) -> Option<&Complex> {
+    pub fn get(&self, bidx: &B) -> Option<&Complex> {
         self.table.get(bidx)
     }
 }
 
-impl Table for SparseStateTable {
-    fn put(&mut self, bidx: BasisIdx64, weight: Complex) {
+impl<B: BasisIdx> Table<B> for SparseStateTable<B> {
+    fn put(&mut self, bidx: B, weight: Complex) {
         self.table
             .entry(bidx)
             .and_modify(|w| *w += weight)

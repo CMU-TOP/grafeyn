@@ -2,20 +2,20 @@ use derivative::Derivative;
 use log::debug;
 
 use crate::{
-    types::{constants, BasisIdx64, Complex, QubitIndex, Real},
+    types::{constants, BasisIdx, Complex, QubitIndex, Real},
     utility,
 };
 
 #[derive(Debug)]
-pub enum PushApplyOutput {
-    Nonbranching(BasisIdx64, Complex),                     // bidx, weight
-    Branching((BasisIdx64, Complex), (BasisIdx64, Complex)), // (bidx, weight), (bidx, weight)
+pub enum PushApplyOutput<B: BasisIdx> {
+    Nonbranching(B, Complex),              // bidx, weight
+    Branching((B, Complex), (B, Complex)), // (bidx, weight), (bidx, weight)
 }
 
 #[derive(Debug)]
-pub enum PullApplyOutput {
-    Nonbranching(BasisIdx64, Complex), // neighbor, multiplier
-    Branching((BasisIdx64, Complex), (BasisIdx64, Complex)), // (neighbor, multiplier), (neighbor, multiplier)
+pub enum PullApplyOutput<B: BasisIdx> {
+    Nonbranching(B, Complex),              // neighbor, multiplier
+    Branching((B, Complex), (B, Complex)), // (neighbor, multiplier), (neighbor, multiplier)
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -101,22 +101,22 @@ pub enum GateDefn {
     },
 }
 
-pub trait PushApplicable {
-    fn push_apply(&self, bidx: BasisIdx64, weight: Complex) -> PushApplyOutput;
+pub trait PushApplicable<B: BasisIdx> {
+    fn push_apply(&self, bidx: B, weight: Complex) -> PushApplyOutput<B>;
 }
 
-type PullAction = Box<dyn Fn(BasisIdx64) -> PullApplyOutput + Send + Sync>;
+type PullAction<B> = Box<dyn Fn(B) -> PullApplyOutput<B> + Send + Sync>;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct Gate {
+pub struct Gate<B: BasisIdx> {
     defn: GateDefn,
     pub touches: Vec<QubitIndex>,
     #[derivative(Debug = "ignore")]
-    pub pull_action: Option<PullAction>,
+    pub pull_action: Option<PullAction<B>>,
 }
 
-impl Gate {
+impl<B: BasisIdx> Gate<B> {
     pub fn new(defn: GateDefn) -> Self {
         let touches = create_touches(&defn);
         let pull_action = create_pull_action(&defn, &touches);
@@ -177,7 +177,10 @@ fn create_touches(defn: &GateDefn) -> Vec<QubitIndex> {
     }
 }
 
-fn create_pull_action(defn: &GateDefn, touches: &[QubitIndex]) -> Option<PullAction> {
+fn create_pull_action<B: BasisIdx>(
+    defn: &GateDefn,
+    touches: &[QubitIndex],
+) -> Option<PullAction<B>> {
     match *defn {
         GateDefn::CCX { .. }
         | GateDefn::CPhase { .. }
@@ -338,7 +341,7 @@ fn create_pull_action(defn: &GateDefn, touches: &[QubitIndex]) -> Option<PullAct
 }
 
 impl GateDefn {
-    fn push_apply(&self, bidx: BasisIdx64, weight: Complex) -> PushApplyOutput {
+    fn push_apply<B: BasisIdx>(&self, bidx: B, weight: Complex) -> PushApplyOutput<B> {
         match *self {
             GateDefn::CCX {
                 control1,
@@ -617,15 +620,15 @@ impl GateDefn {
     }
 }
 
-fn single_qubit_unitary_push(
-    bidx: BasisIdx64,
+fn single_qubit_unitary_push<B: BasisIdx>(
+    bidx: B,
     weight: Complex,
     target: QubitIndex,
     a: Complex,
     b: Complex,
     c: Complex,
     d: Complex,
-) -> PushApplyOutput {
+) -> PushApplyOutput<B> {
     assert!(!(utility::is_zero(a) && utility::is_zero(b)));
     assert!(!(utility::is_zero(c) && utility::is_zero(d)));
 
@@ -652,14 +655,14 @@ fn single_qubit_unitary_push(
     }
 }
 
-fn single_qubit_unitary_pull(
-    bidx: BasisIdx64,
+fn single_qubit_unitary_pull<B: BasisIdx>(
+    bidx: B,
     target: QubitIndex,
     a: Complex,
     b: Complex,
     c: Complex,
     d: Complex,
-) -> PullApplyOutput {
+) -> PullApplyOutput<B> {
     assert!(!(utility::is_zero(a) && utility::is_zero(b)));
     assert!(!(utility::is_zero(c) && utility::is_zero(d)));
 
@@ -682,12 +685,12 @@ fn single_qubit_unitary_pull(
     }
 }
 
-fn push_to_pull(defn: &GateDefn, touches: &[QubitIndex]) -> Option<PullAction> {
+fn push_to_pull<B: BasisIdx>(defn: &GateDefn, touches: &[QubitIndex]) -> Option<PullAction<B>> {
     match (touches.len(), defn.branching_type()) {
         (1, BranchingType::Nonbranching) => {
             let qi = touches[0];
 
-            let (b0, m0) = match defn.push_apply(BasisIdx64::zeros(), Complex::new(1.0, 0.0)) {
+            let (b0, m0) = match defn.push_apply(B::zeros(), Complex::new(1.0, 0.0)) {
                 PushApplyOutput::Nonbranching(bidx, multiplier) => (bidx, multiplier),
                 _ => unreachable!(
                     "push_apply(BasisIdx64::zeros(), Complex::new(1.0,0.0)) must return Nonbranching"
@@ -695,12 +698,12 @@ fn push_to_pull(defn: &GateDefn, touches: &[QubitIndex]) -> Option<PullAction> {
             };
 
             let (_bidx2, m1) =
-                    match defn.push_apply(BasisIdx64::zeros().set(qi), Complex::new(1.0, 0.0)) {
+                    match defn.push_apply(B::zeros().set(qi), Complex::new(1.0, 0.0)) {
                         PushApplyOutput::Nonbranching(bidx, multiplier) => (bidx, multiplier),
                     _ => unreachable!("push_apply(BasisIdx64::zeros().set(qi), Complex::new(1.0,0.0)) must return Nonbranching"),
                     };
 
-            if b0 == BasisIdx64::zeros() {
+            if b0 == B::zeros() {
                 Some(Box::new(move |bidx| {
                     PullApplyOutput::Nonbranching(bidx, if bidx.get(qi) { m1 } else { m0 })
                 }))
@@ -714,10 +717,10 @@ fn push_to_pull(defn: &GateDefn, touches: &[QubitIndex]) -> Option<PullAction> {
             let qi = touches[0];
             let qj = touches[1];
 
-            let a00 = BasisIdx64::zeros();
-            let a01 = BasisIdx64::zeros().set(qj);
-            let a10 = BasisIdx64::zeros().set(qi);
-            let a11 = BasisIdx64::zeros().set(qi).set(qj);
+            let a00 = B::zeros();
+            let a01 = B::zeros().set(qj);
+            let a10 = B::zeros().set(qi);
+            let a11 = B::zeros().set(qi).set(qj);
 
             let (b00, m00) = match defn.push_apply(a00, Complex::new(1.0, 0.0)) {
                 PushApplyOutput::Nonbranching(bidx, multiplier) => (bidx, multiplier),
@@ -745,10 +748,10 @@ fn push_to_pull(defn: &GateDefn, touches: &[QubitIndex]) -> Option<PullAction> {
                     _ => unreachable!("push_apply(BasisIdx64::zeros().set(qi).set(qj), Complex::new(1.0,0.0)) must return Nonbranching"),
                 };
 
-            let apply_match = |left: bool, right: bool, bb: &BasisIdx64| -> bool {
+            let apply_match = |left: bool, right: bool, bb: &B| -> bool {
                 left == bb.get(qi) && right == bb.get(qj)
             };
-            let find = |left: bool, right: bool| -> (BasisIdx64, Complex) {
+            let find = |left: bool, right: bool| -> (B, Complex) {
                 if apply_match(left, right, &b00) {
                     (a00, m00)
                 } else if apply_match(left, right, &b01) {
@@ -767,7 +770,7 @@ fn push_to_pull(defn: &GateDefn, touches: &[QubitIndex]) -> Option<PullAction> {
             let (new_b10, new_m10) = find(true, false);
             let (new_b11, new_m11) = find(true, true);
 
-            let align_with = move |bb: &BasisIdx64, bidx: &BasisIdx64| -> BasisIdx64 {
+            let align_with = move |bb: &B, bidx: &B| -> B {
                 match (bb.get(qi), bb.get(qj)) {
                     (true, true) => bidx.set(qi).set(qj),
                     (true, false) => bidx.set(qi).unset(qj),
@@ -793,19 +796,15 @@ fn push_to_pull(defn: &GateDefn, touches: &[QubitIndex]) -> Option<PullAction> {
             let qi = touches[0];
 
             let PushApplyOutput::Branching((b00, m00), (b01, m01)) =
-                defn.push_apply(BasisIdx64::zeros(), Complex::new(1.0, 0.0))
+                defn.push_apply(B::zeros(), Complex::new(1.0, 0.0))
             else {
-                unreachable!(
-                    "push_apply(BasisIdx64::zeros(), Complex::new(1.0,0.0)) must return Branching"
-                )
+                unreachable!("push_apply(B::zeros(), Complex::new(1.0,0.0)) must return Branching")
             };
 
             let PushApplyOutput::Branching((b10, m10), (b11, m11)) =
-                defn.push_apply(BasisIdx64::zeros().set(qi), Complex::new(1.0, 0.0))
+                defn.push_apply(B::zeros().set(qi), Complex::new(1.0, 0.0))
             else {
-                unreachable!(
-                    "push_apply(BasisIdx64::zeros(), Complex::new(1.0,0.0)) must return Branching"
-                )
+                unreachable!("push_apply(B::zeros(), Complex::new(1.0,0.0)) must return Branching")
             };
 
             let ((b00, m00), (b01, m01)) = if b00.get(qi) {
@@ -838,8 +837,8 @@ fn push_to_pull(defn: &GateDefn, touches: &[QubitIndex]) -> Option<PullAction> {
     }
 }
 
-impl PushApplicable for Gate {
-    fn push_apply(&self, bidx: BasisIdx64, weight: Complex) -> PushApplyOutput {
+impl<B: BasisIdx> PushApplicable<B> for Gate<B> {
+    fn push_apply(&self, bidx: B, weight: Complex) -> PushApplyOutput<B> {
         self.defn.push_apply(bidx, weight)
     }
 }

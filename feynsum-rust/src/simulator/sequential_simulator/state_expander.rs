@@ -3,7 +3,7 @@ use std::fmt::{self, Display, Formatter};
 
 use crate::circuit::{Gate, PullApplyOutput, PushApplicable, PushApplyOutput};
 use crate::config::Config;
-use crate::types::{BasisIdx64, Complex, Real};
+use crate::types::{BasisIdx, Complex, Real};
 use crate::utility;
 
 use super::super::{Compactifiable, SimulatorError};
@@ -26,20 +26,20 @@ impl Display for ExpandMethod {
     }
 }
 
-pub struct ExpandResult {
-    pub state: State,
+pub struct ExpandResult<B: BasisIdx> {
+    pub state: State<B>,
     pub num_nonzeros: usize,
     pub num_gate_apps: usize,
     pub method: ExpandMethod,
 }
 
-pub fn expand(
-    gates: Vec<&Gate>,
+pub fn expand<B: BasisIdx>(
+    gates: Vec<&Gate<B>>,
     config: &Config,
     num_qubits: usize,
     prev_num_nonzeros: usize,
-    state: State,
-) -> Result<ExpandResult, SimulatorError> {
+    state: State<B>,
+) -> Result<ExpandResult<B>, SimulatorError> {
     let expected_cost = expected_cost(num_qubits, state.num_nonzeros(), prev_num_nonzeros);
 
     let all_gates_pullable = gates.iter().all(|gate| gate.is_pullable());
@@ -64,8 +64,11 @@ fn expected_cost(num_qubits: usize, num_nonzeros: usize, prev_num_nonzeros: usiz
     expected_density.max(current_density)
 }
 
-fn expand_sparse(gates: Vec<&Gate>, state: State) -> Result<ExpandResult, SimulatorError> {
-    let mut table = SparseStateTable::new();
+fn expand_sparse<B: BasisIdx>(
+    gates: Vec<&Gate<B>>,
+    state: State<B>,
+) -> Result<ExpandResult<B>, SimulatorError> {
+    let mut table = SparseStateTable::<B>::new();
 
     let num_gate_apps = state
         .compactify()
@@ -82,11 +85,11 @@ fn expand_sparse(gates: Vec<&Gate>, state: State) -> Result<ExpandResult, Simula
     })
 }
 
-fn expand_push_dense(
-    gates: Vec<&Gate>,
+fn expand_push_dense<B: BasisIdx>(
+    gates: Vec<&Gate<B>>,
     num_qubits: usize,
-    state: State,
-) -> Result<ExpandResult, SimulatorError> {
+    state: State<B>,
+) -> Result<ExpandResult<B>, SimulatorError> {
     let mut table = DenseStateTable::new(num_qubits);
 
     let num_gate_apps = state
@@ -104,18 +107,18 @@ fn expand_push_dense(
     })
 }
 
-fn expand_pull_dense(
-    gates: Vec<&Gate>,
+fn expand_pull_dense<B: BasisIdx>(
+    gates: Vec<&Gate<B>>,
     num_qubits: usize,
-    state: State,
-) -> Result<ExpandResult, SimulatorError> {
+    state: State<B>,
+) -> Result<ExpandResult<B>, SimulatorError> {
     let mut table = DenseStateTable::new(num_qubits);
 
     let capacity = 1 << num_qubits;
 
     let (num_gate_apps, num_nonzeros) =
         (0..capacity).try_fold((0, 0), |(num_gate_apps, num_nonzeros), idx| {
-            let bidx = BasisIdx64::from_idx(idx);
+            let bidx = B::from_idx(idx);
             let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, &bidx)?;
 
             let num_nonzeros_here = if utility::is_nonzero(weight) { 1 } else { 0 };
@@ -135,7 +138,12 @@ fn expand_pull_dense(
     })
 }
 
-fn apply_gates(gates: &[&Gate], table: &mut impl Table, bidx: BasisIdx64, weight: Complex) -> usize {
+fn apply_gates<B: BasisIdx>(
+    gates: &[&Gate<B>],
+    table: &mut impl Table<B>,
+    bidx: B,
+    weight: Complex,
+) -> usize {
     if utility::is_zero(weight) {
         return 0;
     }
@@ -156,10 +164,10 @@ fn apply_gates(gates: &[&Gate], table: &mut impl Table, bidx: BasisIdx64, weight
     }
 }
 
-fn apply_pull_gates(
-    gates: &[&Gate],
-    prev_state: &State,
-    bidx: &BasisIdx64,
+fn apply_pull_gates<B: BasisIdx>(
+    gates: &[&Gate<B>],
+    prev_state: &State<B>,
+    bidx: &B,
 ) -> Result<(Complex, usize), SimulatorError> {
     if gates.is_empty() {
         let weight = prev_state
