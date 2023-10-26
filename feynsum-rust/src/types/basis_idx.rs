@@ -2,6 +2,22 @@ use std::fmt::{self, Display, Formatter};
 
 pub const MAX_QUBITS: usize = 63;
 
+pub trait BasisIdx {
+    fn get(&self, qi: usize) -> bool;
+    fn flip(&self, qi: usize) -> Self;
+    fn zeros() -> Self;
+    fn set(&self, qi: usize) -> Self;
+    fn unset(&self, qi: usize) -> Self;
+    fn swap(&self, qi1: usize, qi2: usize) -> Self;
+    // TODO: Add more
+}
+
+// represents a type that is used to store a BasisIdx type in a concurrent data
+// structure.
+pub trait AtomicBasisIdx {
+    // TODO: Add methods
+}
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct BasisIdx64 {
     bits: u64,
