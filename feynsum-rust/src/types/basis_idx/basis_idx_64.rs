@@ -1,6 +1,6 @@
 use std::fmt::{self, Display, Formatter};
 use std::hash::Hash;
-use std::sync::atomic::AtomicU64;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::{AtomicBasisIdx, BasisIdx};
 
@@ -82,7 +82,29 @@ impl BasisIdx for BasisIdx64 {
     }
 }
 
-impl AtomicBasisIdx for AtomicU64 {}
+impl AtomicBasisIdx<BasisIdx64> for AtomicU64 {
+    fn empty_key() -> Self {
+        Self::new(BasisIdx64::empty_key().into_u64())
+    }
+
+    fn load(&self) -> BasisIdx64 {
+        BasisIdx64 {
+            bits: self.load(Ordering::Relaxed),
+        }
+    }
+
+    fn compare_exchange(&self, current: BasisIdx64, new: BasisIdx64) -> Result<BasisIdx64, ()> {
+        match self.compare_exchange(
+            current.into_u64(),
+            new.into_u64(),
+            Ordering::SeqCst,
+            Ordering::Acquire,
+        ) {
+            Ok(v) => Ok(BasisIdx64 { bits: v }),
+            Err(_) => Err(()),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

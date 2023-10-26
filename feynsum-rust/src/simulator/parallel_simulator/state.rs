@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 use std::sync::atomic::Ordering;
 
-use crate::types::{BasisIdx, Complex};
+use crate::types::{AtomicBasisIdx, BasisIdx, Complex};
 use crate::utility;
 
 mod dense_state_table;
@@ -15,8 +15,8 @@ pub use sparse_state_table::SparseStateTable;
 use super::super::Compactifiable;
 
 //#[derive(Debug)]
-pub enum State<B: BasisIdx> {
-    Sparse(SparseStateTable<B>),
+pub enum State<B: BasisIdx, AB: AtomicBasisIdx<B>> {
+    Sparse(SparseStateTable<B, AB>),
     Dense(DenseStateTable),
     // Used to avoid a compiler error that says B is not used.  Refer to
     // https://github.com/rust-lang/rust/issues/23246 for more details.
@@ -24,7 +24,7 @@ pub enum State<B: BasisIdx> {
     Never(Infallible, PhantomData<B>),
 }
 
-impl<B: BasisIdx> State<B> {
+impl<B: BasisIdx, AB: AtomicBasisIdx<B>> State<B, AB> {
     pub fn num_nonzeros(&self) -> usize {
         match self {
             State::Sparse(table) => table.num_nonzeros(),
@@ -42,7 +42,7 @@ impl<B: BasisIdx> State<B> {
     }
 }
 
-impl<B: BasisIdx> Compactifiable<B> for State<B> {
+impl<B: BasisIdx, AB: AtomicBasisIdx<B>> Compactifiable<B> for State<B, AB> {
     fn compactify(self) -> Box<dyn Iterator<Item = (B, Complex)>> {
         match self {
             State::Sparse(table) => Box::new(table.nonzeros().into_iter()),
