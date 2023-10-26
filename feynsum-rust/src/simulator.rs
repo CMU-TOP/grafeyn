@@ -1,10 +1,10 @@
 pub mod parallel_simulator;
 pub mod sequential_simulator;
 
-use crate::types::{BasisIdx64, Complex};
+use crate::types::{BasisIdx, Complex};
 
-pub trait Compactifiable {
-    fn compactify(self) -> Box<dyn Iterator<Item = (BasisIdx64, Complex)>>;
+pub trait Compactifiable<B: BasisIdx> {
+    fn compactify(self) -> Box<dyn Iterator<Item = (B, Complex)>>;
 }
 
 #[derive(Debug)]

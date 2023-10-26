@@ -1,15 +1,21 @@
 use std::fmt::{self, Display, Formatter};
+use std::hash::Hash;
+use std::sync::atomic::AtomicU64;
 
 pub const MAX_QUBITS: usize = 63;
 
-pub trait BasisIdx {
+pub trait BasisIdx: Eq + Hash + Sync + Send + Clone + Copy + 'static {
     fn get(&self, qi: usize) -> bool;
     fn flip(&self, qi: usize) -> Self;
     fn zeros() -> Self;
     fn set(&self, qi: usize) -> Self;
     fn unset(&self, qi: usize) -> Self;
     fn swap(&self, qi1: usize, qi2: usize) -> Self;
-    // TODO: Add more
+    fn from_idx(idx: usize) -> Self;
+    fn into_idx(self) -> usize;
+    fn into_u64(self) -> u64;
+    fn from_u64(u: u64) -> Self;
+    fn empty_key() -> Self;
 }
 
 // represents a type that is used to store a BasisIdx type in a concurrent data
@@ -17,6 +23,63 @@ pub trait BasisIdx {
 pub trait AtomicBasisIdx {
     // TODO: Add methods
 }
+
+impl BasisIdx for BasisIdx64 {
+    fn get(&self, qi: usize) -> bool {
+        self.bits & (1 << qi) != 0
+    }
+
+    fn flip(&self, qi: usize) -> Self {
+        BasisIdx64 {
+            bits: self.bits ^ (1 << qi),
+        }
+    }
+
+    fn zeros() -> Self {
+        Self { bits: 0 }
+    }
+
+    fn set(&self, qi: usize) -> Self {
+        Self {
+            bits: self.bits | (1 << qi),
+        }
+    }
+
+    fn unset(&self, qi: usize) -> Self {
+        Self {
+            bits: self.bits & !(1 << qi),
+        }
+    }
+
+    fn swap(&self, qi1: usize, qi2: usize) -> Self {
+        let tmp = ((self.bits >> qi1) ^ (self.bits >> qi2)) & 1;
+
+        Self {
+            bits: self.bits ^ (tmp << qi1) ^ (tmp << qi2),
+        }
+    }
+
+    fn from_idx(idx: usize) -> Self {
+        Self { bits: idx as u64 }
+    }
+
+    fn into_idx(self) -> usize {
+        self.bits as usize
+    }
+
+    fn into_u64(self) -> u64 {
+        self.bits
+    }
+
+    fn from_u64(u: u64) -> Self {
+        Self { bits: u }
+    }
+    fn empty_key() -> Self {
+        Self { bits: (1 << 63) }
+    }
+}
+
+impl AtomicBasisIdx for AtomicU64 {}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct BasisIdx64 {
@@ -33,63 +96,6 @@ impl Display for BasisIdx64 {
 }
 
 impl BasisIdx64 {
-    pub fn get(&self, qi: usize) -> bool {
-        self.bits & (1 << qi) != 0
-    }
-
-    pub const fn flip_unsafe(&self, qi: usize) -> Self {
-        BasisIdx64 {
-            bits: self.bits ^ (1 << qi),
-        }
-    }
-
-    pub fn flip(&self, qi: usize) -> Self {
-        BasisIdx64 {
-            bits: self.bits ^ (1 << qi),
-        }
-    }
-
-    pub fn zeros() -> Self {
-        Self { bits: 0 }
-    }
-
-    pub fn set(&self, qi: usize) -> Self {
-        Self {
-            bits: self.bits | (1 << qi),
-        }
-    }
-
-    pub fn unset(&self, qi: usize) -> Self {
-        Self {
-            bits: self.bits & !(1 << qi),
-        }
-    }
-
-    pub fn swap(&self, qi1: usize, qi2: usize) -> Self {
-        let tmp = ((self.bits >> qi1) ^ (self.bits >> qi2)) & 1;
-
-        Self {
-            bits: self.bits ^ (tmp << qi1) ^ (tmp << qi2),
-        }
-    }
-
-    // NOTE: DenseStateTable uses BasisIdx64 as an index into its array
-    pub fn into_idx(self) -> usize {
-        self.bits as usize
-    }
-
-    pub fn from_idx(idx: usize) -> Self {
-        Self { bits: idx as u64 }
-    }
-
-    pub fn into_u64(self) -> u64 {
-        self.bits
-    }
-
-    pub const fn from_u64(u: u64) -> Self {
-        Self { bits: u }
-    }
-
     #[cfg(test)]
     pub fn new(bits: &str) -> Self {
         Self {

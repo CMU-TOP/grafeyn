@@ -20,7 +20,7 @@ use config::Config;
 use fingerprint::Fingerprint;
 use options::Options;
 use simulator::Compactifiable;
-use types::{BasisIdx64, Complex};
+use types::{BasisIdx, BasisIdx64, Complex};
 
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
@@ -54,7 +54,7 @@ fn main() -> io::Result<()> {
     };
     info!("parse complete. starting circuit construction.");
 
-    let circuit = match Circuit::new(program) {
+    let circuit = match Circuit::<BasisIdx64>::new(program) {
         Ok(circuit) => circuit,
         Err(err) => {
             panic!("Failed to construct circuit: {:?}", err);
@@ -79,11 +79,11 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-fn run(
+fn run<B: BasisIdx>(
     parallelism: usize,
     config: Config,
-    circuit: Circuit,
-) -> Box<dyn Iterator<Item = (BasisIdx64, Complex)>> {
+    circuit: Circuit<B>,
+) -> Box<dyn Iterator<Item = (B, Complex)>> {
     if parallelism > 1 {
         info!("using parallel simulator");
         match simulator::parallel_simulator::run(&config, circuit) {

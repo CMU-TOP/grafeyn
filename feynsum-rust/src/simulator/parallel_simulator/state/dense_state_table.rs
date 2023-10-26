@@ -1,7 +1,7 @@
 use rayon::prelude::*;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::types::{BasisIdx64, Complex};
+use crate::types::{BasisIdx, Complex};
 use crate::utility;
 
 #[derive(Debug)]
@@ -32,7 +32,7 @@ impl DenseStateTable {
             })
             .count()
     }
-    pub fn atomic_put(&self, bidx: BasisIdx64, weight: Complex) {
+    pub fn atomic_put<B: BasisIdx>(&self, bidx: B, weight: Complex) {
         // FIXME: We can use `put` method instead of `atomic_put` method if we
         // change the signature of `put` method from `&mut self` to &self
         let idx = bidx.into_idx();
@@ -40,7 +40,7 @@ impl DenseStateTable {
         atomic_put(&self.array[idx], weight);
     }
 
-    pub fn get(&self, bidx: &BasisIdx64) -> Option<Complex> {
+    pub fn get<B: BasisIdx>(&self, bidx: &B) -> Option<Complex> {
         self.array
             .get(bidx.into_idx())
             .map(|v| utility::unpack_complex(v.load(Ordering::Relaxed)))

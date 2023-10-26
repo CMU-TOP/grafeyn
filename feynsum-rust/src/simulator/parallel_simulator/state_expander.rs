@@ -6,7 +6,7 @@ use rayon::prelude::*;
 
 use crate::circuit::{Gate, PullApplyOutput, PushApplicable, PushApplyOutput};
 use crate::config::Config;
-use crate::types::{BasisIdx64, Complex, Real};
+use crate::types::{BasisIdx, Complex, Real};
 use crate::utility;
 
 use super::state::{DenseStateTable, SparseStateTable, SparseStateTableInsertion, State};
@@ -27,20 +27,20 @@ impl Display for ExpandMethod {
     }
 }
 
-pub struct ExpandResult {
-    pub state: State,
+pub struct ExpandResult<B: BasisIdx> {
+    pub state: State<B>,
     pub num_nonzeros: usize,
     pub num_gate_apps: usize,
     pub method: ExpandMethod,
 }
 
-pub fn expand(
-    gates: Vec<&Gate>,
+pub fn expand<B: BasisIdx>(
+    gates: Vec<&Gate<B>>,
     config: &Config,
     num_qubits: usize,
     prev_num_nonzeros: usize,
-    state: State,
-) -> ExpandResult {
+    state: State<B>,
+) -> ExpandResult<B> {
     let (expected_cost, expected) =
         expected_cost(num_qubits, state.num_nonzeros(), prev_num_nonzeros);
 
@@ -66,9 +66,9 @@ fn expected_cost(num_qubits: usize, num_nonzeros: usize, prev_num_nonzeros: usiz
     (Real::max(expected_density, current_density), expected)
 }
 
-fn try_put(
-    table: &SparseStateTable,
-    bidx: BasisIdx64,
+fn try_put<B: BasisIdx>(
+    table: &SparseStateTable<B>,
+    bidx: B,
     weight: Complex,
     maxload: Real,
 ) -> SparseStateTableInsertion {
@@ -79,21 +79,21 @@ fn try_put(
     table.insert_add_weights_limit_probes(tolerance, bidx, weight)
 }
 
-pub enum SuccessorsResult {
+pub enum SuccessorsResult<B: BasisIdx> {
     AllSucceeded,
-    SomeFailed(Vec<(BasisIdx64, Complex, usize)>),
+    SomeFailed(Vec<(B, Complex, usize)>),
 }
 
-fn apply_gates1(
+fn apply_gates1<B: BasisIdx>(
     gatenum: usize,
-    gates: &[&Gate],
-    table: &SparseStateTable,
-    bidx: BasisIdx64,
+    gates: &[&Gate<B>],
+    table: &SparseStateTable<B>,
+    bidx: B,
     weight: Complex,
     full: &AtomicBool,
     apps: usize,
     maxload: Real,
-) -> (usize, SuccessorsResult) {
+) -> (usize, SuccessorsResult<B>) {
     if utility::is_zero(weight) {
         return (apps, SuccessorsResult::AllSucceeded);
     }
@@ -142,18 +142,18 @@ fn apply_gates1(
     }
 }
 
-fn apply_gates2(
+fn apply_gates2<B: BasisIdx>(
     gatenum: usize,
-    gates: &[&Gate],
-    table: &SparseStateTable,
-    bidx1: BasisIdx64,
+    gates: &[&Gate<B>],
+    table: &SparseStateTable<B>,
+    bidx1: B,
     weight1: Complex,
-    bidx2: BasisIdx64,
+    bidx2: B,
     weight2: Complex,
     full: &AtomicBool,
     apps: usize,
     maxload: Real,
-) -> (usize, SuccessorsResult) {
+) -> (usize, SuccessorsResult<B>) {
     match apply_gates1(gatenum, gates, table, bidx1, weight1, full, apps, maxload) {
         (apps, SuccessorsResult::AllSucceeded) => {
             apply_gates1(gatenum, gates, table, bidx2, weight2, full, apps, maxload)
@@ -166,26 +166,27 @@ fn apply_gates2(
     }
 }
 
-fn expand_sparse2(
-    gates: Vec<&Gate>,
+fn expand_sparse2<B: BasisIdx>(
+    gates: Vec<&Gate<B>>,
     config: &Config,
     expected: i64,
-    state: &State,
-) -> ExpandResult {
+    state: &State<B>,
+) -> ExpandResult<B> {
     let mut table = SparseStateTable::new(config.maxload, expected);
     let n: usize = match state {
         State::Sparse(prev_table) => prev_table.num_nonzeros(),
         State::Dense(prev_table) => prev_table.capacity(),
+        State::Never(_, _) => unreachable!(),
     };
     let block_size = std::cmp::max(100, std::cmp::min(n / 1000, config.block_size));
     let num_blocks = (n as f64 / block_size as f64).ceil() as usize;
     let block_start = |b: usize| block_size * b;
     let block_stop = |b: usize| std::cmp::min(n, block_size + block_start(b));
-    let mut blocks: Vec<(usize, usize, Vec<(BasisIdx64, Complex, usize)>)> = (0..num_blocks)
+    let mut blocks: Vec<(usize, usize, Vec<(B, Complex, usize)>)> = (0..num_blocks)
         .into_par_iter()
         .map(|b| (b, block_start(b), vec![]))
         .collect();
-    let get: Box<dyn Fn(usize) -> (BasisIdx64, Complex) + Sync> = match state {
+    let get: Box<dyn Fn(usize) -> (B, Complex) + Sync> = match state {
         State::Sparse(prev_table) => {
             let nonzeros = prev_table.nonzeros();
             Box::new(move |i: usize| nonzeros[i])
@@ -193,8 +194,9 @@ fn expand_sparse2(
         State::Dense(prev_table) => Box::new(|i: usize| {
             let v = prev_table.array[i].load(Ordering::Relaxed);
             let weight = utility::unpack_complex(v);
-            (BasisIdx64::from_idx(i), weight)
+            (B::from_idx(i), weight)
         }),
+        State::Never(_, _) => unreachable!(),
     };
 
     while !blocks.is_empty() {
@@ -274,7 +276,11 @@ fn expand_sparse2(
     }
 }
 
-fn expand_push_dense(gates: Vec<&Gate>, num_qubits: usize, state: State) -> ExpandResult {
+fn expand_push_dense<B: BasisIdx>(
+    gates: Vec<&Gate<B>>,
+    num_qubits: usize,
+    state: State<B>,
+) -> ExpandResult<B> {
     let table = DenseStateTable::new(num_qubits);
 
     let num_gate_apps = match state {
@@ -291,9 +297,10 @@ fn expand_push_dense(gates: Vec<&Gate>, num_qubits: usize, state: State) -> Expa
             .enumerate()
             .map(|(idx, v)| {
                 let weight = utility::unpack_complex(v.load(Ordering::Relaxed));
-                apply_gates(&gates, &table, BasisIdx64::from_idx(idx), weight)
+                apply_gates(&gates, &table, B::from_idx(idx), weight)
             })
             .sum(),
+        State::Never(_, _) => unreachable!(),
     };
 
     let num_nonzeros = table.num_nonzeros();
@@ -306,7 +313,11 @@ fn expand_push_dense(gates: Vec<&Gate>, num_qubits: usize, state: State) -> Expa
     }
 }
 
-fn expand_pull_dense(gates: Vec<&Gate>, num_qubits: usize, state: State) -> ExpandResult {
+fn expand_pull_dense<B: BasisIdx>(
+    gates: Vec<&Gate<B>>,
+    num_qubits: usize,
+    state: State<B>,
+) -> ExpandResult<B> {
     let table = DenseStateTable::new(num_qubits);
     let capacity = 1 << num_qubits;
 
@@ -315,7 +326,7 @@ fn expand_pull_dense(gates: Vec<&Gate>, num_qubits: usize, state: State) -> Expa
         .fold(
             || (0, 0),
             |acc, idx| {
-                let bidx = BasisIdx64::from_idx(idx);
+                let bidx = B::from_idx(idx);
                 let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, bidx);
                 table.atomic_put(bidx, weight);
                 (
@@ -334,10 +345,10 @@ fn expand_pull_dense(gates: Vec<&Gate>, num_qubits: usize, state: State) -> Expa
     }
 }
 
-fn apply_gates(
-    gates: &[&Gate],
+fn apply_gates<B: BasisIdx>(
+    gates: &[&Gate<B>],
     table: &DenseStateTable,
-    bidx: BasisIdx64,
+    bidx: B,
     weight: Complex,
 ) -> usize {
     if utility::is_zero(weight) {
@@ -360,7 +371,11 @@ fn apply_gates(
     }
 }
 
-fn apply_pull_gates(gates: &[&Gate], prev_state: &State, bidx: BasisIdx64) -> (Complex, usize) {
+fn apply_pull_gates<B: BasisIdx>(
+    gates: &[&Gate<B>],
+    prev_state: &State<B>,
+    bidx: B,
+) -> (Complex, usize) {
     if gates.is_empty() {
         let weight = prev_state.get(&bidx).unwrap_or(Complex::new(0.0, 0.0));
         return (weight, 0);
