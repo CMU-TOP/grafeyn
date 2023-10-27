@@ -23,6 +23,7 @@ pub fn run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
 
     let mut num_gates_visited = 0;
     let mut state = State::Sparse(SparseStateTable::singleton(
+        num_qubits,
         B::zeros(),
         Complex::new(1.0, 0.0),
         config.maxload,

@@ -74,10 +74,10 @@ impl BasisIdx for BasisIdxUnlimited {
         unimplemented!("push/pull dense should never be called")
     }
 
-    fn empty_key() -> Self {
-        Self {
-            bits: BitVec::new(), // FIXME
-        }
+    fn empty_key(num_qubits: usize) -> Self {
+        let mut bits = BitVec::from_elem(num_qubits + 1, false);
+        bits.set(num_qubits, true);
+        Self { bits }
     }
 
     fn into_bytes(&self) -> Vec<u8> {
@@ -92,8 +92,8 @@ fn resize_if_needed(bits: &mut BitVec, qi: usize) {
 }
 
 impl AtomicBasisIdx<BasisIdxUnlimited> for RwLock<BasisIdxUnlimited> {
-    fn empty_key() -> Self {
-        RwLock::new(BasisIdxUnlimited::empty_key())
+    fn empty_key(num_qubits: usize) -> Self {
+        RwLock::new(BasisIdxUnlimited::empty_key(num_qubits))
     }
 
     fn load(&self) -> BasisIdxUnlimited {

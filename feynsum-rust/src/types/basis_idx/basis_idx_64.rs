@@ -70,7 +70,7 @@ impl BasisIdx for BasisIdx64 {
         self.bits as usize
     }
 
-    fn empty_key() -> Self {
+    fn empty_key(_num_qubits: usize) -> Self {
         Self { bits: (1 << 63) }
     }
 
@@ -80,8 +80,8 @@ impl BasisIdx for BasisIdx64 {
 }
 
 impl AtomicBasisIdx<BasisIdx64> for AtomicU64 {
-    fn empty_key() -> Self {
-        Self::new(BasisIdx64::empty_key().into_u64())
+    fn empty_key(num_qubits: usize) -> Self {
+        Self::new(BasisIdx64::empty_key(num_qubits).into_u64())
     }
 
     fn load(&self) -> BasisIdx64 {

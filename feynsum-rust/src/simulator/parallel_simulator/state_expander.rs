@@ -49,7 +49,7 @@ pub fn expand<B: BasisIdx, AB: AtomicBasisIdx<B>>(
     assert!(config.dense_threshold <= config.pull_threshold);
 
     if expected_cost < config.dense_threshold {
-        expand_sparse(gates, config, expected, &state)
+        expand_sparse(gates, num_qubits, config, expected, &state)
     } else if expected_cost >= config.pull_threshold && all_gates_pullable {
         expand_pull_dense(gates, num_qubits, state)
     } else {
@@ -168,16 +168,18 @@ fn apply_gates2<B: BasisIdx, AB: AtomicBasisIdx<B>>(
 
 fn expand_sparse<B: BasisIdx, AB: AtomicBasisIdx<B>>(
     gates: Vec<&Gate<B>>,
+    num_qubits: usize,
     config: &Config,
     expected: i64,
     state: &State<B, AB>,
 ) -> ExpandResult<B, AB> {
-    let mut table = SparseStateTable::new(config.maxload, expected);
+    let mut table = SparseStateTable::new(num_qubits, config.maxload, expected);
     let n: usize = match state {
         State::Sparse(prev_table) => prev_table.num_nonzeros(),
         State::Dense(prev_table) => prev_table.capacity(),
         State::Never(_, _) => unreachable!(),
     };
+    println!("n: {}", n);
     let block_size = std::cmp::max(100, std::cmp::min(n / 1000, config.block_size));
     let num_blocks = (n as f64 / block_size as f64).ceil() as usize;
     let block_start = |b: usize| block_size * b;

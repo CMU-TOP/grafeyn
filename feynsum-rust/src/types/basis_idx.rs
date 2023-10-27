@@ -15,7 +15,7 @@ pub trait BasisIdx: Eq + Hash + Sync + Send + Clone + 'static + Display {
     fn swap(&self, qi1: usize, qi2: usize) -> Self;
     fn from_idx(idx: usize) -> Self;
     fn into_idx(&self) -> usize;
-    fn empty_key() -> Self;
+    fn empty_key(num_qubits: usize) -> Self;
     fn into_bytes(&self) -> Vec<u8>;
 }
 
@@ -23,7 +23,7 @@ pub trait BasisIdx: Eq + Hash + Sync + Send + Clone + 'static + Display {
 // structure.
 pub trait AtomicBasisIdx<B: BasisIdx>: Sync + Send {
     // TODO: Add methods
-    fn empty_key() -> Self;
+    fn empty_key(num_qubits: usize) -> Self;
     fn load(&self) -> B;
     fn compare_exchange(&self, current: B, new: B) -> Result<B, ()>;
 }

@@ -1,7 +1,6 @@
 use rayon::prelude::*;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use std::marker::PhantomData;
 
 use crate::types::{AtomicBasisIdx, AtomicComplex, AtomicReal, BasisIdx, Complex, Real};
 use crate::utility;
@@ -19,14 +18,15 @@ fn calculate_hash<T: Hash>(t: &T) -> u64 {
 pub struct SparseStateTable<B: BasisIdx, AB: AtomicBasisIdx<B>> {
     pub keys: Vec<AB>,
     pub weights: Vec<AtomicComplex>,
-    _mark: PhantomData<B>,
+    num_qubits: usize,
+    empty_key: B,
 }
 
 impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
-    fn new_with_capacity(capacity: usize) -> Self {
+    fn new_with_capacity(num_qubits: usize, capacity: usize) -> Self {
         let keys: Vec<AB> = (0..capacity)
             .into_par_iter()
-            .map(|_i| AB::empty_key())
+            .map(|_i| AB::empty_key(num_qubits))
             .collect();
         let weights: Vec<AtomicComplex> = (0..capacity)
             .into_par_iter()
@@ -35,16 +35,24 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
         Self {
             keys,
             weights,
-            _mark: Default::default(),
+            num_qubits,
+            empty_key: B::empty_key(num_qubits),
         }
     }
-    pub fn new(maxload: Real, expected: i64) -> Self {
+    pub fn new(num_qubits: usize, maxload: Real, expected: i64) -> Self {
         let capacity = (1.1 * (1.0 / maxload) * (expected as Real)).ceil() as usize;
-        Self::new_with_capacity(capacity)
+        Self::new_with_capacity(num_qubits, capacity)
     }
-    pub fn singleton(bidx: B, weight: Complex, maxload: Real, expected: i64) -> Self {
-        let t = SparseStateTable::new(maxload, expected);
+    pub fn singleton(
+        num_qubits: usize,
+        bidx: B,
+        weight: Complex,
+        maxload: Real,
+        expected: i64,
+    ) -> Self {
+        let t = SparseStateTable::new(num_qubits, maxload, expected);
         t.force_insert_unique(bidx, weight);
+        println!("singleton nonzeros: {}", t.num_nonzeros());
         t
     }
     pub fn capacity(&self) -> usize {
@@ -56,7 +64,7 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
             .enumerate()
             .filter(|&(i, k)| {
                 let k = k.load();
-                k != B::empty_key() && utility::is_nonzero(self.get_value_at(i))
+                k != self.empty_key && utility::is_nonzero(self.get_value_at(i))
             })
             .count()
     }
@@ -86,7 +94,7 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
                 continue;
             }
             let k = self.keys[i].load();
-            if k == B::empty_key() && self.keys[i].compare_exchange(k.clone(), y.clone()).is_ok() {
+            if k == self.empty_key && self.keys[i].compare_exchange(k.clone(), y.clone()).is_ok() {
                 self.put_value_at_nonatomic(i, v);
                 break;
             }
@@ -114,7 +122,7 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
                 continue;
             }
             let k = self.keys[i].load();
-            if k == B::empty_key() {
+            if k == self.empty_key {
                 match self.keys[i].compare_exchange(k, y.clone()) {
                     Ok(_) => {
                         self.put_value_at(i, v);
@@ -138,7 +146,7 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
         let y = x;
         loop {
             let k = self.keys[i].load();
-            if k == B::empty_key() {
+            if k == self.empty_key {
                 return None;
             } else if k == *y {
                 return Some(self.get_value_at(i));
@@ -149,7 +157,7 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
     }
     pub fn increase_capacity_by_factor(&self, alpha: f32) -> Self {
         let new_capacity = (alpha * self.keys.len() as f32).ceil() as usize;
-        let new_table = Self::new_with_capacity(new_capacity);
+        let new_table = Self::new_with_capacity(self.num_qubits, new_capacity);
         self.keys
             .par_iter()
             .zip(self.weights.par_iter())
@@ -169,7 +177,7 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
                 let weight = self.get_value_at(i);
                 (bidx, weight)
             })
-            .filter(|(bidx, weight)| bidx != &B::empty_key() && utility::is_nonzero(*weight))
+            .filter(|(bidx, weight)| bidx != &self.empty_key && utility::is_nonzero(*weight))
             .collect()
     }
 }
