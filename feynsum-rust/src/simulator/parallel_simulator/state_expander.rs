@@ -49,7 +49,7 @@ pub fn expand<B: BasisIdx, AB: AtomicBasisIdx<B>>(
     assert!(config.dense_threshold <= config.pull_threshold);
 
     if expected_cost < config.dense_threshold {
-        expand_sparse2(gates, config, expected, &state)
+        expand_sparse(gates, config, expected, &state)
     } else if expected_cost >= config.pull_threshold && all_gates_pullable {
         expand_pull_dense(gates, num_qubits, state)
     } else {
@@ -166,7 +166,7 @@ fn apply_gates2<B: BasisIdx, AB: AtomicBasisIdx<B>>(
     }
 }
 
-fn expand_sparse2<B: BasisIdx, AB: AtomicBasisIdx<B>>(
+fn expand_sparse<B: BasisIdx, AB: AtomicBasisIdx<B>>(
     gates: Vec<&Gate<B>>,
     config: &Config,
     expected: i64,
