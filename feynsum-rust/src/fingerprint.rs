@@ -16,7 +16,7 @@ impl<B: BasisIdx> PartialOrd for Entry<B> {
         } else if self.1.norm() > other.1.norm() {
             Some(Ordering::Greater)
         } else {
-            self.0.into_u64().partial_cmp(&other.0.into_u64())
+            self.0.into_bytes().partial_cmp(&other.0.into_bytes())
         }
     }
 }
@@ -28,7 +28,7 @@ impl<B: BasisIdx> Ord for Entry<B> {
         } else if self.1.norm() > other.1.norm() {
             Ordering::Greater
         } else {
-            other.0.into_u64().cmp(&self.0.into_u64())
+            other.0.into_bytes().cmp(&self.0.into_bytes())
         }
     }
 }
@@ -59,6 +59,6 @@ impl<B: BasisIdx> Fingerprint<B> {
         self.entries
             .iter()
             .rev()
-            .map(|Entry(bidx, weight)| (*bidx, *weight))
+            .map(|Entry(bidx, weight)| (bidx.clone(), *weight))
     }
 }

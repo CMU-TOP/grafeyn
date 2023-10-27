@@ -99,7 +99,7 @@ fn apply_gates1<B: BasisIdx, AB: AtomicBasisIdx<B>>(
     }
     if gatenum >= gates.len() {
         if !full.load(Ordering::Relaxed) {
-            match try_put(table, bidx, weight, maxload) {
+            match try_put(table, bidx.clone(), weight, maxload) {
                 SparseStateTableInsertion::Success => {
                     return (apps, SuccessorsResult::AllSucceeded)
                 }
@@ -189,7 +189,7 @@ fn expand_sparse2<B: BasisIdx, AB: AtomicBasisIdx<B>>(
     let get: Box<dyn Fn(usize) -> (B, Complex) + Sync> = match state {
         State::Sparse(prev_table) => {
             let nonzeros = prev_table.nonzeros();
-            Box::new(move |i: usize| nonzeros[i])
+            Box::new(move |i: usize| nonzeros[i].clone())
         }
         State::Dense(prev_table) => Box::new(|i: usize| {
             let v = prev_table.array[i].load(Ordering::Relaxed);
@@ -327,7 +327,7 @@ fn expand_pull_dense<B: BasisIdx, AB: AtomicBasisIdx<B>>(
             || (0, 0),
             |acc, idx| {
                 let bidx = B::from_idx(idx);
-                let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, bidx);
+                let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, bidx.clone());
                 table.atomic_put(bidx, weight);
                 (
                     acc.0 + num_gate_apps_here,
