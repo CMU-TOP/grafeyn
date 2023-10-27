@@ -1,27 +1,20 @@
 mod state;
 mod state_expander;
 
-use log::{debug, error, info};
+use log::{debug, info};
 
 use crate::circuit::Circuit;
 use crate::config::Config;
 use crate::gate_scheduler;
 use crate::profile;
-use crate::types::basis_idx::MAX_QUBITS;
 use crate::types::{BasisIdx, Complex, Real};
 
-use super::SimulatorError;
 use state::{SparseStateTable, State};
 use state_expander::ExpandResult;
 
-pub fn run<B: BasisIdx>(config: &Config, circuit: Circuit<B>) -> Result<State<B>, SimulatorError> {
+pub fn run<B: BasisIdx>(config: &Config, circuit: Circuit<B>) -> State<B> {
     let num_gates = circuit.num_gates();
     let num_qubits = circuit.num_qubits;
-
-    if num_qubits > MAX_QUBITS {
-        error!("Too many qubits: {}", num_qubits);
-        return Err(SimulatorError::TooManyQubits);
-    }
 
     let mut num_gates_visited = 0;
     let mut state = State::Sparse(SparseStateTable::singleton(
@@ -82,7 +75,7 @@ pub fn run<B: BasisIdx>(config: &Config, circuit: Circuit<B>) -> Result<State<B>
             num_qubits,
             prev_num_nonzeros,
             state
-        )?);
+        ));
 
         let density = {
             let max_num_states: u64 = 1 << num_qubits;
@@ -124,7 +117,7 @@ pub fn run<B: BasisIdx>(config: &Config, circuit: Circuit<B>) -> Result<State<B>
     );
 
     assert!(num_gates_visited >= num_gates);
-    Ok(state)
+    state
 }
 
 #[cfg(test)]
@@ -231,7 +224,7 @@ h q0[28];
         )
         .unwrap();
 
-        let state = run::<BasisIdx64>(&config, circuit).unwrap();
+        let state = run::<BasisIdx64>(&config, circuit);
 
         println!("{:?}", state);
 

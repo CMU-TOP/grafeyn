@@ -86,7 +86,7 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
                 continue;
             }
             let k = self.keys[i].load();
-            if k == B::empty_key() && self.keys[i].compare_exchange(k, y).is_ok() {
+            if k == B::empty_key() && self.keys[i].compare_exchange(k.clone(), y.clone()).is_ok() {
                 self.put_value_at_nonatomic(i, v);
                 break;
             }
@@ -115,7 +115,7 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
             }
             let k = self.keys[i].load();
             if k == B::empty_key() {
-                match self.keys[i].compare_exchange(k, y) {
+                match self.keys[i].compare_exchange(k, y.clone()) {
                     Ok(_) => {
                         self.put_value_at(i, v);
                         break;

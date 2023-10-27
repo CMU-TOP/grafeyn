@@ -6,7 +6,7 @@ use crate::config::Config;
 use crate::types::{BasisIdx, Complex, Real};
 use crate::utility;
 
-use super::super::{Compactifiable, SimulatorError};
+use super::super::Compactifiable;
 use super::state::{DenseStateTable, SparseStateTable, State, Table};
 
 pub enum ExpandMethod {
@@ -39,7 +39,7 @@ pub fn expand<B: BasisIdx>(
     num_qubits: usize,
     prev_num_nonzeros: usize,
     state: State<B>,
-) -> Result<ExpandResult<B>, SimulatorError> {
+) -> ExpandResult<B> {
     let expected_cost = expected_cost(num_qubits, state.num_nonzeros(), prev_num_nonzeros);
 
     let all_gates_pullable = gates.iter().all(|gate| gate.is_pullable());
@@ -64,10 +64,7 @@ fn expected_cost(num_qubits: usize, num_nonzeros: usize, prev_num_nonzeros: usiz
     expected_density.max(current_density)
 }
 
-fn expand_sparse<B: BasisIdx>(
-    gates: Vec<&Gate<B>>,
-    state: State<B>,
-) -> Result<ExpandResult<B>, SimulatorError> {
+fn expand_sparse<B: BasisIdx>(gates: Vec<&Gate<B>>, state: State<B>) -> ExpandResult<B> {
     let mut table = SparseStateTable::<B>::new();
 
     let num_gate_apps = state
@@ -77,19 +74,19 @@ fn expand_sparse<B: BasisIdx>(
 
     let num_nonzeros = table.num_nonzeros();
 
-    Ok(ExpandResult {
+    ExpandResult {
         state: State::Sparse(table),
         num_nonzeros,
         num_gate_apps,
         method: ExpandMethod::Sparse,
-    })
+    }
 }
 
 fn expand_push_dense<B: BasisIdx>(
     gates: Vec<&Gate<B>>,
     num_qubits: usize,
     state: State<B>,
-) -> Result<ExpandResult<B>, SimulatorError> {
+) -> ExpandResult<B> {
     let mut table = DenseStateTable::new(num_qubits);
 
     let num_gate_apps = state
@@ -99,43 +96,43 @@ fn expand_push_dense<B: BasisIdx>(
 
     let num_nonzeros = table.num_nonzeros();
 
-    Ok(ExpandResult {
+    ExpandResult {
         state: State::Dense(table),
         num_nonzeros,
         num_gate_apps,
         method: ExpandMethod::PushDense,
-    })
+    }
 }
 
 fn expand_pull_dense<B: BasisIdx>(
     gates: Vec<&Gate<B>>,
     num_qubits: usize,
     state: State<B>,
-) -> Result<ExpandResult<B>, SimulatorError> {
+) -> ExpandResult<B> {
     let mut table = DenseStateTable::new(num_qubits);
 
     let capacity = 1 << num_qubits;
 
     let (num_gate_apps, num_nonzeros) =
-        (0..capacity).try_fold((0, 0), |(num_gate_apps, num_nonzeros), idx| {
+        (0..capacity).fold((0, 0), |(num_gate_apps, num_nonzeros), idx| {
             let bidx = B::from_idx(idx);
-            let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, &bidx)?;
+            let (weight, num_gate_apps_here) = apply_pull_gates(&gates, &state, &bidx);
 
             let num_nonzeros_here = if utility::is_nonzero(weight) { 1 } else { 0 };
             table.put(bidx, weight);
 
-            Ok::<(usize, usize), SimulatorError>((
+            (
                 num_gate_apps + num_gate_apps_here,
                 num_nonzeros + num_nonzeros_here,
-            ))
-        })?;
+            )
+        });
 
-    Ok(ExpandResult {
+    ExpandResult {
         state: State::Dense(table),
         num_nonzeros,
         num_gate_apps,
         method: ExpandMethod::PullDense,
-    })
+    }
 }
 
 fn apply_gates<B: BasisIdx>(
@@ -168,28 +165,28 @@ fn apply_pull_gates<B: BasisIdx>(
     gates: &[&Gate<B>],
     prev_state: &State<B>,
     bidx: &B,
-) -> Result<(Complex, usize), SimulatorError> {
+) -> (Complex, usize) {
     if gates.is_empty() {
         let weight = prev_state
             .get(bidx)
             .map_or(Complex::new(0.0, 0.0), Clone::clone);
-        return Ok((weight, 0));
+        return (weight, 0);
     }
 
-    match gates[0].pull_action.as_ref().unwrap()(*bidx) {
+    match gates[0].pull_action.as_ref().unwrap()(bidx.clone()) {
         // FIXME: No clone
         PullApplyOutput::Nonbranching(neighbor, multiplier) => {
-            let (weight, num_gate_apps) = apply_pull_gates(&gates[1..], prev_state, &neighbor)?;
-            Ok((weight * multiplier, 1 + num_gate_apps))
+            let (weight, num_gate_apps) = apply_pull_gates(&gates[1..], prev_state, &neighbor);
+            (weight * multiplier, 1 + num_gate_apps)
         }
         PullApplyOutput::Branching((neighbor1, multiplier1), (neighbor2, multiplier2)) => {
-            let (weight1, num_gate_apps_1) = apply_pull_gates(&gates[1..], prev_state, &neighbor1)?;
-            let (weight2, num_gate_apps_2) = apply_pull_gates(&gates[1..], prev_state, &neighbor2)?;
+            let (weight1, num_gate_apps_1) = apply_pull_gates(&gates[1..], prev_state, &neighbor1);
+            let (weight2, num_gate_apps_2) = apply_pull_gates(&gates[1..], prev_state, &neighbor2);
 
-            Ok((
+            (
                 weight1 * multiplier1 + weight2 * multiplier2,
                 1 + num_gate_apps_1 + num_gate_apps_2,
-            ))
+            )
         }
     }
 }

@@ -66,19 +66,16 @@ impl BasisIdx for BasisIdx64 {
         Self { bits: idx as u64 }
     }
 
-    fn into_idx(self) -> usize {
+    fn into_idx(&self) -> usize {
         self.bits as usize
     }
 
-    fn into_u64(self) -> u64 {
-        self.bits
-    }
-
-    fn from_u64(u: u64) -> Self {
-        Self { bits: u }
-    }
     fn empty_key() -> Self {
         Self { bits: (1 << 63) }
+    }
+
+    fn into_bytes(&self) -> Vec<u8> {
+        self.bits.to_be_bytes().to_vec()
     }
 }
 
@@ -103,6 +100,12 @@ impl AtomicBasisIdx<BasisIdx64> for AtomicU64 {
             Ok(v) => Ok(BasisIdx64 { bits: v }),
             Err(_) => Err(()),
         }
+    }
+}
+
+impl BasisIdx64 {
+    fn into_u64(self) -> u64 {
+        self.bits
     }
 }
 

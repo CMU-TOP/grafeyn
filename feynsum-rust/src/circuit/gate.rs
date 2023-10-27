@@ -705,7 +705,7 @@ fn push_to_pull<B: BasisIdx>(defn: &GateDefn, touches: &[QubitIndex]) -> Option<
 
             if b0 == B::zeros() {
                 Some(Box::new(move |bidx| {
-                    PullApplyOutput::Nonbranching(bidx, if bidx.get(qi) { m1 } else { m0 })
+                    PullApplyOutput::Nonbranching(bidx.clone(), if bidx.get(qi) { m1 } else { m0 })
                 }))
             } else {
                 Some(Box::new(move |bidx| {
@@ -722,7 +722,7 @@ fn push_to_pull<B: BasisIdx>(defn: &GateDefn, touches: &[QubitIndex]) -> Option<
             let a10 = B::zeros().set(qi);
             let a11 = B::zeros().set(qi).set(qj);
 
-            let (b00, m00) = match defn.push_apply(a00, Complex::new(1.0, 0.0)) {
+            let (b00, m00) = match defn.push_apply(a00.clone(), Complex::new(1.0, 0.0)) {
                 PushApplyOutput::Nonbranching(bidx, multiplier) => (bidx, multiplier),
                 _ => unreachable!(
                     "push_apply(BasisIdx64::zeros(), Complex::new(1.0,0.0)) must return Nonbranching"
@@ -730,19 +730,19 @@ fn push_to_pull<B: BasisIdx>(defn: &GateDefn, touches: &[QubitIndex]) -> Option<
             };
 
             let (b01, m01) =
-                    match defn.push_apply(a01, Complex::new(1.0, 0.0)) {
+                    match defn.push_apply(a01.clone(), Complex::new(1.0, 0.0)) {
                         PushApplyOutput::Nonbranching(bidx, multiplier) => (bidx, multiplier),
                         _ => unreachable!("push_apply(BasisIdx64::zeros().set(qj), Complex::new(1.0,0.0)) must return Nonbranching"),
                     };
 
             let (b10, m10) =
-                    match defn.push_apply(a10, Complex::new(1.0, 0.0)) {
+                    match defn.push_apply(a10.clone(), Complex::new(1.0, 0.0)) {
                         PushApplyOutput::Nonbranching(bidx, multiplier) => (bidx, multiplier),
                         _ => unreachable!("push_apply(BasisIdx64::zeros().set(qi), Complex::new(1.0,0.0)) must return Nonbranching"),
                     };
 
             let (b11, m11) = match defn
-                    .push_apply(a11, Complex::new(1.0, 0.0))
+                    .push_apply(a11.clone(), Complex::new(1.0, 0.0))
                 {
                     PushApplyOutput::Nonbranching(bidx, multiplier) => (bidx, multiplier),
                     _ => unreachable!("push_apply(BasisIdx64::zeros().set(qi).set(qj), Complex::new(1.0,0.0)) must return Nonbranching"),
@@ -753,13 +753,13 @@ fn push_to_pull<B: BasisIdx>(defn: &GateDefn, touches: &[QubitIndex]) -> Option<
             };
             let find = |left: bool, right: bool| -> (B, Complex) {
                 if apply_match(left, right, &b00) {
-                    (a00, m00)
+                    (a00.clone(), m00)
                 } else if apply_match(left, right, &b01) {
-                    (a01, m01)
+                    (a01.clone(), m01)
                 } else if apply_match(left, right, &b10) {
-                    (a10, m10)
+                    (a10.clone(), m10)
                 } else if apply_match(left, right, &b11) {
-                    (a11, m11)
+                    (a11.clone(), m11)
                 } else {
                     unreachable!("apply_match must return true for one of the basis")
                 }

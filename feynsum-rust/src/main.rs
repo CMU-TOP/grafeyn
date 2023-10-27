@@ -14,7 +14,7 @@ use rayon::ThreadPoolBuilder;
 use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
-use std::sync::atomic::AtomicU64;
+use std::sync::{atomic::AtomicU64, RwLock};
 use structopt::StructOpt;
 
 use circuit::Circuit;
@@ -22,7 +22,7 @@ use config::Config;
 use fingerprint::Fingerprint;
 use options::Options;
 use simulator::Compactifiable;
-use types::{AtomicBasisIdx, BasisIdx, BasisIdx64, Complex};
+use types::{AtomicBasisIdx, BasisIdx, BasisIdx64, BasisIdxUnlimited, Complex};
 
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
@@ -61,8 +61,9 @@ fn main() -> io::Result<()> {
     if circuit::num_qubits(&program) <= BASIS_IDX_64_OKAY_THRESHOLD {
         build_circuit_and_run::<BasisIdx64, AtomicU64>(options, config, program)
     } else {
-        // TODO: use BasisIdxUnlimited
-        build_circuit_and_run::<BasisIdx64, AtomicU64>(options, config, program)
+        build_circuit_and_run::<BasisIdxUnlimited, RwLock<BasisIdxUnlimited>>(
+            options, config, program,
+        )
     }
 }
 
@@ -103,20 +104,10 @@ fn run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
 ) -> Box<dyn Iterator<Item = (B, Complex)>> {
     if parallelism > 1 {
         info!("using parallel simulator");
-        match simulator::parallel_simulator::run::<B, AB>(&config, circuit) {
-            Ok(result) => result.compactify(),
-            Err(err) => {
-                panic!("failed to run simulator: {:?}", err);
-            }
-        }
+        simulator::parallel_simulator::run::<B, AB>(&config, circuit).compactify()
     } else {
         info!("using sequential simulator");
-        match simulator::sequential_simulator::run::<B>(&config, circuit) {
-            Ok(result) => result.compactify(),
-            Err(err) => {
-                panic!("failed to run simulator: {:?}", err);
-            }
-        }
+        simulator::sequential_simulator::run::<B>(&config, circuit).compactify()
     }
 }
 
@@ -135,7 +126,7 @@ fn process_output<B: BasisIdx>(
 
     for (bidx, weight) in densities {
         if print_fingerprint {
-            fingerprint.insert(bidx, weight);
+            fingerprint.insert(bidx.clone(), weight);
         }
         if let Some(f) = file.as_mut() {
             f.write_fmt(format_args!(
