@@ -179,7 +179,6 @@ fn expand_sparse<B: BasisIdx, AB: AtomicBasisIdx<B>>(
         State::Dense(prev_table) => prev_table.capacity(),
         State::Never(_, _) => unreachable!(),
     };
-    println!("n: {}", n);
     let block_size = std::cmp::max(100, std::cmp::min(n / 1000, config.block_size));
     let num_blocks = (n as f64 / block_size as f64).ceil() as usize;
     let block_start = |b: usize| block_size * b;
