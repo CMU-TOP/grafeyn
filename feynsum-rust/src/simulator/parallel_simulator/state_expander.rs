@@ -66,7 +66,7 @@ fn expected_cost(num_qubits: usize, num_nonzeros: usize, prev_num_nonzeros: usiz
     (Real::max(expected_density, current_density), expected)
 }
 
-pub enum SuccessorsResult<B: BasisIdx> {
+enum SuccessorsResult<B: BasisIdx> {
     AllSucceeded,
     SomeFailed(Vec<(B, Complex, usize)>),
 }
