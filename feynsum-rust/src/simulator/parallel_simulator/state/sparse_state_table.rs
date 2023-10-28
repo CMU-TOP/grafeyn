@@ -7,7 +7,10 @@ use crate::utility;
 
 use std::sync::atomic::Ordering;
 
-use super::SparseStateTableInsertion;
+pub enum SparseStateTableInsertion {
+    Success,
+    Full,
+}
 
 fn calculate_hash<T: Hash>(t: &T) -> u64 {
     let mut s = DefaultHasher::new();
@@ -168,6 +171,13 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
                 }
             });
         new_table
+    }
+    pub fn try_put(&self, bidx: B, weight: Complex, maxload: Real) -> SparseStateTableInsertion {
+        let n = self.capacity();
+        let probably_longest_probe =
+            ((n as Real).log2() / (maxload - 1.0 - maxload.log2())).ceil() as usize;
+        let tolerance = std::cmp::min(4 * std::cmp::max(10, probably_longest_probe), n);
+        self.insert_add_weights_limit_probes(tolerance, bidx, weight)
     }
     pub fn nonzeros(&self) -> Vec<(B, Complex)> {
         (0..self.capacity())

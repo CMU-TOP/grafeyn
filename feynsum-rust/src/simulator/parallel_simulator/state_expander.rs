@@ -66,19 +66,6 @@ fn expected_cost(num_qubits: usize, num_nonzeros: usize, prev_num_nonzeros: usiz
     (Real::max(expected_density, current_density), expected)
 }
 
-fn try_put<B: BasisIdx, AB: AtomicBasisIdx<B>>(
-    table: &SparseStateTable<B, AB>,
-    bidx: B,
-    weight: Complex,
-    maxload: Real,
-) -> SparseStateTableInsertion {
-    let n = table.capacity();
-    let probably_longest_probe =
-        ((n as Real).log2() / (maxload - 1.0 - maxload.log2())).ceil() as usize;
-    let tolerance = std::cmp::min(4 * std::cmp::max(10, probably_longest_probe), n);
-    table.insert_add_weights_limit_probes(tolerance, bidx, weight)
-}
-
 pub enum SuccessorsResult<B: BasisIdx> {
     AllSucceeded,
     SomeFailed(Vec<(B, Complex, usize)>),
@@ -99,7 +86,7 @@ fn apply_gates1<B: BasisIdx, AB: AtomicBasisIdx<B>>(
     }
     if gatenum >= gates.len() {
         if !full.load(Ordering::Relaxed) {
-            match try_put(table, bidx.clone(), weight, maxload) {
+            match table.try_put(bidx.clone(), weight, maxload) {
                 SparseStateTableInsertion::Success => {
                     return (apps, SuccessorsResult::AllSucceeded)
                 }

@@ -10,7 +10,7 @@ mod dense_state_table;
 mod sparse_state_table;
 
 pub use dense_state_table::DenseStateTable;
-pub use sparse_state_table::SparseStateTable;
+pub use sparse_state_table::{SparseStateTable, SparseStateTableInsertion};
 
 use super::super::Compactifiable;
 
@@ -53,9 +53,4 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> Compactifiable<B> for State<B, AB> {
             State::Never(_, _) => unreachable!(),
         }
     }
-}
-
-pub enum SparseStateTableInsertion {
-    Success,
-    Full,
 }
