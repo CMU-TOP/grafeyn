@@ -77,7 +77,7 @@ fn apply_gates1<B: BasisIdx, AB: AtomicBasisIdx<B>>(
     table: &SparseStateTable<B, AB>,
     bidx: B,
     weight: Complex,
-    full: &AtomicBool,
+    is_full: &AtomicBool,
     apps: usize,
     maxload: Real,
 ) -> (usize, SuccessorsResult<B>) {
@@ -85,14 +85,14 @@ fn apply_gates1<B: BasisIdx, AB: AtomicBasisIdx<B>>(
         return (apps, SuccessorsResult::AllSucceeded);
     }
     if gatenum >= gates.len() {
-        if !full.load(Ordering::Relaxed) {
+        if !is_full.load(Ordering::Relaxed) {
             match table.try_put(bidx.clone(), weight, maxload) {
                 Ok(()) => return (apps, SuccessorsResult::AllSucceeded),
                 Err(()) => (),
             }
         }
-        if !full.load(Ordering::Relaxed) {
-            full.store(true, Ordering::SeqCst);
+        if !is_full.load(Ordering::Relaxed) {
+            is_full.store(true, Ordering::SeqCst);
         }
         return (
             apps,
@@ -106,7 +106,7 @@ fn apply_gates1<B: BasisIdx, AB: AtomicBasisIdx<B>>(
             table,
             new_bidx,
             new_weight,
-            full,
+            is_full,
             apps + 1,
             maxload,
         ),
@@ -119,7 +119,7 @@ fn apply_gates1<B: BasisIdx, AB: AtomicBasisIdx<B>>(
                 new_weight1,
                 new_bidx2,
                 new_weight2,
-                full,
+                is_full,
                 apps + 1,
                 maxload,
             )
@@ -135,14 +135,16 @@ fn apply_gates2<B: BasisIdx, AB: AtomicBasisIdx<B>>(
     weight1: Complex,
     bidx2: B,
     weight2: Complex,
-    full: &AtomicBool,
+    is_full: &AtomicBool,
     apps: usize,
     maxload: Real,
 ) -> (usize, SuccessorsResult<B>) {
-    match apply_gates1(gatenum, gates, table, bidx1, weight1, full, apps, maxload) {
-        (apps, SuccessorsResult::AllSucceeded) => {
-            apply_gates1(gatenum, gates, table, bidx2, weight2, full, apps, maxload)
-        }
+    match apply_gates1(
+        gatenum, gates, table, bidx1, weight1, is_full, apps, maxload,
+    ) {
+        (apps, SuccessorsResult::AllSucceeded) => apply_gates1(
+            gatenum, gates, table, bidx2, weight2, is_full, apps, maxload,
+        ),
         (apps, SuccessorsResult::SomeFailed(v)) => {
             let mut v2 = v.clone();
             v2.push((bidx2, weight2, gatenum));
@@ -186,7 +188,7 @@ fn expand_sparse<B: BasisIdx, AB: AtomicBasisIdx<B>>(
     };
 
     while !blocks.is_empty() {
-        let full: AtomicBool = AtomicBool::new(false);
+        let is_full: AtomicBool = AtomicBool::new(false);
         let mut blocks_next = blocks
             .par_iter()
             // We process a given block b in two steps:
@@ -195,7 +197,7 @@ fn expand_sparse<B: BasisIdx, AB: AtomicBasisIdx<B>>(
                 let mut s2 = *s;
                 let mut ps2 = ps.clone();
                 loop {
-                    if full.load(Ordering::Relaxed) {
+                    if is_full.load(Ordering::Relaxed) {
                         return (*b, s2, ps2);
                     }
                     match ps2.pop() {
@@ -209,7 +211,7 @@ fn expand_sparse<B: BasisIdx, AB: AtomicBasisIdx<B>>(
                                 &table,
                                 idx,
                                 weight,
-                                &full,
+                                &is_full,
                                 0,
                                 config.maxload,
                             ) {
@@ -224,12 +226,13 @@ fn expand_sparse<B: BasisIdx, AB: AtomicBasisIdx<B>>(
                 }
                 // (2) we apply remaining gate applications in the block
                 for i in *s..block_stop(*b) {
-                    if full.load(Ordering::Relaxed) {
+                    if is_full.load(Ordering::Relaxed) {
                         s2 = i;
                         break;
                     }
                     let (idx, weight) = get(i);
-                    match apply_gates1(0, &gates, &table, idx, weight, &full, 0, config.maxload) {
+                    match apply_gates1(0, &gates, &table, idx, weight, &is_full, 0, config.maxload)
+                    {
                         (_, SuccessorsResult::AllSucceeded) => {}
                         (_, SuccessorsResult::SomeFailed(fs)) => {
                             s2 = i + 1;
