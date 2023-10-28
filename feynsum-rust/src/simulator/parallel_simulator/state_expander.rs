@@ -9,7 +9,7 @@ use crate::config::Config;
 use crate::types::{AtomicBasisIdx, BasisIdx, Complex, Real};
 use crate::utility;
 
-use super::state::{DenseStateTable, SparseStateTable, SparseStateTableInsertion, State};
+use super::state::{DenseStateTable, SparseStateTable, State};
 
 pub enum ExpandMethod {
     Sparse,
@@ -87,10 +87,8 @@ fn apply_gates1<B: BasisIdx, AB: AtomicBasisIdx<B>>(
     if gatenum >= gates.len() {
         if !full.load(Ordering::Relaxed) {
             match table.try_put(bidx.clone(), weight, maxload) {
-                SparseStateTableInsertion::Success => {
-                    return (apps, SuccessorsResult::AllSucceeded)
-                }
-                SparseStateTableInsertion::Full => (),
+                Ok(()) => return (apps, SuccessorsResult::AllSucceeded),
+                Err(()) => (),
             }
         }
         if !full.load(Ordering::Relaxed) {

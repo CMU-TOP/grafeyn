@@ -7,11 +7,6 @@ use crate::utility;
 
 use std::sync::atomic::Ordering;
 
-pub enum SparseStateTableInsertion {
-    Success,
-    Full,
-}
-
 fn calculate_hash<T: Hash>(t: &T) -> u64 {
     let mut s = DefaultHasher::new();
     t.hash(&mut s);
@@ -111,14 +106,14 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
         tolerance: usize,
         x: B,
         v: Complex,
-    ) -> SparseStateTableInsertion {
+    ) -> Result<(), ()> {
         let n = self.keys.len();
         let mut i: usize = calculate_hash(&x) as usize % n;
         let y = x;
         let mut probes: usize = 0;
         loop {
             if probes >= tolerance {
-                return SparseStateTableInsertion::Full;
+                return Err(());
             }
             if i >= n {
                 i = 0;
@@ -141,7 +136,7 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
                 probes += 1;
             }
         }
-        SparseStateTableInsertion::Success
+        Ok(())
     }
     pub fn get(&self, x: &B) -> Option<Complex> {
         let n = self.keys.len();
@@ -172,7 +167,7 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
             });
         new_table
     }
-    pub fn try_put(&self, bidx: B, weight: Complex, maxload: Real) -> SparseStateTableInsertion {
+    pub fn try_put(&self, bidx: B, weight: Complex, maxload: Real) -> Result<(), ()> {
         let n = self.capacity();
         let probably_longest_probe =
             ((n as Real).log2() / (maxload - 1.0 - maxload.log2())).ceil() as usize;
