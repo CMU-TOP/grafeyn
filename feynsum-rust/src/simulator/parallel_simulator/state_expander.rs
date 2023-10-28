@@ -189,7 +189,7 @@ fn expand_sparse<B: BasisIdx, AB: AtomicBasisIdx<B>>(
 
     while !blocks.is_empty() {
         let is_full: AtomicBool = AtomicBool::new(false);
-        let mut blocks_next = blocks
+        blocks = blocks
             .par_iter()
             // We process a given block b in two steps:
             .map(|(b, s, ps)| {
@@ -249,7 +249,6 @@ fn expand_sparse<B: BasisIdx, AB: AtomicBasisIdx<B>>(
             // We keep any block that is not fully processed.
             .filter(|(b, s, ps)| s < &block_stop(*b) || !ps.is_empty())
             .collect();
-        std::mem::swap(&mut blocks, &mut blocks_next);
         if !blocks.is_empty() {
             let mut table2 = table.increase_capacity_by_factor(1.5);
             std::mem::swap(&mut table, &mut table2);
