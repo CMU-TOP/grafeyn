@@ -55,11 +55,4 @@ pub struct Options {
         help = "block size for parallelism"
     )]
     pub block_size: usize,
-
-    #[structopt(
-        name = "fingerprint",
-        long = "fingerprint",
-        help = "option to print fingerprint"
-    )]
-    pub fingerprint: bool,
 }

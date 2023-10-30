@@ -90,7 +90,7 @@ fn build_circuit_and_run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
 
     let result = run::<B, AB>(options.parallelism, config, circuit);
 
-    process_output(result, options.output, options.fingerprint, num_qubits)?;
+    process_output(result, options.output, num_qubits)?;
 
     info!("simulation complete");
 
@@ -114,7 +114,6 @@ fn run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
 fn process_output<B: BasisIdx>(
     densities: Box<dyn Iterator<Item = (B, Complex)>>,
     output: Option<PathBuf>,
-    print_fingerprint: bool,
     bidx_width: usize,
 ) -> io::Result<()> {
     if let Some(path) = output.as_ref() {
@@ -125,9 +124,8 @@ fn process_output<B: BasisIdx>(
     let mut fingerprint = Fingerprint::new(10);
 
     for (bidx, weight) in densities {
-        if print_fingerprint {
-            fingerprint.insert(bidx.clone(), weight);
-        }
+        fingerprint.insert(bidx.clone(), weight);
+
         if let Some(f) = file.as_mut() {
             f.write_fmt(format_args!(
                 "{:0width$} {:.10}\n",
@@ -138,12 +136,10 @@ fn process_output<B: BasisIdx>(
         }
     }
 
-    if print_fingerprint {
-        println!("fingerprint:");
-        fingerprint.iter().for_each(|(bidx, weight)| {
-            println!("{:0width$} {:.10}", bidx, weight, width = bidx_width,);
-        });
-    }
+    println!("fingerprint:");
+    fingerprint.iter().for_each(|(bidx, weight)| {
+        println!("{:0width$} {:.10}", bidx, weight, width = bidx_width,);
+    });
 
     Ok(())
 }
