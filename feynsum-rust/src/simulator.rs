@@ -1,3 +1,4 @@
+pub mod dense_simulator;
 pub mod parallel_simulator;
 pub mod sequential_simulator;
 
