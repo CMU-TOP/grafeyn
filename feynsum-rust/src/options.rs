@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 use crate::gate_scheduler::GateSchedulingPolicy;
+use crate::simulator::Simulator;
 use crate::types::Real;
 
 #[derive(Debug, StructOpt)]
@@ -41,10 +42,19 @@ pub struct Options {
     pub pull_threshold: Real,
 
     #[structopt(
+        name = "simulator",
+        long = "simulator",
+        default_value = "parallel",
+        help = "simulator to use"
+    )]
+    pub simulator: Simulator,
+
+    #[structopt(
         name = "parallelism",
         long = "parallelism",
         default_value = "1",
-        help = "number of threads to use"
+        help = "number of threads to use",
+        required_if("simulator", "parallel")
     )]
     pub parallelism: usize,
 
