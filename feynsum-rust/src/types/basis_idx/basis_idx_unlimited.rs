@@ -12,8 +12,9 @@ pub struct BasisIdxUnlimited {
 
 impl Display for BasisIdxUnlimited {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        for i in 0..self.bits.len() {
-            if self.bits[i] {
+        let n = self.bits.len();
+        for i in 0..n {
+            if self.bits[n - i - 1] {
                 write!(f, "1")?;
             } else {
                 write!(f, "0")?;

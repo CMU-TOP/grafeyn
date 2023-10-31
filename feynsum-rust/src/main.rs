@@ -136,10 +136,13 @@ fn process_output<B: BasisIdx>(
         }
     }
 
-    println!("fingerprint:");
-    fingerprint.iter().for_each(|(bidx, weight)| {
-        println!("{:0width$} {:.10}", bidx, weight, width = bidx_width,);
-    });
+    println!("computed fingerprint:");
+    fingerprint
+        .iter()
+        .enumerate()
+        .for_each(|(idx, (bidx, weight))| {
+            println!("fp{idx} {:0width$} {:.8}", bidx, weight, width = bidx_width,);
+        });
 
     Ok(())
 }
