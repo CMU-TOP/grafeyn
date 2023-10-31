@@ -21,7 +21,7 @@ use circuit::Circuit;
 use config::Config;
 use fingerprint::Fingerprint;
 use options::Options;
-use simulator::Compactifiable;
+use simulator::{Compactifiable, Simulator};
 use types::{AtomicBasisIdx, BasisIdx, BasisIdx64, BasisIdxUnlimited, Complex};
 
 #[global_allocator]
@@ -88,7 +88,7 @@ fn build_circuit_and_run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
         .build_global()
         .unwrap();
 
-    let result = run::<B, AB>(options.parallelism, config, circuit);
+    let result = run::<B, AB>(&options, config, circuit);
 
     process_output(result, options.output, num_qubits)?;
 
@@ -98,16 +98,23 @@ fn build_circuit_and_run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
 }
 
 fn run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
-    parallelism: usize,
+    options: &Options,
     config: Config,
     circuit: Circuit<B>,
 ) -> Box<dyn Iterator<Item = (B, Complex)>> {
-    if parallelism > 1 {
-        info!("using parallel simulator");
-        simulator::parallel_simulator::run::<B, AB>(&config, circuit).compactify()
-    } else {
-        info!("using sequential simulator");
-        simulator::sequential_simulator::run::<B>(&config, circuit).compactify()
+    match options.simulator {
+        Simulator::Sequential => {
+            info!("using sequential simulator");
+            simulator::sequential_simulator::run::<B>(&config, circuit).compactify()
+        }
+        Simulator::Parallel => {
+            info!("using parallel simulator");
+            simulator::parallel_simulator::run::<B, AB>(&config, circuit).compactify()
+        }
+        Simulator::Dense => {
+            info!("using dense simulator");
+            simulator::dense_simulator::run(&config, circuit).compactify()
+        }
     }
 }
 
