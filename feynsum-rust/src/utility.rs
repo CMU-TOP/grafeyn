@@ -37,6 +37,14 @@ pub fn pack_complex(c: Complex) -> u64 {
     bytemuck::cast([re, im])
 }
 
+pub fn print_complex(c: &Complex) -> String {
+    if c.im > -constants::ZERO_THRESHOLD {
+        format!("{:.8}+{:.8}i", c.re, c.im.abs(),)
+    } else {
+        format!("{:.8}-{:.8}i", c.re, c.im.abs(),)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -141,7 +141,12 @@ fn process_output<B: BasisIdx>(
         .iter()
         .enumerate()
         .for_each(|(idx, (bidx, weight))| {
-            println!("fp{idx} {:0width$} {:.8}", bidx, weight, width = bidx_width,);
+            println!(
+                "fp{idx} {:0width$} {}",
+                bidx,
+                utility::print_complex(&weight),
+                width = bidx_width,
+            );
         });
 
     Ok(())
