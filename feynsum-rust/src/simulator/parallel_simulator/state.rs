@@ -5,7 +5,6 @@ use std::sync::atomic::Ordering;
 
 use crate::types::{AtomicBasisIdx, BasisIdx, Complex};
 use crate::utility;
-
 mod dense_state_table;
 mod sparse_state_table;
 
@@ -46,10 +45,16 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> Compactifiable<B> for State<B, AB> {
     fn compactify(self) -> Box<dyn Iterator<Item = (B, Complex)>> {
         match self {
             State::Sparse(table) => Box::new(table.nonzeros().into_iter()),
-            State::Dense(table) => Box::new(table.array.into_iter().enumerate().map(|(idx, v)| {
-                let weight = utility::unpack_complex(v.load(Ordering::Relaxed));
-                (B::from_idx(idx), weight)
-            })),
+            State::Dense(table) => {
+                Box::new(table.array.into_iter().enumerate().filter_map(|(idx, v)| {
+                    let weight = utility::unpack_complex(v.load(Ordering::Relaxed));
+                    if utility::is_nonzero(weight) {
+                        Some((B::from_idx(idx), weight))
+                    } else {
+                        None
+                    }
+                }))
+            }
             State::Never(_, _) => unreachable!(),
         }
     }

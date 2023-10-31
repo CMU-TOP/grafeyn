@@ -1,4 +1,5 @@
 use crate::types::{BasisIdx, Complex};
+use crate::utility;
 
 mod dense_state_table;
 mod sparse_state_table;
@@ -37,14 +38,21 @@ impl<B: BasisIdx> State<B> {
 impl<B: BasisIdx> Compactifiable<B> for State<B> {
     fn compactify(self) -> Box<dyn Iterator<Item = (B, Complex)>> {
         match self {
-            State::Sparse(table) => Box::new(table.table.into_iter()),
-            State::Dense(table) => Box::new(
+            State::Sparse(table) => Box::new(
                 table
-                    .array
+                    .table
                     .into_iter()
-                    .enumerate()
-                    .map(|(idx, c)| (B::from_idx(idx), c)),
+                    .filter(|(_b, c)| utility::is_nonzero(*c)),
             ),
+            State::Dense(table) => {
+                Box::new(table.array.into_iter().enumerate().filter_map(|(idx, c)| {
+                    if utility::is_nonzero(c) {
+                        Some((B::from_idx(idx), c))
+                    } else {
+                        None
+                    }
+                }))
+            }
         }
     }
 }
