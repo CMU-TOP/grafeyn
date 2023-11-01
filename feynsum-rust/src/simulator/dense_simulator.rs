@@ -5,6 +5,8 @@ use crate::utility;
 
 use super::Compactifiable;
 
+include!(concat!(env!("OUT_DIR"), "/futhark_lib.rs"));
+
 type State = Vec<Complex>;
 
 impl<B: BasisIdx> Compactifiable<B> for State {
