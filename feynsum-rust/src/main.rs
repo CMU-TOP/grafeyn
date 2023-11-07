@@ -1,6 +1,7 @@
 mod circuit;
 mod config;
 mod fingerprint;
+mod futhark;
 mod gate_scheduler;
 mod options;
 mod parser;
