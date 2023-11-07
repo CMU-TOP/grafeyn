@@ -109,7 +109,7 @@ type PullAction<B> = Box<dyn Fn(B) -> PullApplyOutput<B> + Send + Sync>;
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Gate<B: BasisIdx> {
-    defn: GateDefn,
+    pub defn: GateDefn,
     pub touches: Vec<QubitIndex>,
     #[derivative(Debug = "ignore")]
     pub pull_action: Option<PullAction<B>>,
