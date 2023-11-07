@@ -1,10 +1,13 @@
-use crate::circuit::Circuit;
+mod unitary;
+
+use crate::circuit::{Circuit, Gate};
 use crate::config::Config;
 use crate::futhark;
 use crate::types::{BasisIdx, Complex};
 use crate::utility;
 
 use super::Compactifiable;
+use unitary::Unitary;
 
 type State = Vec<Complex>;
 
@@ -21,13 +24,28 @@ impl<B: BasisIdx> Compactifiable<B> for State {
 }
 
 pub fn run<B: BasisIdx>(_config: &Config, circuit: Circuit<B>) -> State {
-    let unitary = vec![
-        vec![Complex::new(1.0, 0.0), Complex::new(0.0, 0.0)],
-        vec![Complex::new(0.0, 0.0), Complex::new(1.0, 0.0)],
-    ];
-    let init_state = vec![vec![Complex::new(1.0, 0.0)], vec![Complex::new(0.0, 0.0)]];
+    let dim = 1 << circuit.num_qubits;
 
-    let result = futhark::matmul(unitary, init_state);
+    let init_state = (0..dim)
+        .into_iter()
+        .map(|i| {
+            if i == 0 {
+                vec![Complex::new(1.0, 0.0)]
+            } else {
+                vec![Complex::new(0.0, 0.0)]
+            }
+        })
+        .collect::<Vec<Vec<Complex>>>();
+
+    let result =
+        circuit
+            .gates
+            .into_iter()
+            .fold(init_state, |acc, gate: Gate<B>| -> Vec<Vec<Complex>> {
+                let unitary = gate.unitary(circuit.num_qubits);
+                futhark::matmul(unitary, acc)
+            });
+
     let result_dim = result.len();
 
     let linearized: Vec<Complex> = result.into_iter().flatten().collect();
