@@ -5,6 +5,7 @@ local
   in
     functor RedBlackMapFn
     functor RedBlackSetFn
+    structure IntBinarySet
   end
   ../lib/github.com/mpllang/mpllib/sources.$(COMPILER).mlb
 
@@ -19,6 +20,8 @@ local
     structure SMLQasmAst = Ast
     structure SMLQasmParser = Parser
   end
+
+  $(SML_LIB)/smlnj-lib/JSON/json-lib.mlb
 
   HashTable.sml
   ApplyUntilFailure.sml
@@ -61,6 +64,14 @@ local
   GateSchedulerGreedyFinishQubit.sml
 
   Fingerprint.sml
+
+  DepGraph.sml
+  DepGraphUtil.sml
+  DepGraphScheduler.sml
+  DepGraphSchedulerGreedyBranching.sml
+  DepGraphSchedulerGreedyNonBranching.sml
+  DepGraphSchedulerGreedyFinishQubit.sml
+  GateSchedulerOrder.sml
 in
   structure HashTable
   structure ApplyUntilFailure
@@ -116,4 +127,12 @@ in
   functor RedBlackSetFn
 
   functor Fingerprint
+
+  structure DepGraph
+  structure DepGraphUtil
+  structure DepGraphScheduler
+  structure DepGraphSchedulerGreedyBranching
+  functor DepGraphSchedulerGreedyNonBranching
+  functor DepGraphSchedulerGreedyFinishQubit
+  structure GateSchedulerOrder
 end
