@@ -27,19 +27,19 @@ struct
   fun popOIS ({S = S, A = A}: OrderedIntSet) =
       case !A of
           nil => NONE
-        | x :: xs => (A := xs; S := IntBinarySet.delete (!S, x); SOME x)
+        | x :: xs => (print ("Pop " ^ Int.toString x ^ "\n"); A := xs; S := IntBinarySet.delete (!S, x); SOME x)
 
   fun pushFrontOIS ({S = S, A = A}: OrderedIntSet) (x: int) =
       if IntBinarySet.member (!S, x) then
         ()
       else
-        (A := x :: !A; S := IntBinarySet.add (!S, x))
+        (print ("Push front " ^ Int.toString x ^ "\n"); A := x :: !A; S := IntBinarySet.add (!S, x))
 
   fun pushBackOIS ({S = S, A = A}: OrderedIntSet) (x: int) =
       if IntBinarySet.member (!S, x) then
         ()
       else
-        (A := (!A) @ (x :: nil); S := IntBinarySet.add (!S, x))
+        (print ("Push back " ^ Int.toString x ^ "\n"); A := (!A) @ (x :: nil); S := IntBinarySet.add (!S, x))
 
   fun newOIS () = {S = ref IntBinarySet.empty, A = ref nil}
 
@@ -49,31 +49,36 @@ struct
 
   fun revTopologicalSort (dg: DepGraph.t) (tr: TraversalOrder) =
       let val N = Seq.length (#gates dg)
-          val L = ref nil
-          val ois = newOIS ()
-          (*fun outdegree i = Seq.length (Seq.nth (#deps dg) i)*)
           val ind = Array.tabulate (N, Seq.nth (#indegree dg))
-          fun decInd i = let val d = Array.sub (ind, i) in Array.update (ind, i, d - 1); d end
+          fun decInd i = let val d = Array.sub (ind, i) in Array.update (ind, i, d - 1); d - 1 end
+
+          (*
+          val ois = newOIS ()          
           val push = case tr of BFS => pushBackOIS ois | DFS => pushFrontOIS ois
+          fun pop () = popOIS ois
+          *)
+          val queue = ref nil
+          val push = case tr of BFS => (fn i => queue := (!queue) @ (i :: nil)) | DFS => (fn i => queue := i :: !queue)
+          fun pop () = case !queue of nil => NONE | x :: xs => (queue := xs; SOME x)
           val _ = intDo N (fn i => if Seq.nth (#indegree dg) i = 0 then
                                      push i else ())
-          fun loop () =
-              case popOIS ois of
-                  NONE => ()
-                | SOME n => 
-                  (L := n :: !L;
-                   intDo (Seq.length (Seq.nth (#deps dg) n))
-                         (fn m => if decInd m = 0 then push m else ());
-                   loop ())
+          fun loop L =
+              (print ("loop " ^ Int.toString (List.length L) ^ "\n");
+              case pop () of
+                  NONE => L
+                | SOME n =>
+                  (Seq.map (fn m => if decInd m = 0 then push m else ())
+                           (Seq.nth (#deps dg) n);
+                   loop (n :: L)))
       in
-        loop (); !L
+        loop nil
       end
 
   fun topologicalSort (dg: DepGraph.t) (tr: TraversalOrder) =
       List.rev (revTopologicalSort dg tr)
 
   fun ordered (dg: DepGraph.t) =
-      topologicalSort (DepGraphUtil.redirect dg) DFS
+      topologicalSort (DepGraphUtil.transpose dg) DFS
 
   val gateDepths: int array option ref = ref NONE
 

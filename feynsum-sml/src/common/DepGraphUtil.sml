@@ -13,7 +13,7 @@ sig
   val initState: dep_graph -> state
 
   (* Switches edge directions *)
-  val redirect: dep_graph -> dep_graph
+  val transpose: dep_graph -> dep_graph
 
   (* val gateIsBranching: dep_graph -> (gate_idx -> bool) *)
 end =
@@ -23,14 +23,15 @@ struct
 
   type dep_graph = DepGraph.t
 
-  fun redirect ({gates = gs, deps = ds, indegree = is, numQubits = qs}: dep_graph) =
-      let val ds2 = Array.array (qs, nil)
+  fun transpose ({gates = gs, deps = ds, indegree = is, numQubits = qs}: dep_graph) =
+      let val N = Seq.length gs
+          val ds2 = Array.array (N, nil)
           fun apply i = Seq.map (fn j => Array.update (ds2, j, i :: Array.sub (ds2, j))) (Seq.nth ds i)
-          val _ = Seq.tabulate apply qs
+          val _ = Seq.tabulate apply N
       in
         {gates = gs,
-         deps = Seq.tabulate (fn i => Seq.rev (Seq.fromList (Array.sub (ds2, i)))) qs,
-         indegree = Seq.tabulate (fn i => Seq.length (Seq.nth ds i)) qs,
+         deps = Seq.tabulate (fn i => Seq.rev (Seq.fromList (Array.sub (ds2, i)))) N,
+         indegree = Seq.map Seq.length ds,
          numQubits = qs}
       end
 
