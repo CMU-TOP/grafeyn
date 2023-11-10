@@ -78,7 +78,6 @@ pub enum GateDefn {
     },
     S(QubitIndex),
     Sdg(QubitIndex),
-    SqrtW(QubitIndex),
     SqrtX(QubitIndex),
     SqrtXdg(QubitIndex),
     Swap {
@@ -146,7 +145,6 @@ fn create_touches(defn: &GateDefn) -> Vec<QubitIndex> {
         | GateDefn::Phase { target: qi, .. }
         | GateDefn::S(qi)
         | GateDefn::Sdg(qi)
-        | GateDefn::SqrtW(qi)
         | GateDefn::SqrtX(qi)
         | GateDefn::SqrtXdg(qi)
         | GateDefn::T(qi)
@@ -191,7 +189,6 @@ fn create_pull_action<B: BasisIdx>(
         | GateDefn::PauliZ(_)
         | GateDefn::S(_)
         | GateDefn::Sdg(_)
-        | GateDefn::SqrtW(_)
         | GateDefn::T(_)
         | GateDefn::Tdg(_)
         | GateDefn::X(_) => push_to_pull(defn, touches),
@@ -489,22 +486,6 @@ impl GateDefn {
                 };
                 PushApplyOutput::Nonbranching(bidx, new_weight)
             }
-            GateDefn::SqrtW(qi) => {
-                let bidx0 = bidx.unset(qi);
-                let bidx1 = bidx.set(qi);
-
-                if bidx.get(qi) {
-                    PushApplyOutput::Branching(
-                        (bidx0, weight * Complex::new(0.0, constants::RECP_SQRT_2)),
-                        (bidx1, weight * Complex::new(-0.5, -0.5)),
-                    )
-                } else {
-                    PushApplyOutput::Branching(
-                        (bidx0, weight * Complex::new(-0.5, -0.5)),
-                        (bidx1, weight * Complex::new(-constants::RECP_SQRT_2, 0.0)),
-                    )
-                }
-            }
             GateDefn::Swap { target1, target2 } => {
                 let new_bidx = bidx.swap(target1, target2);
                 PushApplyOutput::Nonbranching(new_bidx, weight)
@@ -609,7 +590,6 @@ impl GateDefn {
             | GateDefn::X(_) => BranchingType::Nonbranching,
             GateDefn::Hadamard(_)
             | GateDefn::RY { .. }
-            | GateDefn::SqrtW(_)
             | GateDefn::SqrtX(_)
             | GateDefn::SqrtXdg(_) => BranchingType::Branching,
             GateDefn::FSim { .. } | GateDefn::RX { .. } | GateDefn::U { .. } => {
