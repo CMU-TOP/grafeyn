@@ -1,3 +1,5 @@
+use log;
+
 use crate::circuit::{Gate, GateDefn};
 use crate::types::{constants, BasisIdx, Complex};
 pub trait Unitary {
@@ -5,6 +7,7 @@ pub trait Unitary {
 }
 
 impl<B: BasisIdx> Unitary for Gate<B> {
+    // TODO: This should be cached
     fn unitary(&self, num_qubits: usize) -> Vec<Vec<Complex>> {
         let dim = 1 << num_qubits;
         match &self.defn {
@@ -33,42 +36,42 @@ impl<B: BasisIdx> Unitary for Gate<B> {
                         -Complex::new(constants::RECP_SQRT_2, 0.0),
                     ],
                 ];
-                tensor_product_with_identities(&mat, *qi, dim)
+                tensor_product_with_identities(&mat, *qi, num_qubits)
             }
             GateDefn::PauliY(qi) => {
                 let mat = vec![
                     vec![Complex::new(0.0, 0.0), -Complex::new(0.0, 1.0)],
                     vec![Complex::new(0.0, 1.0), Complex::new(0.0, 0.0)],
                 ];
-                tensor_product_with_identities(&mat, *qi, dim)
+                tensor_product_with_identities(&mat, *qi, num_qubits)
             }
             GateDefn::PauliZ(qi) => {
                 let mat = vec![
                     vec![Complex::new(1.0, 0.0), Complex::new(0.0, 0.0)],
                     vec![Complex::new(0.0, 0.0), -Complex::new(1.0, 0.0)],
                 ];
-                tensor_product_with_identities(&mat, *qi, dim)
+                tensor_product_with_identities(&mat, *qi, num_qubits)
             }
             GateDefn::Phase { target, rot } => {
                 let mat = vec![
                     vec![Complex::new(1.0, 0.0), Complex::new(0.0, 0.0)],
                     vec![Complex::new(0.0, 0.0), Complex::new(rot.cos(), rot.sin())],
                 ];
-                tensor_product_with_identities(&mat, *target, dim)
+                tensor_product_with_identities(&mat, *target, num_qubits)
             }
             GateDefn::S(qi) => {
                 let mat = vec![
                     vec![Complex::new(1.0, 0.0), Complex::new(0.0, 0.0)],
                     vec![Complex::new(0.0, 0.0), Complex::new(0.0, 1.0)],
                 ];
-                tensor_product_with_identities(&mat, *qi, dim)
+                tensor_product_with_identities(&mat, *qi, num_qubits)
             }
             GateDefn::Sdg(qi) => {
                 let mat = vec![
                     vec![Complex::new(1.0, 0.0), Complex::new(0.0, 0.0)],
                     vec![Complex::new(0.0, 0.0), -Complex::new(0.0, 1.0)],
                 ];
-                tensor_product_with_identities(&mat, *qi, dim)
+                tensor_product_with_identities(&mat, *qi, num_qubits)
             }
             _ => todo!(),
         }
@@ -78,13 +81,13 @@ impl<B: BasisIdx> Unitary for Gate<B> {
 fn tensor_product_with_identities(
     mat: &[Vec<Complex>],
     qi: usize,
-    dim: usize,
+    num_qubits: usize,
 ) -> Vec<Vec<Complex>> {
     let identity = vec![
         vec![Complex::new(1.0, 0.0), Complex::new(0.0, 0.0)],
         vec![Complex::new(0.0, 0.0), Complex::new(1.0, 0.0)],
     ];
-    (0..dim).into_iter().fold(
+    (0..num_qubits).into_iter().fold(
         vec![vec![Complex::new(1.0, 0.0)]],
         |acc: Vec<Vec<Complex>>, idx| -> Vec<Vec<Complex>> {
             if idx == qi {
