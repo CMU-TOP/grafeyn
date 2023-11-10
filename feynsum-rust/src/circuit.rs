@@ -136,7 +136,6 @@ impl<B: BasisIdx> Circuit<B> {
                         },
                         ("s", 0, 1) => GateDefn::S(args[0]),
                         ("sdg", 0, 1) => GateDefn::Sdg(args[0]),
-                        ("sw", 0, 1) => GateDefn::SqrtW(args[0]),
                         ("swap", 0, 2) => GateDefn::Swap {
                             target1: args[0],
                             target2: args[1],
