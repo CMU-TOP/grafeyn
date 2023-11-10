@@ -1,5 +1,7 @@
 mod unitary;
 
+use log;
+
 use crate::circuit::{Circuit, Gate};
 use crate::config::Config;
 use crate::futhark;
@@ -42,6 +44,7 @@ pub fn run<B: BasisIdx>(_config: &Config, circuit: Circuit<B>) -> State {
             .gates
             .into_iter()
             .fold(init_state, |acc, gate: Gate<B>| -> Vec<Vec<Complex>> {
+                log::debug!("applying gate: {:?}", gate);
                 let unitary = gate.unitary(circuit.num_qubits);
                 futhark::matmul(unitary, acc)
             });

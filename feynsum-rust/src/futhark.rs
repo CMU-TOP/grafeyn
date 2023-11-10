@@ -1,4 +1,5 @@
 // futhark_lib.rs file is dirty so we define a wrapper here
+use log;
 
 mod internal {
     #![allow(warnings)]
@@ -14,6 +15,8 @@ mod internal {
         let n = a.len();
         let m = b.len();
         let p = b[0].len();
+        log::debug!("n: {}, m: {}, p: {}", n, m, p);
+        log::debug!("a[0].len(): {}", a[0].len());
         assert!(m == a[0].len());
 
         let a = ArrayF32D3::new(&ctx, [n as i64, m as i64, 2], &flatten(a)).unwrap();
