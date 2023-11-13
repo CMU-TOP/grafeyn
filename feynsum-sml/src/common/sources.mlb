@@ -5,7 +5,6 @@ local
   in
     functor RedBlackMapFn
     functor RedBlackSetFn
-    structure IntBinarySet
   end
   ../lib/github.com/mpllang/mpllib/sources.$(COMPILER).mlb
 
@@ -22,6 +21,7 @@ local
   end
 
   $(SML_LIB)/smlnj-lib/JSON/json-lib.mlb
+  $(SML_LIB)/smlnj-lib/Util/smlnj-lib.mlb
 
   HashTable.sml
   ApplyUntilFailure.sml

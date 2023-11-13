@@ -12,15 +12,33 @@ struct
     , gateIsBranching: gate_idx -> bool
     }
 
-  fun pickNonBranching i branching gates =
-      if i < Seq.length gates then
+  fun pickNonBranching i branching ftr =
+      if i < Seq.length ftr then
         (if branching i then
-           pickNonBranching (i + 1) branching gates
+           pickNonBranching (i + 1) branching ftr
          else
-           Seq.nth gates i)
+           Seq.nth ftr i)
       else
-        Seq.nth gates 0 (* pick a branching gate *)
+        Seq.nth ftr 0
 
   (* From a frontier, select which gate to apply next *)
-  fun scheduler ({gateIsBranching = gib, ...} : args) gates = pickNonBranching 0 gib gates
+  fun scheduler ({gateIsBranching = branching, ...} : args) ftr =
+      pickNonBranching 0 branching ftr
+  (*fun scheduler ({gateIsBranching = branching, ...} : args) updateFrontier breakFusion initialFrontier =
+      let fun updateAndBreak i = let val ftr = updateFrontier i in breakFusion (); ftr end
+          fun pickNonBranching i ftr =
+              if i < Seq.length gates then
+                (if branching i then
+                   pickNonBranching (i + 1) gates
+                 else
+                   Seq.nth gates i)
+              else
+                (breakFusion (); Seq.nth gates 0)
+          fun sched ftr = if Seq.null ftr then
+                            ()
+                          else
+                            scheduler (updateFrontier (pickNonBranching 0 gates))
+      in
+        sched initialFrontier
+      end*)
 end

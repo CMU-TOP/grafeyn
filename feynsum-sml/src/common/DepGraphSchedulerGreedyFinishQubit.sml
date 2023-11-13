@@ -2,7 +2,11 @@ functor DepGraphSchedulerGreedyFinishQubit
   (val maxBranchingStride: int val disableFusion: bool):
 sig
   val scheduler: DepGraphScheduler.t
-  val ordered: DepGraph.t -> int list
+  val scheduler2: DepGraphScheduler.t
+  val scheduler3: DepGraphScheduler.t
+  val scheduler4: DepGraphScheduler.t
+  val scheduler5: DepGraphScheduler.t
+  val schedulerRandom: int -> DepGraphScheduler.t
 end =
 struct
 
@@ -13,101 +17,33 @@ struct
     , gateIsBranching: gate_idx -> bool
     }
 
-  fun intDo (n : int) (f: int -> 'b) =
-      let fun next i = if i = n then () else (f i; next (i + 1))
-      in
-        next 0
-      end
+  fun DFS ((new, old) : (int list * int list)) = new @ old
+  fun BFS ((new, old) : (int list * int list)) = old @ new
 
-  type OrderedIntSet = {
-    S: IntBinarySet.set ref,
-    A: int list ref
-  }
-
-  fun popOIS ({S = S, A = A}: OrderedIntSet) =
-      case !A of
-          nil => NONE
-        | x :: xs => (print ("Pop " ^ Int.toString x ^ "\n"); A := xs; S := IntBinarySet.delete (!S, x); SOME x)
-
-  fun pushFrontOIS ({S = S, A = A}: OrderedIntSet) (x: int) =
-      if IntBinarySet.member (!S, x) then
-        ()
-      else
-        (print ("Push front " ^ Int.toString x ^ "\n"); A := x :: !A; S := IntBinarySet.add (!S, x))
-
-  fun pushBackOIS ({S = S, A = A}: OrderedIntSet) (x: int) =
-      if IntBinarySet.member (!S, x) then
-        ()
-      else
-        (print ("Push back " ^ Int.toString x ^ "\n"); A := (!A) @ (x :: nil); S := IntBinarySet.add (!S, x))
-
-  fun newOIS () = {S = ref IntBinarySet.empty, A = ref nil}
-
-  fun emptyOIS ({S = S, A = A}: OrderedIntSet) = List.null (!A)
-
-  datatype TraversalOrder = BFS | DFS
-
-  fun revTopologicalSort (dg: DepGraph.t) (tr: TraversalOrder) =
+  fun revTopologicalSort (dg: DepGraph.t) (push: (int list * int list) -> int list) =
       let val N = Seq.length (#gates dg)
           val ind = Array.tabulate (N, Seq.nth (#indegree dg))
           fun decInd i = let val d = Array.sub (ind, i) in Array.update (ind, i, d - 1); d - 1 end
-
-          (*
-          val ois = newOIS ()          
-          val push = case tr of BFS => pushBackOIS ois | DFS => pushFrontOIS ois
-          fun pop () = popOIS ois
-          *)
           val queue = ref nil
-          val push = case tr of BFS => (fn i => queue := (!queue) @ (i :: nil)) | DFS => (fn i => queue := i :: !queue)
+          (*val push = case tr of BFS => (fn xs => queue := (!queue) @ xs) | DFS => (fn xs => queue := xs @ (!queue))*)
           fun pop () = case !queue of nil => NONE | x :: xs => (queue := xs; SOME x)
-          val _ = intDo N (fn i => if Seq.nth (#indegree dg) i = 0 then
-                                     push i else ())
+          val _ = queue := push (List.filter (fn i => Seq.nth (#indegree dg) i = 0) (List.tabulate (N, fn i => i)), !queue)
           fun loop L =
-              (print ("loop " ^ Int.toString (List.length L) ^ "\n");
               case pop () of
                   NONE => L
                 | SOME n =>
-                  (Seq.map (fn m => if decInd m = 0 then push m else ())
-                           (Seq.nth (#deps dg) n);
-                   loop (n :: L)))
+                  (let val ndeps = Seq.nth (#deps dg) n in
+                     queue := push (List.filter (fn m => decInd m = 0) (List.tabulate (Seq.length ndeps, Seq.nth ndeps)), !queue)
+                   end;
+                   loop (n :: L))
       in
         loop nil
       end
 
-  fun topologicalSort (dg: DepGraph.t) (tr: TraversalOrder) =
-      List.rev (revTopologicalSort dg tr)
-
-  fun ordered (dg: DepGraph.t) =
-      topologicalSort (DepGraphUtil.transpose dg) DFS
+  fun topologicalSort (dg: DepGraph.t) (push: (int list * int list) -> int list) =
+      List.rev (revTopologicalSort dg push)
 
   val gateDepths: int array option ref = ref NONE
-
-  fun popIntBinarySet (S: IntBinarySet.set ref) = case IntBinarySet.find (fn _ => true) (!S) of
-      NONE => raise Fail "popIntBinarySet called on empty set"
-    | SOME elt => (S := IntBinarySet.delete (!S, elt); elt)
-
-  fun revTopologicalSortOld (dg: DepGraph.t) =
-      let val N = Seq.length (#gates dg)
-          val L = ref nil
-          val S = ref IntBinarySet.empty
-          val A = ref nil
-          val ind = Array.tabulate (N, Seq.nth (#indegree dg))
-          fun decInd i = let val d = Array.sub (ind, i) in Array.update (ind, i, d - 1); d end
-          val _ = intDo N (fn i => if Seq.nth (#indegree dg) i = 0 then
-                                     S := IntBinarySet.add (!S, i) else ())
-          fun loop () =
-              if IntBinarySet.isEmpty (!S) then
-                ()
-              else
-                let val n = popIntBinarySet S in
-                  L := n :: !L;
-                  intDo (Seq.length (Seq.nth (#deps dg) n))
-                        (fn m => if decInd m = 0 then S := IntBinarySet.add (!S, m) else ());
-                  loop ()
-                end
-      in
-        loop (); !L
-      end
 
   fun computeGateDepths (dg: DepGraph.t) =
       let val N = Seq.length (#gates dg)
@@ -119,6 +55,40 @@ struct
                               | d => d*)
       in
         List.foldl (fn (i, ()) => gdep i) () (revTopologicalSort dg DFS); depths
+      end
+
+  fun sortList (lt: 'a * 'a -> bool) (xs: 'a list) =
+      let fun insert (x, xs) =
+              case xs of
+                  nil => x :: nil
+                | x' :: xs => if lt (x, x') then x :: x' :: xs else x' :: insert (x, xs)
+      in
+        List.foldr insert nil xs
+      end
+
+  (* Choose in reverse topological order, sorted by easiest qubit to finish *)
+  fun scheduler3 ({depGraph = dg, gateIsBranching = gib}: args) =
+      let val dgt = DepGraphUtil.transpose dg
+          val depths = computeGateDepths dg
+          fun lt (a, b) = Array.sub (depths, a) < Array.sub (depths, b) orelse (Array.sub (depths, a) = Array.sub (depths, b) andalso not (gib a) andalso gib b)
+          fun push (new, old) = DFS (sortList lt new, old)
+          val xs = revTopologicalSort dgt push
+          val N = Seq.length (#gates dg)
+          val ord = Array.array (N, ~1)
+          fun writeOrd i xs = case xs of nil => () | x :: xs' => (Array.update (ord, x, i); writeOrd (i + 1) xs')
+          val _ = writeOrd 0 xs
+          fun pickEarliestOrd best_idx best_ord i gates =
+              if i = Seq.length gates then
+                best_idx
+              else let val cur_idx = Seq.nth gates i
+                       val cur_ord = Array.sub (ord, cur_idx)
+                   in
+                     if cur_ord < best_ord then pickEarliestOrd cur_idx cur_ord (i + 1) gates else pickEarliestOrd best_idx best_ord (i + 1) gates
+                   end
+      in
+        fn gates => let val g0 = Seq.nth gates 0 in
+                      pickEarliestOrd g0 (Array.sub (ord, g0)) 1 gates
+                   end
       end
 
   fun gateDepth i dg =
@@ -142,10 +112,119 @@ struct
             pickLeastDepth best_idx best_depth (i + 1) gates dg
         end
 
+  fun pickGreatestDepth best_idx best_depth i gates dg =
+      if i = Seq.length gates then
+        best_idx
+      else
+        let val cur_idx = Seq.nth gates i
+            val cur_depth = gateDepth cur_idx dg in
+          if cur_depth > best_depth then
+            pickGreatestDepth cur_idx cur_depth (i + 1) gates dg
+          else
+            pickGreatestDepth best_idx best_depth (i + 1) gates dg
+        end
+
   (* From a frontier, select which gate to apply next *)
   fun scheduler ({depGraph = dg, ...} : args) =
       (gateDepths := SOME (computeGateDepths dg);
        fn gates => let val g0 = Seq.nth gates 0 in
                      pickLeastDepth g0 (gateDepth g0 dg) 1 gates dg
                    end)
+
+  (* Select gate with greatest number of descendants *)
+  fun scheduler4 ({depGraph = dg, ...} : args) =
+      (gateDepths := SOME (computeGateDepths dg);
+       fn gates => let val g0 = Seq.nth gates 0 in
+                     pickGreatestDepth g0 (gateDepth g0 dg) 1 gates dg
+                   end)
+
+  structure G = Gate (structure B = BasisIdxUnlimited
+                      structure C = Complex64)
+
+  (* Hybrid of scheduler2 (avoid branching on unbranched qubits) and also scheduler3 (choose in reverse topological order, sorted by easiest qubit to finish) *)
+  fun scheduler5 ({depGraph = dg, gateIsBranching = gib} : args) =
+      let val gates = Seq.map G.fromGateDefn (#gates dg)
+          fun touches i = #touches (Seq.nth gates i)
+          fun branches i = case #action (Seq.nth gates i) of G.NonBranching _ => 0 | G.MaybeBranching _ => 1 | G.Branching _ => 2
+
+          val dgt = DepGraphUtil.transpose dg
+          val depths = computeGateDepths dg
+          fun lt (a, b) = Array.sub (depths, a) < Array.sub (depths, b) orelse (Array.sub (depths, a) = Array.sub (depths, b) andalso branches a < branches b)
+          fun push (new, old) = DFS (sortList lt new, old)
+          val xs = revTopologicalSort dgt push
+          val N = Seq.length (#gates dg)
+          val ord = Array.array (N, ~1)
+          fun writeOrd i xs = case xs of nil => () | x :: xs' => (Array.update (ord, x, i); writeOrd (i + 1) xs')
+          val _ = writeOrd 0 xs
+          val touched = Array.array (#numQubits dg, false)
+          fun touch i = Array.update (touched, i, true)
+          fun touchAll gidx = let val ts = touches gidx in List.tabulate (Seq.length ts, fn i => touch (Seq.nth ts i)); () end
+          fun newTouches i =
+              Seq.length (Seq.filter (fn j => not (Array.sub (touched, j))) (touches i))
+          fun pickLeastNewTouches best_idx best_newTouches best_ord i gates =
+              if i = Seq.length gates then
+                ((* print ("Picked " ^ Int.toString best_idx ^ ", new touches " ^ Int.toString best_newTouches ^ "\n"); *)
+                 best_idx)
+              else
+                let val cur_idx = Seq.nth gates i
+                    val cur_newTouches = newTouches cur_idx
+                    val cur_ord = Array.sub (ord, cur_idx)
+                in
+                  if cur_newTouches < best_newTouches
+                     orelse (cur_newTouches = best_newTouches
+                             andalso cur_ord < best_ord) then
+                    pickLeastNewTouches cur_idx cur_newTouches cur_ord (i + 1) gates
+                  else
+                    pickLeastNewTouches best_idx best_newTouches best_ord (i + 1) gates
+                end
+      in
+        fn gates => let val g0 = Seq.nth gates 0
+                        val next = pickLeastNewTouches g0 (newTouches g0) (Array.sub (ord, g0)) 1 gates
+                    in
+                      touchAll next; next
+                    end
+      end
+
+  (* Avoids branching on unbranched qubits *)
+  fun scheduler2 ({depGraph = dg, gateIsBranching = gib} : args) =
+      let val touched = Array.array (#numQubits dg, false)
+          val gates = Seq.map G.fromGateDefn (#gates dg)
+          fun touches i = #touches (Seq.nth gates i)
+          fun branches i = case #action (Seq.nth gates i) of G.NonBranching _ => 0 | G.MaybeBranching _ => 1 | G.Branching _ => 2
+          fun touch i = Array.update (touched, i, true)
+          fun touchAll gidx = let val ts = touches gidx in List.tabulate (Seq.length ts, fn i => touch (Seq.nth ts i)); () end
+          fun newTouches i =
+              Seq.length (Seq.filter (fn j => not (Array.sub (touched, j))) (touches i))
+          fun pickLeastNewTouches best_idx best_newTouches i gates =
+              if i = Seq.length gates then
+                ((* print ("Picked " ^ Int.toString best_idx ^ ", new touches " ^ Int.toString best_newTouches ^ "\n"); *)
+                 best_idx)
+              else
+                let val cur_idx = Seq.nth gates i
+                    val cur_newTouches = newTouches cur_idx
+                in
+                  if cur_newTouches < best_newTouches
+                     orelse (cur_newTouches = best_newTouches
+                             andalso branches cur_idx < branches best_idx) then
+                    pickLeastNewTouches cur_idx cur_newTouches (i + 1) gates
+                  else
+                    pickLeastNewTouches best_idx best_newTouches (i + 1) gates
+                end
+      in
+        fn gates => let val g0 = Seq.nth gates 0
+                        val next = pickLeastNewTouches g0 (newTouches g0) 1 gates
+                    in
+                      touchAll next; next
+                    end
+      end
+
+  val seed = Random.rand (50, 14125)
+
+  fun schedulerRandom seedNum ({depGraph = dg, gateIsBranching = gib} : args) =
+      (*let val seed = Random.rand (seedNum, seedNum * seedNum) in*)
+        fn gates => let val r = Random.randRange (0, Seq.length gates - 1) seed in
+                      (print ("Randomly chose " ^ Int.toString r ^ " from range [0, " ^ Int.toString (Seq.length gates) ^ ")\n");
+                        Seq.nth gates r)
+                    end
+      (* end *)
 end

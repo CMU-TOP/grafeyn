@@ -257,26 +257,35 @@ def write_dep_graph(num_qubits: int, graph, find_qubit: dict[Q.circuit.Bit, int]
 def usage(argv):
     return f"""
 Usage:
-    {argv[0]} [input.qasm] [output.json]
+    {argv[0]} [--dag] [input.qasm] [output.json]
 If either arg is omitted, read from stdin/stdout
+If --dag, immediately output unprocessed DAG
 """
 
 def main(argv):
+    just_dag = False
     if len(argv) == 2:
         ifh = open(argv[1])
         ofh = sys.stdout
     elif len(argv) == 3:
         ifh = open(argv[1])
         ofh = open(argv[2], 'w')
+    elif len(argv) == 4 and argv[1] == '--dag':
+        just_dag = True
+        ifh = open(argv[2])
+        ofh = open(argv[3], 'w')
     else:
         print(usage(argv).strip(), file=sys.stderr)
         return 1
     circuit = read_qasm(ifh)
     dag = circuit_to_dag(circuit)
     find_qubit = circuit_find_qubit_dict(circuit)
-    dg = dag_to_dep_graph(dag._multi_graph, find_qubit, trim=True)
-    trim_edges(dg)
-    write_dep_graph(circuit.num_qubits, dg, find_qubit, ofh)
+    if just_dag:
+        write_dep_graph(circuit.num_qubits, dag._multi_graph, find_qubit, ofh)
+    else:
+        dg = dag_to_dep_graph(dag._multi_graph, find_qubit, trim=True)
+        trim_edges(dg)
+        write_dep_graph(circuit.num_qubits, dg, find_qubit, ofh)
 
 # def glen(generator: Iterator[Any]) -> int:
 #     return sum(1 for _ in generator)

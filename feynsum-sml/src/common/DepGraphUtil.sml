@@ -15,6 +15,11 @@ sig
   (* Switches edge directions *)
   val transpose: dep_graph -> dep_graph
 
+  val scheduleWithOracle: dep_graph -> (gate_idx -> bool) -> (gate_idx Seq.t -> gate_idx) -> int -> gate_idx Seq.t Seq.t
+
+  val scheduleCost: gate_idx Seq.t Seq.t -> (gate_idx -> bool) -> real
+  val chooseSchedule: gate_idx Seq.t Seq.t Seq.t -> (gate_idx -> bool) -> gate_idx Seq.t Seq.t
+
   (* val gateIsBranching: dep_graph -> (gate_idx -> bool) *)
 end =
 struct
@@ -65,5 +70,75 @@ struct
           val deg = Array.tabulate (N, Seq.nth (#indegree graph))
       in
         { visited = vis, indegree = deg }
+      end
+
+  fun scheduleWithOracle (graph: dep_graph) (branching: gate_idx -> bool) (choose: gate_idx Seq.t -> gate_idx) (maxBranchingStride: int) =
+      let val st = initState graph
+          fun findNonBranching (i: int) (xs: gate_idx Seq.t) =
+              if i = Seq.length xs then
+                NONE
+              else if branching (Seq.nth xs i) then
+                findNonBranching (i + 1) xs
+              else
+                SOME (Seq.nth xs i)
+          fun loadNonBranching (acc: gate_idx list) =
+              case findNonBranching 0 (frontier st) of
+                  NONE => acc
+                | SOME i => (visit graph i st; loadNonBranching (i :: acc))
+          fun loadNext numBranchingSoFar thisStep (acc: gate_idx list list) =
+              let val ftr = frontier st in
+                if Seq.length ftr = 0 then
+                  Seq.map Seq.fromList (Seq.rev (Seq.fromList (if List.null thisStep then acc else List.rev thisStep :: acc)))
+                else
+                  (let val next = choose ftr in
+                     visit graph next st;
+                     if numBranchingSoFar + 1 >= maxBranchingStride then
+                       loadNext 0 nil (List.rev (loadNonBranching (next :: thisStep)) :: acc)
+                     else
+                       loadNext (numBranchingSoFar + 1) (loadNonBranching (next :: thisStep)) acc
+                   end)
+              end
+      in
+        loadNext 0 (loadNonBranching nil) nil
+      end
+
+  (*fun scheduleCost2 (order: gate_idx Seq.t Seq.t) (branching: gate_idx -> bool) =
+      let val gates = Seq.flatten order
+          val N = Seq.length gates
+          fun iter i cost branchedQubits =
+              if i = N then
+                cost
+              else
+                iter (i + 1) (1.0 + cost + (if branching (Seq.nth gates i) then cost else 0.0))
+      in
+        iter 0 0.0 (Vector.tabulate (N, fn _ => false))
+      end*)
+
+  
+  fun scheduleCost (order: gate_idx Seq.t Seq.t) (branching: gate_idx -> bool) =
+      let val gates = Seq.flatten order
+          val N = Seq.length gates
+          fun iter i cost =
+              if i = N then
+                cost
+              else
+                iter (i + 1) (1.0 + (if branching (Seq.nth gates i) then cost * 2.0 else cost))
+      in
+        iter 0 0.0
+      end
+
+  fun chooseSchedule (orders: gate_idx Seq.t Seq.t Seq.t) (branching: gate_idx -> bool) =
+      let fun iter i best_i best_cost =
+              if i = Seq.length orders then
+                Seq.nth orders best_i
+              else
+                let val cost = scheduleCost (Seq.nth orders i) branching in
+                  if cost < best_cost then
+                    (print ("Reduced cost from " ^ Real.toString best_cost ^ " to " ^ Real.toString cost ^ "\n"); iter (i + 1) i cost)
+                  else
+                    (print ("Maintained cost " ^ Real.toString best_cost ^ " over " ^ Real.toString cost ^ "\n"); iter (i + 1) best_i best_cost)
+                end
+      in
+        iter 1 0 (scheduleCost (Seq.nth orders 0) branching)
       end
 end
