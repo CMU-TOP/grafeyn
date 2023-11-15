@@ -9,7 +9,7 @@ use crate::types::{BasisIdx, Complex};
 use crate::utility;
 
 use super::Compactifiable;
-use unitary::Unitary;
+use unitary::{Unitary, UnitaryMatrix};
 
 type State = Vec<Complex>;
 
@@ -32,26 +32,22 @@ pub fn run<B: BasisIdx>(_config: &Config, circuit: Circuit<B>) -> State {
         .into_iter()
         .map(|i| {
             if i == 0 {
-                vec![Complex::new(1.0, 0.0)]
+                Complex::new(1.0, 0.0)
             } else {
-                vec![Complex::new(0.0, 0.0)]
+                Complex::new(0.0, 0.0)
             }
         })
-        .collect::<Vec<Vec<Complex>>>();
+        .collect::<Vec<Complex>>();
 
-    let result =
-        circuit
-            .gates
-            .into_iter()
-            .fold(init_state, |acc, gate: Gate<B>| -> Vec<Vec<Complex>> {
-                log::debug!("applying gate: {:?}", gate);
-                let unitary = gate.unitary(circuit.num_qubits);
-                futhark::matmul(unitary, acc)
-            });
+    let result = circuit
+        .gates
+        .into_iter()
+        .fold(init_state, |acc, gate: Gate<B>| -> Vec<Complex> {
+            log::debug!("applying gate: {:?}", gate);
+            let UnitaryMatrix { mat, qubit_indices } = gate.unitary();
+            futhark::apply_vec(acc, mat, qubit_indices)
+        });
 
-    let result_dim = result.len();
-
-    let linearized: Vec<Complex> = result.into_iter().flatten().collect();
-    assert!(result_dim == linearized.len());
-    linearized
+    assert!(result.len() == dim);
+    result
 }
