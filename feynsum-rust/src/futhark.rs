@@ -1,6 +1,4 @@
 // futhark_lib.rs file is dirty so we define a wrapper here
-use log;
-
 mod internal {
     #![allow(warnings)]
     include!(concat!(env!("OUT_DIR"), "/futhark_lib.rs"));
@@ -72,7 +70,7 @@ mod internal {
             .unwrap()
             .get()
             .unwrap();
-        assert!(linearized.len() == n);
+        assert!(linearized.len() == 2 * n);
 
         let result: Vec<Complex> = linearized
             .chunks(2)
