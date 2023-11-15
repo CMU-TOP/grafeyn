@@ -16,3 +16,29 @@ entry matmul [n][m][p]
              (transpose B))
       A
 
+
+def get_G_index [q] (i: i64) (qubit_indices: [q]i64) : i64 =
+       reduce (\acc -> \j -> acc + (((i >> (qubit_indices[j])) & 1) << j))
+              0i64
+              (indices qubit_indices)
+
+def get_S_index [q] (i: i64) (k: i64) (qubit_indices: [q]i64) : i64 =
+       reduce (\acc -> 
+                     \j -> 
+                     if bool.i64 (k & (1 << j)) then acc | (1 << qubit_indices[j]) else acc & !(1 << qubit_indices[j]))
+              i
+              (indices qubit_indices)
+
+
+entry apply_vec [n][q][qsq]
+          (S: [n]complex) (G : [qsq][qsq]complex) (qubit_indices: [q]i64): [n]complex =
+  map (\i -> (reduce 
+              add
+              (copy zero)
+              (map (\k -> 
+                     mul S[get_S_index i k qubit_indices] G[get_G_index i qubit_indices][k])
+                     --- actually (indices (G[get_G_index i qubit_indices]))
+                     (indices G)
+              )
+              ))
+(indices S)

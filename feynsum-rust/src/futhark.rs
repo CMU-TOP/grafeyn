@@ -37,6 +37,51 @@ mod internal {
         assert!(result.len() == n);
         result
     }
+
+    pub fn apply_vec(
+        s: Vec<Complex>,
+        mat: Vec<Vec<Complex>>,
+        qubit_indices: Vec<usize>,
+    ) -> Vec<Complex> {
+        let ctx = Context::new().unwrap();
+        let n = s.len();
+        let q = qubit_indices.len();
+        log::debug!("n: {}, q: {}", n, q);
+        assert!(mat.len() == 1 << q);
+        assert!(mat[0].len() == 1 << q);
+
+        let s = ArrayF32D2::new(
+            &ctx,
+            [n as i64, 2],
+            s.iter().flat_map(|c| [c.re, c.im]).collect::<Vec<f32>>(),
+        )
+        .unwrap();
+        let mat = ArrayF32D3::new(&ctx, [1 << q as i64, 1 << q as i64, 2], &flatten(mat)).unwrap();
+        let qubit_indices = ArrayI64D1::new(
+            &ctx,
+            [q as i64],
+            qubit_indices
+                .iter()
+                .map(|&i| i as i64)
+                .collect::<Vec<i64>>(),
+        )
+        .unwrap();
+
+        let linearized = ctx
+            .apply_vec(&s, &mat, &qubit_indices)
+            .unwrap()
+            .get()
+            .unwrap();
+        assert!(linearized.len() == n);
+
+        let result: Vec<Complex> = linearized
+            .chunks(2)
+            .map(|c| Complex::new(c[0], c[1]))
+            .collect();
+
+        assert!(result.len() == n);
+        result
+    }
 }
 
-pub use internal::matmul;
+pub use internal::{apply_vec, matmul};
