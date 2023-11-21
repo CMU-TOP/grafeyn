@@ -205,7 +205,7 @@ struct
                   case apply widx of
                     G.OutputOne widx' => doGates (apps + 1) (widx', gatenum + 1)
                   | G.OutputTwo (widx1, widx) =>
-                      doTwo (apps + 1) ((widx1, widx), gatenum + 1)
+                      doTwo (apps + 2) ((widx1, widx), gatenum + 1)
 
           and doTwo apps ((widx1, widx2), gatenum) =
             case doGates apps (widx1, gatenum) of
