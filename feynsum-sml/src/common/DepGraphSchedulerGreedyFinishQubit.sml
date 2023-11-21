@@ -223,7 +223,7 @@ struct
   fun schedulerRandom seedNum ({depGraph = dg, gateIsBranching = gib} : args) =
       (*let val seed = Random.rand (seedNum, seedNum * seedNum) in*)
         fn gates => let val r = Random.randRange (0, Seq.length gates - 1) seed in
-                      (print ("Randomly chose " ^ Int.toString r ^ " from range [0, " ^ Int.toString (Seq.length gates) ^ ")\n");
+                      ((*print ("Randomly chose " ^ Int.toString r ^ " from range [0, " ^ Int.toString (Seq.length gates) ^ ")\n");*)
                         Seq.nth gates r)
                     end
       (* end *)

@@ -134,8 +134,15 @@ struct
           density
         end
 
+      fun getNumZeros state =
+          case state of
+              Expander.Sparse sst => SST.zeroSize sst
+            | Expander.Dense ds => raise Fail "Can't do dense stuff!"
+              (*DS.unsafeViewContents ds, DS.nonZeroSize ds, TODO exception*)
+            | Expander.DenseKnownNonZeroSize (ds, nz) => raise Fail "Can't do dense stuff!"
+              (*DS.unsafeViewContents ds, nz, TODO exception*)
 
-      fun loop numGateApps gatesVisitedSoFar counts prevNonZeroSize state =
+      fun loop numGateApps gatesVisitedSoFar counts prevNonZeroSize state totalDensity =
         if gatesVisitedSoFar >= depth then
           let
             val (nonZeros, numNonZeros) =
@@ -150,9 +157,10 @@ struct
             (* val _ = dumpState numQubits state *)
 
             val density =
-              dumpDensity (gatesVisitedSoFar, numNonZeros, NONE, NONE)
+              dumpDensity (gatesVisitedSoFar, numNonZeros, SOME (getNumZeros state), NONE)
           in
             print "\n";
+            print ("avg-density " ^ Real.toString (totalDensity / Real.fromInt gatesVisitedSoFar) ^ "\n");
             (numGateApps, nonZeros, Seq.fromRevList (numNonZeros :: counts))
           end
 
@@ -187,7 +195,7 @@ struct
             val throughput = millions / seconds
             val throughputStr = Real.fmt (StringCvt.FIX (SOME 2)) throughput
             val density =
-              dumpDensity (gatesVisitedSoFar, numNonZeros, NONE, NONE)
+              dumpDensity (gatesVisitedSoFar, numNonZeros, SOME (getNumZeros state), NONE)
             val _ = print
               (" hop " ^ leftPad 3 (Int.toString numGatesVisitedHere) ^ " "
                ^ rightPad 11 method ^ " "
@@ -195,14 +203,14 @@ struct
                ^ throughputStr ^ "\n")
           in
             loop (numGateApps + apps) (gatesVisitedSoFar + numGatesVisitedHere)
-              (numNonZeros :: counts) numNonZeros result
+              (numNonZeros :: counts) numNonZeros result (totalDensity + (Rat.approx density) * Real.fromInt numGatesVisitedHere)
           end
 
 
       val initialState = Expander.Sparse
         (SST.singleton {numQubits = numQubits} (B.zeros, C.defaultReal 1.0))
 
-      val (numGateApps, finalState, counts) = loop 0 0 [] 1 initialState
+      val (numGateApps, finalState, counts) = loop 0 0 [] 1 initialState 0.0
       val _ = print ("gate app count " ^ Int.toString numGateApps ^ "\n")
     in
       {result = finalState, counts = counts}

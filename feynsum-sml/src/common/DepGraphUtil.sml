@@ -15,7 +15,7 @@ sig
   (* Switches edge directions *)
   val transpose: dep_graph -> dep_graph
 
-  val scheduleWithOracle: dep_graph -> (gate_idx -> bool) -> (gate_idx Seq.t -> gate_idx) -> int -> gate_idx Seq.t Seq.t
+  val scheduleWithOracle: dep_graph -> (gate_idx -> bool) -> (gate_idx Seq.t -> gate_idx) -> bool -> int -> gate_idx Seq.t Seq.t
 
   val scheduleCost: gate_idx Seq.t Seq.t -> (gate_idx -> bool) -> real
   val chooseSchedule: gate_idx Seq.t Seq.t Seq.t -> (gate_idx -> bool) -> gate_idx Seq.t Seq.t
@@ -72,7 +72,7 @@ struct
         { visited = vis, indegree = deg }
       end
 
-  fun scheduleWithOracle (graph: dep_graph) (branching: gate_idx -> bool) (choose: gate_idx Seq.t -> gate_idx) (maxBranchingStride: int) =
+  fun scheduleWithOracle (graph: dep_graph) (branching: gate_idx -> bool) (choose: gate_idx Seq.t -> gate_idx) (disableFusion: bool) (maxBranchingStride: int) =
       let val st = initState graph
           fun findNonBranching (i: int) (xs: gate_idx Seq.t) =
               if i = Seq.length xs then
@@ -81,6 +81,7 @@ struct
                 findNonBranching (i + 1) xs
               else
                 SOME (Seq.nth xs i)
+          fun returnSeq thisStep acc = Seq.map Seq.fromList (Seq.rev (Seq.fromList (if List.null thisStep then acc else List.rev thisStep :: acc)))
           fun loadNonBranching (acc: gate_idx list) =
               case findNonBranching 0 (frontier st) of
                   NONE => acc
@@ -88,7 +89,7 @@ struct
           fun loadNext numBranchingSoFar thisStep (acc: gate_idx list list) =
               let val ftr = frontier st in
                 if Seq.length ftr = 0 then
-                  Seq.map Seq.fromList (Seq.rev (Seq.fromList (if List.null thisStep then acc else List.rev thisStep :: acc)))
+                  returnSeq thisStep acc
                 else
                   (let val next = choose ftr in
                      visit graph next st;
@@ -98,8 +99,21 @@ struct
                        loadNext (numBranchingSoFar + 1) (loadNonBranching (next :: thisStep)) acc
                    end)
               end
+          fun loadNextNoFusion (acc: gate_idx list list) =
+              let val ftr = frontier st in
+                if Seq.length ftr = 0 then
+                  returnSeq nil acc
+                else
+                  (let val next = choose ftr in
+                     visit graph next st;
+                     loadNextNoFusion ((next :: nil) :: acc)
+                   end)
+              end
       in
-        loadNext 0 (loadNonBranching nil) nil
+        if disableFusion then
+          loadNextNoFusion nil
+        else
+          loadNext 0 (loadNonBranching nil) nil
       end
 
   (*fun scheduleCost2 (order: gate_idx Seq.t Seq.t) (branching: gate_idx -> bool) =
@@ -122,7 +136,7 @@ struct
               if i = N then
                 cost
               else
-                iter (i + 1) (1.0 + (if branching (Seq.nth gates i) then cost * 2.0 else cost))
+                iter (i + 1) (1.0 + (if branching (Seq.nth gates i) then cost * 1.67 else cost))
       in
         iter 0 0.0
       end
