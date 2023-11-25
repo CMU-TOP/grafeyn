@@ -15,6 +15,13 @@ macro_rules! profile {
     }
 }
 
+#[macro_export]
+macro_rules! test_case {
+    ($fname:expr) => {
+        concat!(env!("CARGO_MANIFEST_DIR"), "/resources/test/", $fname) // assumes Linux ('/')!
+    };
+}
+
 pub fn is_real_zero(x: Real) -> bool {
     x.abs() < constants::ZERO_THRESHOLD
 }

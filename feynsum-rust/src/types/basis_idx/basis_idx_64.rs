@@ -1,5 +1,6 @@
 use std::fmt::{self, Display, Formatter};
 use std::hash::Hash;
+use std::str::FromStr;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::{AtomicBasisIdx, BasisIdx};
@@ -15,6 +16,16 @@ impl Display for BasisIdx64 {
             Some(width) => format!("{:0width$b}", self.bits, width = width).fmt(f),
             None => format!("{:b}", self.bits).fmt(f),
         }
+    }
+}
+
+impl FromStr for BasisIdx64 {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            bits: u64::from_str_radix(s, 2).map_err(|_| ())?,
+        })
     }
 }
 
