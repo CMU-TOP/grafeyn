@@ -1,2 +1,3 @@
 [env]
 RUST_LOG = "debug"
+FUTHARK_BACKEND = "c"
