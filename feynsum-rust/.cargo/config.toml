@@ -1,3 +1,8 @@
 [env]
 RUST_LOG = "debug"
 FUTHARK_BACKEND = "c"
+
+# For Futhark CUDA backend
+LIBRARY_PATH = "/usr/local/cuda/lib64"
+LD_LIBRARY_PATH = "/usr/local/cuda/lib64/"
+CPATH = "/usr/local/cuda/include"
