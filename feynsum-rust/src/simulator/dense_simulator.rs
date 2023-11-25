@@ -9,7 +9,8 @@ use crate::types::{BasisIdx, Complex};
 use crate::utility;
 
 use super::Compactifiable;
-use unitary::{Unitary, UnitaryMatrix};
+use unitary::Unitary;
+pub use unitary::UnitaryMatrix;
 
 type State = Vec<Complex>;
 
@@ -44,8 +45,7 @@ pub fn run<B: BasisIdx>(_config: &Config, circuit: Circuit<B>) -> State {
         .into_iter()
         .fold(init_state, |acc, gate: Gate<B>| -> Vec<Complex> {
             log::debug!("applying gate: {:?}", gate);
-            let UnitaryMatrix { mat, qubit_indices } = gate.unitary();
-            futhark::apply_vec(acc, mat, qubit_indices)
+            futhark::apply_vec(acc, gate.unitary())
         });
 
     assert!(result.len() == dim);

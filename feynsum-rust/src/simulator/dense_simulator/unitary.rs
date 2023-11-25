@@ -1,8 +1,12 @@
 use crate::circuit::{Gate, GateDefn};
 use crate::types::{constants, BasisIdx, Complex, QubitIndex};
+use nalgebra::{
+    base::{Matrix, VecStorage},
+    dmatrix, Dyn,
+};
 
 pub struct UnitaryMatrix {
-    pub mat: Vec<Vec<Complex>>,
+    pub mat: Matrix<Complex, Dyn, Dyn, VecStorage<Complex, Dyn, Dyn>>,
     pub qubit_indices: Vec<QubitIndex>,
 }
 pub trait Unitary {
@@ -28,15 +32,12 @@ impl<B: BasisIdx> Unitary for Gate<B> {
                 todo!()
             }
             GateDefn::Hadamard(qi) => {
-                let mat = vec![
-                    vec![
+                let mat = dmatrix![
                         Complex::new(constants::RECP_SQRT_2, 0.0),
+                        Complex::new(constants::RECP_SQRT_2, 0.0);
                         Complex::new(constants::RECP_SQRT_2, 0.0),
-                    ],
-                    vec![
-                        Complex::new(constants::RECP_SQRT_2, 0.0),
-                        -Complex::new(constants::RECP_SQRT_2, 0.0),
-                    ],
+                        -Complex::new(constants::RECP_SQRT_2, 0.0)
+
                 ];
                 UnitaryMatrix {
                     mat,
@@ -44,9 +45,9 @@ impl<B: BasisIdx> Unitary for Gate<B> {
                 }
             }
             GateDefn::PauliY(qi) => {
-                let mat = vec![
-                    vec![Complex::new(0.0, 0.0), -Complex::new(0.0, 1.0)],
-                    vec![Complex::new(0.0, 1.0), Complex::new(0.0, 0.0)],
+                let mat = dmatrix![
+                    Complex::new(0.0, 0.0), -Complex::new(0.0, 1.0);
+                    Complex::new(0.0, 1.0), Complex::new(0.0, 0.0)
                 ];
                 UnitaryMatrix {
                     mat,
@@ -54,9 +55,9 @@ impl<B: BasisIdx> Unitary for Gate<B> {
                 }
             }
             GateDefn::PauliZ(qi) => {
-                let mat = vec![
-                    vec![Complex::new(1.0, 0.0), Complex::new(0.0, 0.0)],
-                    vec![Complex::new(0.0, 0.0), -Complex::new(1.0, 0.0)],
+                let mat = dmatrix![
+                    Complex::new(1.0, 0.0), Complex::new(0.0, 0.0);
+                    Complex::new(0.0, 0.0), -Complex::new(1.0, 0.0)
                 ];
                 UnitaryMatrix {
                     mat,
@@ -64,9 +65,9 @@ impl<B: BasisIdx> Unitary for Gate<B> {
                 }
             }
             GateDefn::Phase { target, rot } => {
-                let mat = vec![
-                    vec![Complex::new(1.0, 0.0), Complex::new(0.0, 0.0)],
-                    vec![Complex::new(0.0, 0.0), Complex::new(rot.cos(), rot.sin())],
+                let mat = dmatrix![
+                    Complex::new(1.0, 0.0), Complex::new(0.0, 0.0);
+                    Complex::new(0.0, 0.0), Complex::new(rot.cos(), rot.sin())
                 ];
                 UnitaryMatrix {
                     mat,
@@ -74,9 +75,9 @@ impl<B: BasisIdx> Unitary for Gate<B> {
                 }
             }
             GateDefn::S(qi) => {
-                let mat = vec![
-                    vec![Complex::new(1.0, 0.0), Complex::new(0.0, 0.0)],
-                    vec![Complex::new(0.0, 0.0), Complex::new(0.0, 1.0)],
+                let mat = dmatrix![
+                    Complex::new(1.0, 0.0), Complex::new(0.0, 0.0);
+                    Complex::new(0.0, 0.0), Complex::new(0.0, 1.0)
                 ];
                 UnitaryMatrix {
                     mat,
@@ -84,9 +85,9 @@ impl<B: BasisIdx> Unitary for Gate<B> {
                 }
             }
             GateDefn::Sdg(qi) => {
-                let mat = vec![
-                    vec![Complex::new(1.0, 0.0), Complex::new(0.0, 0.0)],
-                    vec![Complex::new(0.0, 0.0), -Complex::new(0.0, 1.0)],
+                let mat = dmatrix![
+                    Complex::new(1.0, 0.0), Complex::new(0.0, 0.0);
+                    Complex::new(0.0, 0.0), -Complex::new(0.0, 1.0)
                 ];
                 UnitaryMatrix {
                     mat,
