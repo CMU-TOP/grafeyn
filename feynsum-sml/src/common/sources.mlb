@@ -71,6 +71,7 @@ local
   DepGraphSchedulerGreedyBranching.sml
   DepGraphSchedulerGreedyNonBranching.sml
   DepGraphSchedulerGreedyFinishQubit.sml
+  DepGraphDynScheduler.sml
   GateSchedulerOrder.sml
 in
   structure HashTable
@@ -135,4 +136,8 @@ in
   functor DepGraphSchedulerGreedyNonBranching
   functor DepGraphSchedulerGreedyFinishQubit
   structure GateSchedulerOrder
+  signature DEP_GRAPH_DYN_SCHEDULER
+  functor DynSchedFinishQubitWrapper
+  functor DynSchedInterference
+  functor DynSchedNaive
 end

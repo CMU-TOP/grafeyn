@@ -17,6 +17,8 @@ sig
 
   val scheduleWithOracle: dep_graph -> (gate_idx -> bool) -> (gate_idx Seq.t -> gate_idx) -> bool -> int -> gate_idx Seq.t Seq.t
 
+  val scheduleWithOracle': dep_graph -> (gate_idx -> bool) -> ('state * gate_idx Seq.t -> gate_idx) -> bool -> int -> ('state * gate_idx Seq.t -> 'state) -> 'state -> 'state
+
   val scheduleCost: gate_idx Seq.t Seq.t -> (gate_idx -> bool) -> real
   val chooseSchedule: gate_idx Seq.t Seq.t Seq.t -> (gate_idx -> bool) -> gate_idx Seq.t Seq.t
 
@@ -72,8 +74,8 @@ struct
         { visited = vis, indegree = deg }
       end
 
-  fun scheduleWithOracle (graph: dep_graph) (branching: gate_idx -> bool) (choose: gate_idx Seq.t -> gate_idx) (disableFusion: bool) (maxBranchingStride: int) =
-      let val st = initState graph
+  fun scheduleWithOracle' (graph: dep_graph) (branching: gate_idx -> bool) (choose: 'state * gate_idx Seq.t -> gate_idx) (disableFusion: bool) (maxBranchingStride: int) (apply: 'state * gate_idx Seq.t -> 'state) state =
+      let val dgst = initState graph
           fun findNonBranching (i: int) (xs: gate_idx Seq.t) =
               if i = Seq.length xs then
                 NONE
@@ -83,38 +85,40 @@ struct
                 SOME (Seq.nth xs i)
           fun returnSeq thisStep acc = Seq.map Seq.fromList (Seq.rev (Seq.fromList (if List.null thisStep then acc else List.rev thisStep :: acc)))
           fun loadNonBranching (acc: gate_idx list) =
-              case findNonBranching 0 (frontier st) of
+              case findNonBranching 0 (frontier dgst) of
                   NONE => acc
-                | SOME i => (visit graph i st; loadNonBranching (i :: acc))
-          fun loadNext numBranchingSoFar thisStep (acc: gate_idx list list) =
-              let val ftr = frontier st in
+                | SOME i => (visit graph i dgst; loadNonBranching (i :: acc))
+          fun loadNext numBranchingSoFar thisStep state =
+              let val ftr = frontier dgst in
                 if Seq.length ftr = 0 then
-                  returnSeq thisStep acc
+                  state
                 else
-                  (let val next = choose ftr in
-                     visit graph next st;
+                  (let val next = choose (state, ftr) in
+                     visit graph next dgst;
                      if numBranchingSoFar + 1 >= maxBranchingStride then
-                       loadNext 0 nil (List.rev (loadNonBranching (next :: thisStep)) :: acc)
+                       loadNext 0 nil (apply (state, Seq.rev (Seq.fromList (loadNonBranching (next :: thisStep)))))
                      else
-                       loadNext (numBranchingSoFar + 1) (loadNonBranching (next :: thisStep)) acc
+                       loadNext (numBranchingSoFar + 1) (loadNonBranching (next :: thisStep)) state
                    end)
               end
-          fun loadNextNoFusion (acc: gate_idx list list) =
-              let val ftr = frontier st in
+          fun loadNextNoFusion state =
+              let val ftr = frontier dgst in
                 if Seq.length ftr = 0 then
-                  returnSeq nil acc
+                  state
                 else
-                  (let val next = choose ftr in
-                     visit graph next st;
-                     loadNextNoFusion ((next :: nil) :: acc)
+                  (let val next = choose (state, ftr) in
+                     visit graph next dgst;
+                     loadNextNoFusion (apply (state, Seq.singleton next))
                    end)
               end
       in
         if disableFusion then
-          loadNextNoFusion nil
+          loadNextNoFusion state
         else
-          loadNext 0 (loadNonBranching nil) nil
+          loadNext 0 (loadNonBranching nil) state
       end
+
+  fun scheduleWithOracle (graph: dep_graph) (branching: gate_idx -> bool) (choose: gate_idx Seq.t -> gate_idx) (disableFusion: bool) (maxBranchingStride: int) = Seq.rev (Seq.fromList (scheduleWithOracle' graph branching (fn (_, x) => choose x) disableFusion maxBranchingStride (fn (gs, g) => g :: gs) nil))
 
   (*fun scheduleCost2 (order: gate_idx Seq.t Seq.t) (branching: gate_idx -> bool) =
       let val gates = Seq.flatten order

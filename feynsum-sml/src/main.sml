@@ -61,18 +61,19 @@ fun parseQasm () =
       Circuit.fromSMLQasmSimpleCircuit simpleCirc
     end
 
-val (circuit, optDepGraph) =
+val (circuit, depGraph) = (*(circuit, optDepGraph)*)
   case inputName of
     "" => Util.die ("missing: -input FILE.qasm")
 
   | _ =>
     if String.isSuffix ".qasm" inputName then
-      (parseQasm (), NONE)
+      raise Fail ".qasm no longer supported, use .json dependency graph"
+      (*parseQasm (), NONE*)
     else
       let val dg = DepGraph.fromFile inputName
           val circuit = {numQubits = #numQubits dg, gates = #gates dg}
       in
-        (circuit, SOME dg)
+        (circuit, dg)
       end
 
 val _ = print ("-------------------------------\n")
@@ -185,7 +186,7 @@ fun gate_branching ({ gates = gates, ...} : DepGraph.t) =
 
 val maxBranchingStride' = if disableFusion then 1 else maxBranchingStride
 
-fun greedybranching () =
+(*fun greedybranching () =
   case optDepGraph of
     NONE => GateSchedulerGreedyBranching.scheduler
   | SOME dg => GateSchedulerOrder.mkScheduler (DepGraphUtil.scheduleWithOracle dg (gate_branching dg) (DepGraphSchedulerGreedyBranching.scheduler { depGraph = dg, gateIsBranching = gate_branching dg }) disableFusion  maxBranchingStride')
@@ -237,9 +238,9 @@ fun randomsched (samples: int) =
         val chosen = DepGraphUtil.chooseSchedule scheds (gate_branching dg)
     in
       GateSchedulerOrder.mkScheduler chosen
-    end
+    end*)
 
-val gateScheduler =
+(*val gateScheduler =
   case schedulerName of
     "naive" => GateSchedulerNaive.scheduler
 
@@ -270,7 +271,7 @@ val gateScheduler =
       Util.die
         ("unknown scheduler: " ^ schedulerName
          ^
-         "; valid options are: naive, greedy-branching (gb), greedy-nonbranching (gnb), greedy-finish-qubit (gfq)")
+         "; valid options are: naive, greedy-branching (gb), greedy-nonbranching (gnb), greedy-finish-qubit (gfq)")*)
 
 (* ========================================================================
  * mains: 32-bit and 64-bit
@@ -280,9 +281,11 @@ structure M_64_32 =
   MkMain
     (structure B = BasisIdx64
      structure C = Complex32
+     val maxBranchingStride = maxBranchingStride
+     val disableFusion = disableFusion
      val blockSize = blockSize
      val maxload = maxload
-     val gateScheduler = gateScheduler
+     val gateScheduler = schedulerName
      val doMeasureZeros = doMeasureZeros
      val denseThreshold = denseThreshold
      val pullThreshold = pullThreshold)
@@ -291,9 +294,11 @@ structure M_64_64 =
   MkMain
     (structure B = BasisIdx64
      structure C = Complex64
+     val maxBranchingStride = maxBranchingStride
+     val disableFusion = disableFusion
      val blockSize = blockSize
      val maxload = maxload
-     val gateScheduler = gateScheduler
+     val gateScheduler = schedulerName
      val doMeasureZeros = doMeasureZeros
      val denseThreshold = denseThreshold
      val pullThreshold = pullThreshold)
@@ -302,9 +307,11 @@ structure M_U_32 =
   MkMain
     (structure B = BasisIdxUnlimited
      structure C = Complex32
+     val maxBranchingStride = maxBranchingStride
+     val disableFusion = disableFusion
      val blockSize = blockSize
      val maxload = maxload
-     val gateScheduler = gateScheduler
+     val gateScheduler = schedulerName
      val doMeasureZeros = doMeasureZeros
      val denseThreshold = denseThreshold
      val pullThreshold = pullThreshold)
@@ -313,9 +320,11 @@ structure M_U_64 =
   MkMain
     (structure B = BasisIdxUnlimited
      structure C = Complex64
+     val maxBranchingStride = maxBranchingStride
+     val disableFusion = disableFusion
      val blockSize = blockSize
      val maxload = maxload
-     val gateScheduler = gateScheduler
+     val gateScheduler = schedulerName
      val doMeasureZeros = doMeasureZeros
      val denseThreshold = denseThreshold
      val pullThreshold = pullThreshold)
@@ -333,4 +342,4 @@ val main =
 
 (* ======================================================================== *)
 
-val _ = main (inputName, circuit)
+val _ = main (inputName, depGraph)

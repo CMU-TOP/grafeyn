@@ -55,7 +55,7 @@ struct
               val d = Char.ord (String.sub (digits, depth)) - Char.ord #"0"
               val _ =
                 if 0 <= d andalso d <= 9 then ()
-                else raise Fail "riMult: bad digit"
+                else raise Fail ("riMult: bad digit " ^ digits ^ ", " ^ Real.toString r ^ ", " ^ IntInf.toString i)
               val acc =
                 acc + (i * IntInf.fromInt d) div (IntInf.pow (10, depth + 1))
             in
@@ -407,7 +407,7 @@ struct
 
       val (method, {result, numGateApps}) =
         if
-          expectedCost < riMult denseThreshold maxNumStates
+          denseThreshold >= 1.0 orelse expectedCost < riMult denseThreshold maxNumStates
         then
           ("push sparse", expandSparse args)
 
