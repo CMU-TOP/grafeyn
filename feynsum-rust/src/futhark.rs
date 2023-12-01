@@ -100,4 +100,4 @@ mod internal {
     }
 }
 
-pub use internal::{apply_vec, create_context, FutharkVector};
+pub use internal::{apply_vec, create_context, Context, FutharkVector};
