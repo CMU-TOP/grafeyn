@@ -33,8 +33,7 @@ pub fn run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
     let mut num_gate_apps = 0;
     let mut prev_num_nonzeros = 1;
 
-    let mut gate_scheduler =
-        gate_scheduler::create_gate_scheduler(&config.gate_scheduling_policy, &circuit);
+    let mut gate_scheduler = gate_scheduler::create_gate_scheduler(&config, &circuit);
 
     info!("starting gate application loop.");
 

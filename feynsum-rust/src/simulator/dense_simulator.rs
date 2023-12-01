@@ -5,6 +5,7 @@ use log;
 use crate::circuit::{Circuit, Gate};
 use crate::config::Config;
 use crate::futhark::{self, FutharkVector};
+use crate::gate_scheduler;
 use crate::types::{BasisIdx, Complex};
 use crate::utility;
 
@@ -26,7 +27,7 @@ impl<B: BasisIdx> Compactifiable<B> for State {
     }
 }
 
-pub fn run<B: BasisIdx>(_config: &Config, circuit: Circuit<B>) -> State {
+pub fn run<B: BasisIdx>(config: &Config, circuit: Circuit<B>) -> State {
     let dim = 1 << circuit.num_qubits;
 
     let futhark_context = futhark::create_context();
@@ -65,7 +66,10 @@ mod tests {
 
     #[test]
     fn test_run() {
-        let config = Config::default();
+        let config = Config {
+            disable_gate_fusion: true,
+            ..Config::default()
+        };
         let source = fs::read_to_string(test_case!("adder_n10.qasm")).unwrap();
         let program = parser::parse_program(&source).unwrap();
         let circuit = Circuit::<BasisIdx64>::new(program).unwrap();

@@ -10,35 +10,46 @@ pub struct GreedyNonbranchingGateScheduler<'a> {
     gate_touches: Vec<&'a [QubitIndex]>,
     gate_is_branching: Vec<bool>,
     max_branching_stride: usize,
+    disable_gate_fusion: bool,
 }
 
 impl<'a> GateScheduler for GreedyNonbranchingGateScheduler<'a> {
     fn pick_next_gates(&mut self) -> Vec<GateIndex> {
-        let mut num_branching_so_far = 0;
-        let mut next_gates = Vec::<GateIndex>::new();
-
-        while num_branching_so_far < self.max_branching_stride {
-            next_gates.append(&mut self.visit_maximal_nonbranching_run());
-
-            if let Some(next_gate) = self.visit_branching() {
-                num_branching_so_far += 1;
-                next_gates.push(next_gate);
-            } else {
-                break;
+        if self.disable_gate_fusion {
+            match self.visit_nonbranching() {
+                Some(gi) => vec![gi],
+                None => match self.visit_branching() {
+                    Some(gi) => vec![gi],
+                    None => vec![],
+                },
             }
+        } else {
+            let mut num_branching_so_far = 0;
+            let mut next_gates = Vec::<GateIndex>::new();
+
+            while num_branching_so_far < self.max_branching_stride {
+                next_gates.append(&mut self.visit_maximal_nonbranching_run());
+
+                if let Some(next_gate) = self.visit_branching() {
+                    num_branching_so_far += 1;
+                    next_gates.push(next_gate);
+                } else {
+                    break;
+                }
+            }
+
+            // each gate in next_gates should be marked as already visited
+            assert!(next_gates.iter().all(|gi| !utility::okay_to_visit(
+                self.num_gates,
+                &self.gate_touches,
+                &self.frontier,
+                *gi
+            )));
+
+            debug!("next gates: {:?}", next_gates);
+
+            next_gates
         }
-
-        // each gate in next_gates should be marked as already visited
-        assert!(next_gates.iter().all(|gi| !utility::okay_to_visit(
-            self.num_gates,
-            &self.gate_touches,
-            &self.frontier,
-            *gi
-        )));
-
-        debug!("next gates: {:?}", next_gates);
-
-        next_gates
     }
 }
 
@@ -48,6 +59,7 @@ impl<'a> GreedyNonbranchingGateScheduler<'a> {
         num_qubits: usize,
         gate_touches: Vec<&'a [QubitIndex]>,
         gate_is_branching: Vec<bool>,
+        disable_gate_fusion: bool,
     ) -> Self {
         debug!(
             "initializing greedy nonbranching gate scheduler with {} gates and {} qubits",
@@ -62,6 +74,7 @@ impl<'a> GreedyNonbranchingGateScheduler<'a> {
             gate_touches,
             gate_is_branching,
             max_branching_stride: 2,
+            disable_gate_fusion,
         };
 
         assert_eq!(scheduler.frontier.len(), num_qubits);
@@ -71,6 +84,29 @@ impl<'a> GreedyNonbranchingGateScheduler<'a> {
         debug!("initial frontier: {:?}", scheduler.frontier);
 
         scheduler
+    }
+
+    fn visit_nonbranching(&mut self) -> Option<GateIndex> {
+        let candidate = self
+            .frontier
+            .iter()
+            .filter(|gi| {
+                *gi < &self.num_gates
+                    && !self.gate_is_branching[**gi]
+                    && utility::okay_to_visit(
+                        self.num_gates,
+                        &self.gate_touches,
+                        &self.frontier,
+                        **gi,
+                    )
+            })
+            .nth(0)
+            .cloned();
+
+        if let Some(gi) = candidate {
+            utility::mark_as_visit(self.num_gates, &self.gate_touches, &mut self.frontier, gi);
+        }
+        candidate
     }
 
     fn visit_maximal_nonbranching_run(&mut self) -> Vec<GateIndex> {

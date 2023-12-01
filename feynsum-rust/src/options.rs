@@ -41,6 +41,9 @@ pub struct Options {
     #[structopt(long = "pull-threshold", default_value = "0.8")]
     pub pull_threshold: Real,
 
+    #[structopt(long = "disable-gate-fusion")]
+    pub disable_gate_fusion: bool,
+
     #[structopt(
         name = "simulator",
         long = "simulator",
