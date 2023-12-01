@@ -9,7 +9,7 @@ use crate::gate_scheduler;
 use crate::profile;
 use crate::types::{AtomicBasisIdx, BasisIdx, Complex, Real};
 
-use state::SparseStateTable;
+pub use state::SparseStateTable;
 use state_expander::ExpandResult;
 
 pub fn run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
