@@ -2,10 +2,11 @@ mod unitary;
 
 use log;
 
-use crate::circuit::{Circuit, Gate};
+use crate::circuit::Circuit;
 use crate::config::Config;
 use crate::futhark::{self, FutharkVector};
 use crate::gate_scheduler;
+use crate::profile;
 use crate::types::{BasisIdx, Complex};
 use crate::utility;
 
@@ -30,9 +31,13 @@ impl<B: BasisIdx> Compactifiable<B> for State {
 pub fn run<B: BasisIdx>(config: &Config, circuit: Circuit<B>) -> State {
     let dim = 1 << circuit.num_qubits;
 
+    let mut gate_scheduler = gate_scheduler::create_gate_scheduler(&config, &circuit);
+
+    let mut num_gates_visited = 0;
+
     let futhark_context = futhark::create_context();
 
-    let init_state = FutharkVector::new(
+    let mut state = FutharkVector::new(
         &futhark_context,
         (0..dim)
             .into_iter()
@@ -46,15 +51,42 @@ pub fn run<B: BasisIdx>(config: &Config, circuit: Circuit<B>) -> State {
             .collect::<Vec<Complex>>(),
     );
 
-    let result = circuit
-        .gates
-        .into_iter()
-        .fold(init_state, |acc, gate: Gate<B>| {
-            log::debug!("applying gate: {:?}", gate);
-            futhark::apply_vec(&futhark_context, acc, gate.unitary())
-        });
+    let (duration, _) = profile!(loop {
+        let these_gates = gate_scheduler.pick_next_gates();
+        if these_gates.is_empty() {
+            break;
+        }
+        assert!(these_gates.len() == 1);
+        let gate = &circuit.gates[these_gates[0]];
 
-    result.into_vec()
+        log::debug!("applying gate: {:?}", gate);
+
+        let num_gates_visited_here = 1;
+
+        let (duration, new_state) =
+            profile!(futhark::apply_vec(&futhark_context, state, gate.unitary()));
+
+        println!(
+            "gate: {:<3} density: ????????? nonzero: ??????????? hop:  {} dense(gpu) time: {:.4}s",
+            num_gates_visited,
+            num_gates_visited_here,
+            duration.as_secs_f32(),
+        );
+
+        state = new_state;
+        num_gates_visited += num_gates_visited_here;
+    });
+
+    let result = state.into_vec();
+    let num_nonzeros = result.iter().filter(|&&v| utility::is_nonzero(v)).count();
+
+    println!(
+        "gate: {:<2} density: ????????? nonzero: {:>10}\n time: {}s",
+        num_gates_visited,
+        num_nonzeros,
+        duration.as_secs_f32()
+    );
+    result
 }
 
 #[cfg(test)]
