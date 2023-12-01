@@ -117,7 +117,7 @@ fn run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
         }
         Simulator::Hybrid => {
             log::info!("using hybrid simulator");
-            simulator::hybrid_simulator::run(&config, circuit).compactify()
+            simulator::hybrid_simulator::run::<B, AB>(&config, circuit).compactify()
         }
     }
 }
