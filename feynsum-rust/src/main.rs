@@ -115,6 +115,10 @@ fn run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
             log::info!("using dense simulator");
             simulator::dense_simulator::run(&config, circuit).compactify()
         }
+        Simulator::Hybrid => {
+            log::info!("using hybrid simulator");
+            simulator::hybrid_simulator::run(&config, circuit).compactify()
+        }
     }
 }
 
