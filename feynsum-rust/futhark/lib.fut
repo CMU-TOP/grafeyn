@@ -32,13 +32,14 @@ def get_S_index [q] (i: i64) (k: i64) (qubit_indices: [q]i64) : i64 =
 
 entry apply_vec [n][q][qsq]
           (S: [n]complex) (G : [qsq][qsq]complex) (qubit_indices: [q]i64): [n]complex =
-  map (\i -> (reduce 
+  map (\i -> 
+       (let G_index = get_G_index i qubit_indices in
+              (reduce 
               add
               (copy zero)
               (map (\k -> 
-                     mul S[get_S_index i k qubit_indices] G[get_G_index i qubit_indices][k])
-                     --- actually (indices (G[get_G_index i qubit_indices]))
+                     mul S[get_S_index i k qubit_indices] G[G_index][k])
                      (indices G)
               )
-              ))
+              )))
 (indices S)
