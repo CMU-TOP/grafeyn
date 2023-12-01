@@ -5,14 +5,6 @@ mod internal {
     use crate::simulator::dense_simulator::UnitaryMatrix;
     use crate::types::Complex;
 
-    fn flatten(unitary: &UnitaryMatrix) -> Vec<f32> {
-        unitary
-            .mat
-            .row_iter()
-            .flat_map(|row| row.iter().flat_map(|c| [c.re, c.im]).collect::<Vec<_>>())
-            .collect()
-    }
-
     pub fn apply_vec(s: Vec<Complex>, unitary: UnitaryMatrix) -> Vec<Complex> {
         let ctx = Context::new().unwrap();
         let n = s.len();
@@ -53,6 +45,14 @@ mod internal {
 
         assert!(result.len() == n);
         result
+    }
+
+    fn flatten(unitary: &UnitaryMatrix) -> Vec<f32> {
+        unitary
+            .mat
+            .row_iter()
+            .flat_map(|row| row.iter().flat_map(|c| [c.re, c.im]).collect::<Vec<_>>())
+            .collect()
     }
 }
 
