@@ -4,6 +4,7 @@ use std::str::FromStr;
 use log::info;
 
 use crate::circuit::Circuit;
+use crate::config::Config;
 use crate::types::BasisIdx;
 
 mod greedy_finish_qubit_gate_scheduler;
@@ -53,9 +54,12 @@ pub trait GateScheduler {
 }
 
 pub fn create_gate_scheduler<'a, B: BasisIdx>(
-    gate_scheduling_policy: &GateSchedulingPolicy,
+    config: &Config,
     circuit: &'a Circuit<B>,
 ) -> Box<dyn GateScheduler + 'a> {
+    let gate_scheduling_policy = config.gate_scheduling_policy;
+    let disable_gate_fusion = config.disable_gate_fusion;
+
     let num_gates = circuit.num_gates();
     let num_qubits = circuit.num_qubits;
     let gate_touches = circuit
@@ -81,6 +85,7 @@ pub fn create_gate_scheduler<'a, B: BasisIdx>(
                 num_qubits,
                 gate_touches,
                 gate_is_branching,
+                disable_gate_fusion,
             ))
         }
         GateSchedulingPolicy::GreedyFinishQubit => {
