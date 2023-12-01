@@ -4,7 +4,7 @@ use log;
 
 use crate::circuit::{Circuit, Gate};
 use crate::config::Config;
-use crate::futhark;
+use crate::futhark::{self, FutharkVector};
 use crate::types::{BasisIdx, Complex};
 use crate::utility;
 
@@ -29,27 +29,31 @@ impl<B: BasisIdx> Compactifiable<B> for State {
 pub fn run<B: BasisIdx>(_config: &Config, circuit: Circuit<B>) -> State {
     let dim = 1 << circuit.num_qubits;
 
-    let init_state = (0..dim)
-        .into_iter()
-        .map(|i| {
-            if i == 0 {
-                Complex::new(1.0, 0.0)
-            } else {
-                Complex::new(0.0, 0.0)
-            }
-        })
-        .collect::<Vec<Complex>>();
+    let futhark_context = futhark::create_context();
+
+    let init_state = FutharkVector::new(
+        &futhark_context,
+        (0..dim)
+            .into_iter()
+            .map(|i| {
+                if i == 0 {
+                    Complex::new(1.0, 0.0)
+                } else {
+                    Complex::new(0.0, 0.0)
+                }
+            })
+            .collect::<Vec<Complex>>(),
+    );
 
     let result = circuit
         .gates
         .into_iter()
-        .fold(init_state, |acc, gate: Gate<B>| -> Vec<Complex> {
+        .fold(init_state, |acc, gate: Gate<B>| {
             log::debug!("applying gate: {:?}", gate);
-            futhark::apply_vec(acc, gate.unitary())
+            futhark::apply_vec(&futhark_context, acc, gate.unitary())
         });
 
-    assert!(result.len() == dim);
-    result
+    result.into_vec()
 }
 
 #[cfg(test)]
