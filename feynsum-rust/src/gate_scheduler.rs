@@ -3,7 +3,8 @@ use std::str::FromStr;
 
 use log::info;
 
-use crate::types::QubitIndex;
+use crate::circuit::Circuit;
+use crate::types::BasisIdx;
 
 mod greedy_finish_qubit_gate_scheduler;
 mod greedy_nonbranching_gate_scheduler;
@@ -51,13 +52,23 @@ pub trait GateScheduler {
     fn pick_next_gates(&mut self) -> Vec<usize>;
 }
 
-pub fn create_gate_scheduler<'a>(
+pub fn create_gate_scheduler<'a, B: BasisIdx>(
     gate_scheduling_policy: &GateSchedulingPolicy,
-    num_gates: usize,
-    num_qubits: usize,
-    gate_touches: Vec<&'a [QubitIndex]>,
-    gate_is_branching: Vec<bool>,
+    circuit: &'a Circuit<B>,
 ) -> Box<dyn GateScheduler + 'a> {
+    let num_gates = circuit.num_gates();
+    let num_qubits = circuit.num_qubits;
+    let gate_touches = circuit
+        .gates
+        .iter()
+        .map(|gate| gate.touches.as_slice())
+        .collect();
+    let gate_is_branching = circuit
+        .gates
+        .iter()
+        .map(|gate| gate.is_branching())
+        .collect();
+
     match gate_scheduling_policy {
         GateSchedulingPolicy::Naive => {
             info!("using naive gate scheduler");
