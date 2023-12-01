@@ -33,24 +33,8 @@ pub fn run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
     let mut num_gate_apps = 0;
     let mut prev_num_nonzeros = 1;
 
-    let gate_touches = circuit
-        .gates
-        .iter()
-        .map(|gate| gate.touches.as_slice())
-        .collect();
-    let gate_is_branching = circuit
-        .gates
-        .iter()
-        .map(|gate| gate.is_branching())
-        .collect();
-
-    let mut gate_scheduler = gate_scheduler::create_gate_scheduler(
-        &config.gate_scheduling_policy,
-        num_gates,
-        num_qubits,
-        gate_touches,
-        gate_is_branching,
-    );
+    let mut gate_scheduler =
+        gate_scheduler::create_gate_scheduler(&config.gate_scheduling_policy, &circuit);
 
     info!("starting gate application loop.");
 
