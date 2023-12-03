@@ -40,7 +40,6 @@ pub fn run<B: BasisIdx>(config: &Config, circuit: Circuit<B>) -> State {
     let mut state = FutharkVector::new(
         &futhark_context,
         (0..dim)
-            .into_iter()
             .map(|i| {
                 if i == 0 {
                     Complex::new(1.0, 0.0)
