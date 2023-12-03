@@ -1,5 +1,4 @@
 use derivative::Derivative;
-use log::debug;
 
 use crate::{
     types::{constants, BasisIdx, Complex, QubitIndex, Real},
@@ -811,7 +810,7 @@ fn push_to_pull<B: BasisIdx>(defn: &GateDefn, touches: &[QubitIndex]) -> Option<
             }))
         }
         _ => {
-            debug!("pull action for {:?} not supported at this moment", defn);
+            log::debug!("pull action for {:?} not supported at this moment", defn);
             None
         }
     }
