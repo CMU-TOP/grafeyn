@@ -11,7 +11,7 @@ use crate::types::{BasisIdx, Complex};
 use crate::utility;
 
 use super::Compactifiable;
-use unitary::Unitary;
+pub use unitary::Unitary;
 pub use unitary::UnitaryMatrix;
 
 type State = Vec<Complex>;

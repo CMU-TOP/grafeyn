@@ -1,5 +1,5 @@
 [env]
-RUST_LOG = "debug"
+RUST_LOG = "info"
 FUTHARK_BACKEND = "c"
 
 # For Futhark CUDA backend
