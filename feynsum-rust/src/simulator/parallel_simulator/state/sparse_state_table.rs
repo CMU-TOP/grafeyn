@@ -37,8 +37,8 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
             empty_key: B::empty_key(num_qubits),
         }
     }
-    pub fn new(num_qubits: usize, maxload: Real, expected: i64) -> Self {
-        let capacity = (1.1 * (1.0 / maxload) * (expected as Real)).ceil() as usize;
+    pub fn new(num_qubits: usize, maxload: Real, expected_num_nonzeros: usize) -> Self {
+        let capacity = (1.1 * (1.0 / maxload) * (expected_num_nonzeros as Real)).ceil() as usize;
         Self::new_with_capacity(num_qubits, capacity)
     }
     pub fn singleton(
@@ -46,9 +46,9 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
         bidx: B,
         weight: Complex,
         maxload: Real,
-        expected: i64,
+        expected_num_nonzeros: usize,
     ) -> Self {
-        let t = SparseStateTable::new(num_qubits, maxload, expected);
+        let t = SparseStateTable::new(num_qubits, maxload, expected_num_nonzeros);
         t.force_insert_unique(bidx, weight);
         t
     }
