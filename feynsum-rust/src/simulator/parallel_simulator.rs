@@ -10,7 +10,8 @@ use crate::profile;
 use crate::types::{AtomicBasisIdx, BasisIdx, Complex, Real};
 
 pub use state::SparseStateTable;
-use state_expander::ExpandResult;
+pub use state_expander::expand_sparse;
+pub use state_expander::{ExpandMethod, ExpandResult};
 
 pub fn run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
     config: &Config,

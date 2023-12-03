@@ -41,6 +41,19 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
         let capacity = (1.1 * (1.0 / maxload) * (expected_num_nonzeros as Real)).ceil() as usize;
         Self::new_with_capacity(num_qubits, capacity)
     }
+
+    pub fn new_from_dense(num_qubits: usize, dense_array: Vec<Complex>) -> Self {
+        // FIXME: Optimize this
+        let capacity = dense_array.len();
+        assert!(capacity == 1 << num_qubits);
+        let table = Self::new_with_capacity(num_qubits, capacity);
+        for (i, v) in dense_array.into_iter().enumerate() {
+            if utility::is_nonzero(v) {
+                table.force_insert_unique(B::from_idx(i), v);
+            }
+        }
+        table
+    }
     pub fn singleton(
         num_qubits: usize,
         bidx: B,

@@ -144,7 +144,7 @@ fn apply_gates2<B: BasisIdx, AB: AtomicBasisIdx<B>>(
     }
 }
 
-fn expand_sparse<B: BasisIdx, AB: AtomicBasisIdx<B>>(
+pub fn expand_sparse<B: BasisIdx, AB: AtomicBasisIdx<B>>(
     gates: Vec<&Gate<B>>,
     num_qubits: usize,
     config: &Config,
