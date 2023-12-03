@@ -1,4 +1,3 @@
-use std::cmp;
 use std::fmt::{self, Display, Formatter};
 use std::sync::{atomic::AtomicBool, atomic::Ordering};
 
@@ -9,6 +8,7 @@ use crate::config::Config;
 use crate::types::{AtomicBasisIdx, BasisIdx, Complex, Real};
 use crate::utility;
 
+use super::super::expected_cost;
 use super::state::{DenseStateTable, SparseStateTable, State};
 
 pub enum ExpandMethod {
@@ -41,29 +41,20 @@ pub fn expand<B: BasisIdx, AB: AtomicBasisIdx<B>>(
     prev_num_nonzeros: usize,
     state: State<B, AB>,
 ) -> ExpandResult<B, AB> {
-    let (expected_cost, expected) =
+    let (expected_density, expected_num_nonzeros) =
         expected_cost(num_qubits, state.num_nonzeros(), prev_num_nonzeros);
 
     let all_gates_pullable = gates.iter().all(|gate| gate.is_pullable());
 
     assert!(config.dense_threshold <= config.pull_threshold);
 
-    if expected_cost < config.dense_threshold {
-        expand_sparse(gates, num_qubits, config, expected, &state)
-    } else if expected_cost >= config.pull_threshold && all_gates_pullable {
+    if expected_density < config.dense_threshold {
+        expand_sparse(gates, num_qubits, config, expected_num_nonzeros, &state)
+    } else if expected_density >= config.pull_threshold && all_gates_pullable {
         expand_pull_dense(gates, num_qubits, state)
     } else {
         expand_push_dense(gates, num_qubits, state)
     }
-}
-
-fn expected_cost(num_qubits: usize, num_nonzeros: usize, prev_num_nonzeros: usize) -> (Real, i64) {
-    let max_num_states = 1 << num_qubits;
-    let rate = Real::max(1.0, num_nonzeros as Real / prev_num_nonzeros as Real);
-    let expected = cmp::min(max_num_states, (rate * num_nonzeros as Real) as i64);
-    let expected_density = expected as Real / max_num_states as Real;
-    let current_density = num_nonzeros as Real / max_num_states as Real;
-    (Real::max(expected_density, current_density), expected)
 }
 
 enum SuccessorsResult<B: BasisIdx> {
@@ -157,10 +148,10 @@ fn expand_sparse<B: BasisIdx, AB: AtomicBasisIdx<B>>(
     gates: Vec<&Gate<B>>,
     num_qubits: usize,
     config: &Config,
-    expected: i64,
+    expected_num_nonzeros: usize,
     state: &State<B, AB>,
 ) -> ExpandResult<B, AB> {
-    let mut table = SparseStateTable::new(num_qubits, config.maxload, expected);
+    let mut table = SparseStateTable::new(num_qubits, config.maxload, expected_num_nonzeros);
     let n: usize = match state {
         State::Sparse(prev_table) => prev_table.num_nonzeros(),
         State::Dense(prev_table) => prev_table.capacity(),

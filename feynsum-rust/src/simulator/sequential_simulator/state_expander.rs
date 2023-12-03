@@ -1,12 +1,11 @@
-use std::cmp;
 use std::fmt::{self, Display, Formatter};
 
 use crate::circuit::{Gate, PullApplyOutput, PushApplicable, PushApplyOutput};
 use crate::config::Config;
-use crate::types::{BasisIdx, Complex, Real};
+use crate::types::{BasisIdx, Complex};
 use crate::utility;
 
-use super::super::Compactifiable;
+use super::super::{expected_cost, Compactifiable};
 use super::state::{DenseStateTable, SparseStateTable, State, Table};
 
 pub enum ExpandMethod {
@@ -40,28 +39,19 @@ pub fn expand<B: BasisIdx>(
     prev_num_nonzeros: usize,
     state: State<B>,
 ) -> ExpandResult<B> {
-    let expected_cost = expected_cost(num_qubits, state.num_nonzeros(), prev_num_nonzeros);
+    let (expected_density, _) = expected_cost(num_qubits, state.num_nonzeros(), prev_num_nonzeros);
 
     let all_gates_pullable = gates.iter().all(|gate| gate.is_pullable());
 
     assert!(config.dense_threshold <= config.pull_threshold);
 
-    if expected_cost < config.dense_threshold {
+    if expected_density < config.dense_threshold {
         expand_sparse(gates, state)
-    } else if expected_cost >= config.pull_threshold && all_gates_pullable {
+    } else if expected_density >= config.pull_threshold && all_gates_pullable {
         expand_pull_dense(gates, num_qubits, state)
     } else {
         expand_push_dense(gates, num_qubits, state)
     }
-}
-
-fn expected_cost(num_qubits: usize, num_nonzeros: usize, prev_num_nonzeros: usize) -> Real {
-    let max_num_states = 1 << num_qubits;
-    let rate = Real::max(1.0, num_nonzeros as Real / prev_num_nonzeros as Real);
-    let expected = cmp::min(max_num_states, (rate * num_nonzeros as Real) as i64);
-    let expected_density = expected as Real / max_num_states as Real;
-    let current_density = num_nonzeros as Real / max_num_states as Real;
-    expected_density.max(current_density)
 }
 
 fn expand_sparse<B: BasisIdx>(gates: Vec<&Gate<B>>, state: State<B>) -> ExpandResult<B> {
