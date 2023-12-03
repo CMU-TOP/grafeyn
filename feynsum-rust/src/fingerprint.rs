@@ -16,7 +16,7 @@ impl<B: BasisIdx> PartialOrd for Entry<B> {
         } else if self.1.norm() > other.1.norm() {
             Some(Ordering::Greater)
         } else {
-            self.0.into_bytes().partial_cmp(&other.0.into_bytes())
+            self.0.as_bytes().partial_cmp(&other.0.as_bytes())
         }
     }
 }
@@ -28,7 +28,7 @@ impl<B: BasisIdx> Ord for Entry<B> {
         } else if self.1.norm() > other.1.norm() {
             Ordering::Greater
         } else {
-            other.0.into_bytes().cmp(&self.0.into_bytes())
+            other.0.as_bytes().cmp(&self.0.as_bytes())
         }
     }
 }

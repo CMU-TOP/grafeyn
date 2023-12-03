@@ -71,7 +71,7 @@ impl BasisIdx for BasisIdxUnlimited {
         unimplemented!("push/pull dense should never be called")
     }
 
-    fn into_idx(&self) -> usize {
+    fn as_idx(&self) -> usize {
         unimplemented!("push/pull dense should never be called")
     }
 
@@ -81,7 +81,7 @@ impl BasisIdx for BasisIdxUnlimited {
         Self { bits }
     }
 
-    fn into_bytes(&self) -> Vec<u8> {
+    fn as_bytes(&self) -> Vec<u8> {
         self.bits.to_bytes()
     }
 }

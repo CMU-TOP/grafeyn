@@ -35,14 +35,14 @@ impl DenseStateTable {
     pub fn atomic_put<B: BasisIdx>(&self, bidx: B, weight: Complex) {
         // FIXME: We can use `put` method instead of `atomic_put` method if we
         // change the signature of `put` method from `&mut self` to &self
-        let idx = bidx.into_idx();
+        let idx = bidx.as_idx();
 
         atomic_put(&self.array[idx], weight);
     }
 
     pub fn get<B: BasisIdx>(&self, bidx: &B) -> Option<Complex> {
         self.array
-            .get(bidx.into_idx())
+            .get(bidx.as_idx())
             .map(|v| utility::unpack_complex(v.load(Ordering::Relaxed)))
     }
 }

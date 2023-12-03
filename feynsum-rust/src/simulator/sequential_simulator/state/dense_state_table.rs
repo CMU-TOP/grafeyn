@@ -25,13 +25,13 @@ impl DenseStateTable {
     }
 
     pub fn get<B: BasisIdx>(&self, bidx: &B) -> Option<&Complex> {
-        self.array.get(bidx.into_idx())
+        self.array.get(bidx.as_idx())
     }
 }
 
 impl<B: BasisIdx> Table<B> for DenseStateTable {
     fn put(&mut self, bidx: B, weight: Complex) {
-        let idx = bidx.into_idx();
+        let idx = bidx.as_idx();
 
         self.array[idx] += weight;
     }
