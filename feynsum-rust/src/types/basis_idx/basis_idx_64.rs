@@ -77,7 +77,7 @@ impl BasisIdx for BasisIdx64 {
         Self { bits: idx as u64 }
     }
 
-    fn into_idx(&self) -> usize {
+    fn as_idx(&self) -> usize {
         self.bits as usize
     }
 
@@ -85,7 +85,7 @@ impl BasisIdx for BasisIdx64 {
         Self { bits: (1 << 63) }
     }
 
-    fn into_bytes(&self) -> Vec<u8> {
+    fn as_bytes(&self) -> Vec<u8> {
         self.bits.to_be_bytes().to_vec()
     }
 }
