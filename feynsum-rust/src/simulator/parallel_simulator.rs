@@ -3,8 +3,6 @@ mod state_expander;
 
 pub use state::State;
 
-use log::{debug, info};
-
 use crate::circuit::Circuit;
 use crate::config::Config;
 use crate::gate_scheduler;
@@ -35,7 +33,7 @@ pub fn run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
 
     let mut gate_scheduler = gate_scheduler::create_gate_scheduler(&config, &circuit);
 
-    info!("starting gate application loop.");
+    log::info!("starting gate application loop.");
 
     let (duration, _) = profile!(loop {
         let these_gates = gate_scheduler
@@ -44,7 +42,7 @@ pub fn run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
             .map(|idx| &circuit.gates[idx])
             .collect::<Vec<_>>();
 
-        debug!("applying gates: {:?}", these_gates);
+        log::debug!("applying gates: {:?}", these_gates);
 
         if these_gates.is_empty() {
             break;

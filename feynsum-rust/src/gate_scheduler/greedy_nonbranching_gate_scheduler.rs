@@ -1,5 +1,3 @@
-use log::debug;
-
 use super::{utility, GateScheduler};
 use crate::types::{GateIndex, QubitIndex};
 
@@ -46,7 +44,7 @@ impl<'a> GateScheduler for GreedyNonbranchingGateScheduler<'a> {
                 *gi
             )));
 
-            debug!("next gates: {:?}", next_gates);
+            log::debug!("next gates: {:?}", next_gates);
 
             next_gates
         }
@@ -61,9 +59,10 @@ impl<'a> GreedyNonbranchingGateScheduler<'a> {
         gate_is_branching: Vec<bool>,
         disable_gate_fusion: bool,
     ) -> Self {
-        debug!(
+        log::debug!(
             "initializing greedy nonbranching gate scheduler with {} gates and {} qubits",
-            num_gates, num_qubits
+            num_gates,
+            num_qubits
         );
         let scheduler = Self {
             frontier: (0..num_qubits)
@@ -81,7 +80,7 @@ impl<'a> GreedyNonbranchingGateScheduler<'a> {
         assert_eq!(scheduler.gate_touches.len(), num_gates);
         assert_eq!(scheduler.gate_is_branching.len(), num_gates);
 
-        debug!("initial frontier: {:?}", scheduler.frontier);
+        log::debug!("initial frontier: {:?}", scheduler.frontier);
 
         scheduler
     }

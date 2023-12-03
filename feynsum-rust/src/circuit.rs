@@ -1,6 +1,5 @@
 mod gate;
 
-use log::error;
 use std::collections::HashMap;
 
 use crate::parser::{Argument, Expression, OpCode, QasmStatement};
@@ -51,7 +50,7 @@ impl<B: BasisIdx> Circuit<B> {
                     let get_index = |arg: Argument| -> Result<QubitIndex, CircuitBuildError> {
                         match arg {
                             Argument::Id(id) => {
-                                error!("unsupported gate arg: identifier {}", id);
+                                log::error!("unsupported gate arg: identifier {}", id);
                                 Err(CircuitBuildError::UnsupportedIdentifier)
                             }
                             Argument::Item(name, index) => {
@@ -59,20 +58,20 @@ impl<B: BasisIdx> Circuit<B> {
                                     Some((start, stop)) => {
                                         if index >= (stop - start) {
                                             // NOTE: index is always nonzero as it is of type usize
-                                            error!("index out of bounds: {}", index);
+                                            log::error!("index out of bounds: {}", index);
                                             Err(CircuitBuildError::IndexOutOfBounds)
                                         } else {
                                             Ok(start + index)
                                         }
                                     }
                                     None => {
-                                        error!("unknown qreg: {}", name);
+                                        log::error!("unknown qreg: {}", name);
                                         Err(CircuitBuildError::UnknownQReg)
                                     }
                                 }
                             }
                             arg => {
-                                error!("unsupported gate arg: {:?}", arg);
+                                log::error!("unsupported gate arg: {:?}", arg);
                                 Err(CircuitBuildError::UnsupportedGateArg)
                             }
                         }
@@ -208,7 +207,7 @@ fn eval(exp: Expression) -> Result<Real, CircuitBuildError> {
         Expression::Minus(exp) => Ok(-eval(*exp)?),
         Expression::Id(_) => Err(CircuitBuildError::UnsupportedIdentifier),
         exp => {
-            error!("unsupported expression: {:?}", exp);
+            log::error!("unsupported expression: {:?}", exp);
             Err(CircuitBuildError::UnsupportedExpression)
         }
     }

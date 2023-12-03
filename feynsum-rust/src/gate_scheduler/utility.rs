@@ -1,5 +1,3 @@
-use log::debug;
-
 use crate::types::{GateIndex, QubitIndex};
 
 pub fn okay_to_visit(
@@ -17,13 +15,13 @@ pub fn mark_as_visit(
     frontier: &mut [GateIndex],
     gi: GateIndex,
 ) {
-    debug!("visiting gate: {}", gi);
+    log::debug!("visiting gate: {}", gi);
     assert!(okay_to_visit(num_gates, gate_touches, frontier, gi));
     for qi in gate_touches[gi] {
         let next = next_touch(num_gates, gate_touches, *qi, gi + 1);
 
         frontier[*qi] = next;
-        debug!("updated frontier[{}] to {}", qi, frontier[*qi]);
+        log::debug!("updated frontier[{}] to {}", qi, frontier[*qi]);
     }
 }
 

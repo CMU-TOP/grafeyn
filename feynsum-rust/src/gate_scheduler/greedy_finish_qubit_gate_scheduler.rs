@@ -1,5 +1,3 @@
-use log::debug;
-
 use super::{utility, GateScheduler};
 use crate::types::{GateIndex, QubitIndex};
 
@@ -23,9 +21,10 @@ impl<'a> GateScheduler for GreedyFinishQubitGateScheduler<'a> {
 
 impl<'a> GreedyFinishQubitGateScheduler<'a> {
     pub fn new(num_gates: usize, num_qubits: usize, gate_touches: Vec<&'a [QubitIndex]>) -> Self {
-        debug!(
+        log::debug!(
             "initializing greedy finish qubit gate scheduler with {} gates and {} qubits",
-            num_gates, num_qubits
+            num_gates,
+            num_qubits
         );
 
         GreedyFinishQubitGateScheduler {

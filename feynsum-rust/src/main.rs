@@ -9,7 +9,6 @@ mod simulator;
 mod types;
 mod utility;
 
-use log::info;
 use parser::QasmStatement;
 use rayon::ThreadPoolBuilder;
 use std::fs;
@@ -35,17 +34,17 @@ fn main() -> io::Result<()> {
 
     let options = Options::from_args();
 
-    info!("input file: {}", options.input.display());
+    log::info!("input file: {}", options.input.display());
     if let Some(output) = &options.output {
-        info!("output file: {}", output.display());
+        log::info!("output file: {}", output.display());
     } else {
-        info!("output file: none");
+        log::info!("output file: none");
     }
-    info!("gate scheduling policy: {}", options.gate_schduling_policy);
-    info!("dense threshold: {}", options.dense_threshold);
-    info!("pull threshold: {}", options.pull_threshold);
-    info!("parallelism: {}", options.parallelism);
-    info!("block size: {}", options.block_size);
+    log::info!("gate scheduling policy: {}", options.gate_schduling_policy);
+    log::info!("dense threshold: {}", options.dense_threshold);
+    log::info!("pull threshold: {}", options.pull_threshold);
+    log::info!("parallelism: {}", options.parallelism);
+    log::info!("block size: {}", options.block_size);
 
     let source = fs::read_to_string(&options.input)?;
 
@@ -57,7 +56,7 @@ fn main() -> io::Result<()> {
             panic!("Failed to parse program: {:?}", err);
         }
     };
-    info!("parse complete. starting circuit construction.");
+    log::info!("parse complete. starting circuit construction.");
 
     if circuit::num_qubits(&program) <= BASIS_IDX_64_OKAY_THRESHOLD {
         build_circuit_and_run::<BasisIdx64, AtomicU64>(options, config, program)
@@ -80,7 +79,7 @@ fn build_circuit_and_run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
         }
     };
 
-    info!("circuit construction complete. starting simulation");
+    log::info!("circuit construction complete. starting simulation");
 
     let num_qubits = circuit.num_qubits;
 
@@ -93,7 +92,7 @@ fn build_circuit_and_run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
 
     process_output(result, options.output, num_qubits)?;
 
-    info!("simulation complete");
+    log::info!("simulation complete");
 
     Ok(())
 }
@@ -105,15 +104,15 @@ fn run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
 ) -> Box<dyn Iterator<Item = (B, Complex)>> {
     match options.simulator {
         Simulator::Sequential => {
-            info!("using sequential simulator");
+            log::info!("using sequential simulator");
             simulator::sequential_simulator::run::<B>(&config, circuit).compactify()
         }
         Simulator::Parallel => {
-            info!("using parallel simulator");
+            log::info!("using parallel simulator");
             simulator::parallel_simulator::run::<B, AB>(&config, circuit).compactify()
         }
         Simulator::Dense => {
-            info!("using dense simulator");
+            log::info!("using dense simulator");
             simulator::dense_simulator::run(&config, circuit).compactify()
         }
     }
@@ -125,7 +124,7 @@ fn process_output<B: BasisIdx>(
     bidx_width: usize,
 ) -> io::Result<()> {
     if let Some(path) = output.as_ref() {
-        info!("writing output to file {}", path.display());
+        log::info!("writing output to file {}", path.display());
     }
 
     let mut file = output.map(fs::File::create).transpose()?;

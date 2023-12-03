@@ -1,8 +1,6 @@
 use std::fmt::Display;
 use std::str::FromStr;
 
-use log::info;
-
 use crate::circuit::Circuit;
 use crate::config::Config;
 use crate::types::BasisIdx;
@@ -75,11 +73,11 @@ pub fn create_gate_scheduler<'a, B: BasisIdx>(
 
     match gate_scheduling_policy {
         GateSchedulingPolicy::Naive => {
-            info!("using naive gate scheduler");
+            log::info!("using naive gate scheduler");
             Box::new(NaiveGateScheduler::new(num_gates))
         }
         GateSchedulingPolicy::GreedyNonbranching => {
-            info!("using greedy nonbranching gate scheduler");
+            log::info!("using greedy nonbranching gate scheduler");
             Box::new(GreedyNonbranchingGateScheduler::new(
                 num_gates,
                 num_qubits,
@@ -89,7 +87,7 @@ pub fn create_gate_scheduler<'a, B: BasisIdx>(
             ))
         }
         GateSchedulingPolicy::GreedyFinishQubit => {
-            info!("using greedy nonbranching gate scheduler");
+            log::info!("using greedy nonbranching gate scheduler");
             Box::new(GreedyFinishQubitGateScheduler::new(
                 num_gates,
                 num_qubits,
