@@ -281,6 +281,7 @@ def main(argv):
     circuit = read_qasm(ifh)
     circuit.remove_final_measurements(True)
     rb = RemoveBarriers()
+    # TODO: prevent commuting across barriers
     circuit = rb(circuit)
     dag = circuit_to_dag(circuit)
     find_qubit = circuit_find_qubit_dict(circuit)
