@@ -1,5 +1,6 @@
 from numpy.typing import NDArray
 import qiskit as Q
+from qiskit.transpiler.passes import RemoveBarriers
 import rustworkx as rx
 import numpy as np
 import sys
@@ -278,6 +279,9 @@ def main(argv):
         print(usage(argv).strip(), file=sys.stderr)
         return 1
     circuit = read_qasm(ifh)
+    circuit.remove_final_measurements(True)
+    rb = RemoveBarriers()
+    circuit = rb(circuit)
     dag = circuit_to_dag(circuit)
     find_qubit = circuit_find_qubit_dict(circuit)
     if just_dag:
