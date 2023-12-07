@@ -54,6 +54,9 @@ local
 
   DENSE_STATE.sml
   DenseState.sml
+
+  HYBRID_STATE.sml
+  HybridState.sml
   
   ExpandState.sml
 
@@ -115,6 +118,9 @@ in
 
   signature DENSE_STATE
   functor DenseState
+  
+  signature HYBRID_STATE
+  functor HybridState
 
   functor ExpandState
 

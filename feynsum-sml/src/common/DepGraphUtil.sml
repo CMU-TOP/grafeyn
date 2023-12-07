@@ -22,7 +22,7 @@ sig
   val scheduleCost: gate_idx Seq.t Seq.t -> (gate_idx -> bool) -> real
   val chooseSchedule: gate_idx Seq.t Seq.t Seq.t -> (gate_idx -> bool) -> gate_idx Seq.t Seq.t
 
-  (* val gateIsBranching: dep_graph -> (gate_idx -> bool) *)
+  val gateIsBranching: dep_graph -> (gate_idx -> bool)
 end =
 struct
 
@@ -159,4 +159,15 @@ struct
       in
         iter 1 0 (scheduleCost (Seq.nth orders 0) branching)
       end
+
+  (* B and C don't affect gate_branching, so pick arbitrarily *)
+  structure Gate_branching = Gate (structure B = BasisIdxUnlimited
+                                   structure C = Complex64)
+
+
+  fun gateIsBranching ({ gates = gates, ...} : dep_graph) =
+      let val branchSeq = Seq.map (fn g => Gate_branching.expectBranching (Gate_branching.fromGateDefn g)) gates in
+        fn i => Seq.nth branchSeq i
+      end
+
 end

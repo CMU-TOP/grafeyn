@@ -21,13 +21,16 @@ end =
 struct
 
   structure DS = DenseState (structure C = C structure B = B)
+  structure HS = HybridState (structure C = C
+                              structure B = B
+                              structure DS = DS
+                              structure SST = SST)
 
   structure Expander =
     ExpandState
       (structure B = B
        structure C = C
-       structure SST = SST
-       structure DS = DS
+       structure HS = HS
        structure G = G
        val denseThreshold = denseThreshold
        val blockSize = blockSize
@@ -62,9 +65,9 @@ struct
     let
       val ss =
         case s of
-          Expander.Sparse sst => SST.unsafeViewContents sst
-        | Expander.Dense ds => DS.unsafeViewContents ds
-        | Expander.DenseKnownNonZeroSize (ds, _) => DS.unsafeViewContents ds
+          HS.Sparse sst => SST.unsafeViewContents sst
+        | HS.Dense ds => DS.unsafeViewContents ds
+        | HS.DenseKnownNonZeroSize (ds, _) => DS.unsafeViewContents ds
     in
       Util.for (0, DelayedSeq.length ss) (fn i =>
         case DelayedSeq.nth ss i of
@@ -80,23 +83,20 @@ struct
   structure DGFQ = DynSchedFinishQubitWrapper
                      (structure B = B
                       structure C = C
-                      structure SST = SST
-                      structure DS = DS
+                      structure HS = HS
                       val maxBranchingStride = maxBranchingStride
                       val disableFusion = disableFusion)
 
   structure DGI = DynSchedInterference
                     (structure B = B
                      structure C = C
-                     structure SST = SST
-                     structure DS = DS
+                     structure HS = HS
                      val maxBranchingStride = maxBranchingStride
                      val disableFusion = disableFusion)
   structure DGN = DynSchedNaive
                     (structure B = B
                      structure C = C
-                     structure SST = SST
-                     structure DS = DS
+                     structure HS = HS
                      val maxBranchingStride = maxBranchingStride
                      val disableFusion = disableFusion)
 
@@ -163,13 +163,13 @@ struct
 
       fun getNumZeros state =
           case state of
-              Expander.Sparse sst => SST.zeroSize sst
-            | Expander.Dense ds => raise Fail "Can't do dense stuff!"
+              HS.Sparse sst => SST.zeroSize sst
+            | HS.Dense ds => raise Fail "Can't do dense stuff!"
               (*DS.unsafeViewContents ds, DS.nonZeroSize ds, TODO exception*)
-            | Expander.DenseKnownNonZeroSize (ds, nz) => raise Fail "Can't do dense stuff!"
+            | HS.DenseKnownNonZeroSize (ds, nz) => raise Fail "Can't do dense stuff!"
               (*DS.unsafeViewContents ds, nz, TODO exception*)
 
-      val initialState = Expander.Sparse
+      val initialState = HS.Sparse
         (SST.singleton {numQubits = numQubits} (B.zeros, C.defaultReal 1.0))
 
       fun runloop () =
@@ -182,10 +182,7 @@ struct
             (fn i => G.expectBranching (Seq.nth gates i))
 
             (* select gate *)
-            (fn ((state, numGateApps, counts, gatesVisitedSoFar), gates) =>
-                case state of
-                  Expander.Sparse sst => pickNextGate (sst, gates)
-                | _ => Seq.nth gates 0)
+            (fn ((state, numGateApps, counts, gatesVisitedSoFar), gates) => pickNextGate (state, gates))
 
             (* disable fusion? *)
             disableFusion
@@ -227,9 +224,9 @@ struct
 
       val (finalState, numGateApps, counts, gatesVisited) = runloop ()
       val nonZeros = case finalState of
-                       Expander.Sparse sst => SST.unsafeViewContents sst
-                     | Expander.Dense ds => DS.unsafeViewContents ds
-                     | Expander.DenseKnownNonZeroSize (ds, nz) => DS.unsafeViewContents ds
+                       HS.Sparse sst => SST.unsafeViewContents sst
+                     | HS.Dense ds => DS.unsafeViewContents ds
+                     | HS.DenseKnownNonZeroSize (ds, nz) => DS.unsafeViewContents ds
       val _ = print ("gate app count " ^ Int.toString numGateApps ^ "\n")
     in
       {result = nonZeros, counts = Seq.fromList counts}

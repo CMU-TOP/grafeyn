@@ -139,22 +139,8 @@ fun print_sched_info () =
 type gate_idx = int
 type Schedule = gate_idx Seq.t
 
-(*fun gate_to_schedule (ags: GateScheduler.args) (sched: GateScheduler.t) =
-    let val next = sched ags;
-        fun loadNext (acc: gate_idx Seq.t list) =
-            let val gs = next () in
-              if Seq.length gs = 0 then
-                Seq.flatten (Seq.rev (Seq.fromList acc))
-              else
-                loadNext (gs :: acc)
-            end
-    in
-      loadNext nil
-    end*)
-
-fun dep_graph_to_schedule (ags: DepGraphScheduler.args) (sched: DepGraphScheduler.t) =
-    let val choose = sched ags
-        val dg = #depGraph ags
+fun dep_graph_to_schedule (dg: DepGraph.t) (sched: DepGraphScheduler.t) =
+    let val choose = sched dg
         val st = DepGraphUtil.initState dg
         fun loadNext (acc: gate_idx list) =
             let val frntr = DepGraphUtil.frontier st in
@@ -169,20 +155,6 @@ fun dep_graph_to_schedule (ags: DepGraphScheduler.args) (sched: DepGraphSchedule
     in
       GateSchedulerOrder.mkScheduler (Seq.map Seq.singleton (loadNext nil))
     end
-
-structure Gate_branching = Gate (structure B = BasisIdxUnlimited
-                                 structure C = Complex64)
-
-
-fun gate_branching ({ gates = gates, ...} : DepGraph.t) =
-      let val gates = Seq.map Gate_branching.fromGateDefn gates
-          fun gate i = Seq.nth gates i
-      in
-        (fn i =>
-            case #action (gate i) of
-                Gate_branching.NonBranching _ => false
-              | _ => true)
-      end
 
 val maxBranchingStride' = if disableFusion then 1 else maxBranchingStride
 

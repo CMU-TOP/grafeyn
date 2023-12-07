@@ -6,11 +6,6 @@ struct
 
   type gate_idx = int
 
-  type args =
-    { depGraph: DepGraph.t
-    , gateIsBranching: gate_idx -> bool
-    }
-
   fun pickBranching i branching gates =
       if i < Seq.length gates then
         (if branching i then
@@ -21,5 +16,8 @@ struct
         Seq.nth gates 0 (* pick a non-branching gate *)
 
   (* From a frontier, select which gate to apply next *)
-  fun scheduler ({gateIsBranching = gib, ...} : args) gates = pickBranching 0 gib gates
+  fun scheduler dg =
+      let val branching = DepGraphUtil.gateIsBranching dg in
+        fn gates => pickBranching 0 branching gates
+      end
 end

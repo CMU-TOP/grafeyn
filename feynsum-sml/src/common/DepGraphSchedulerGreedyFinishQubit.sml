@@ -12,11 +12,6 @@ struct
 
   type gate_idx = int
 
-  type args =
-    { depGraph: DepGraph.t
-    , gateIsBranching: gate_idx -> bool
-    }
-
   fun DFS ((new, old) : (int list * int list)) = new @ old
   fun BFS ((new, old) : (int list * int list)) = old @ new
 
@@ -67,9 +62,10 @@ struct
       end
 
   (* Choose in reverse topological order, sorted by easiest qubit to finish *)
-  fun scheduler3 ({depGraph = dg, gateIsBranching = gib}: args) =
+  fun scheduler3 dg =
       let val dgt = DepGraphUtil.transpose dg
           val depths = computeGateDepths dg
+          val gib = DepGraphUtil.gateIsBranching dg
           fun lt (a, b) = Array.sub (depths, a) < Array.sub (depths, b) orelse (Array.sub (depths, a) = Array.sub (depths, b) andalso not (gib a) andalso gib b)
           fun push (new, old) = DFS (sortList lt new, old)
           val xs = revTopologicalSort dgt push
@@ -125,14 +121,14 @@ struct
         end
 
   (* From a frontier, select which gate to apply next *)
-  fun scheduler ({depGraph = dg, ...} : args) =
+  fun scheduler dg =
       (gateDepths := SOME (computeGateDepths dg);
        fn gates => let val g0 = Seq.nth gates 0 in
                      pickLeastDepth g0 (gateDepth g0 dg) 1 gates dg
                    end)
 
   (* Select gate with greatest number of descendants *)
-  fun scheduler4 ({depGraph = dg, ...} : args) =
+  fun scheduler4 dg =
       (gateDepths := SOME (computeGateDepths dg);
        fn gates => let val g0 = Seq.nth gates 0 in
                      pickGreatestDepth g0 (gateDepth g0 dg) 1 gates dg
@@ -142,7 +138,7 @@ struct
                       structure C = Complex64)
 
   (* Hybrid of scheduler2 (avoid branching on unbranched qubits) and also scheduler3 (choose in reverse topological order, sorted by easiest qubit to finish) *)
-  fun scheduler5 ({depGraph = dg, gateIsBranching = gib} : args) =
+  fun scheduler5 (dg: DepGraph.t) =
       let val gates = Seq.map G.fromGateDefn (#gates dg)
           fun touches i = #touches (Seq.nth gates i)
           fun branches i = case #action (Seq.nth gates i) of G.NonBranching _ => 0 | G.MaybeBranching _ => 1 | G.Branching _ => 2
@@ -186,7 +182,7 @@ struct
       end
 
   (* Avoids branching on unbranched qubits *)
-  fun scheduler2 ({depGraph = dg, gateIsBranching = gib} : args) =
+  fun scheduler2 (dg: DepGraph.t) =
       let val touched = Array.array (#numQubits dg, false)
           val gates = Seq.map G.fromGateDefn (#gates dg)
           fun touches i = #touches (Seq.nth gates i)
@@ -220,7 +216,7 @@ struct
 
   val seed = Random.rand (50, 14125)
 
-  fun schedulerRandom seedNum ({depGraph = dg, gateIsBranching = gib} : args) =
+  fun schedulerRandom seedNum dg =
       (*let val seed = Random.rand (seedNum, seedNum * seedNum) in*)
         fn gates => let val r = Random.randRange (0, Seq.length gates - 1) seed in
                       ((*print ("Randomly chose " ^ Int.toString r ^ " from range [0, " ^ Int.toString (Seq.length gates) ^ ")\n");*)

@@ -2,14 +2,13 @@ signature DEP_GRAPH_DYN_SCHEDULER =
 sig
   structure B: BASIS_IDX
   structure C: COMPLEX
-  structure SST: SPARSE_STATE_TABLE
-  structure DS: DENSE_STATE
-  sharing B = SST.B = DS.B
-  sharing C = SST.C = DS.C
+  structure HS: HYBRID_STATE
+  sharing B = HS.B
+  sharing C = HS.C
 
   type gate_idx = int
 
-  type t = DepGraph.t -> (SST.t * gate_idx Seq.t -> gate_idx)
+  type t = DepGraph.t -> (HS.t * gate_idx Seq.t -> gate_idx)
 
   val choose: t
 end
@@ -17,22 +16,20 @@ end
 functor DynSchedFinishQubitWrapper
   (structure B: BASIS_IDX
    structure C: COMPLEX
-   structure SST: SPARSE_STATE_TABLE
-   structure DS: DENSE_STATE
-   sharing B = SST.B = DS.B
-   sharing C = SST.C = DS.C
+  structure HS: HYBRID_STATE
+  sharing B = HS.B
+  sharing C = HS.C
    val maxBranchingStride: int
    val disableFusion: bool
   ): DEP_GRAPH_DYN_SCHEDULER =
 struct
   structure B = B
   structure C = C
-  structure SST = SST
-  structure DS = DS
+  structure HS = HS
 
   type gate_idx = int
 
-  type t = DepGraph.t -> (SST.t * gate_idx Seq.t -> gate_idx)
+  type t = DepGraph.t -> (HS.t * gate_idx Seq.t -> gate_idx)
 
   structure DGFQ = DepGraphSchedulerGreedyFinishQubit
                      (val maxBranchingStride = maxBranchingStride
@@ -43,9 +40,7 @@ struct
                    structure C = C)
 
   fun choose (depgraph: DepGraph.t) =
-      let val branchSeq = Seq.map (fn g => G.expectBranching (G.fromGateDefn g)) (#gates depgraph)
-          fun branching i = Seq.nth branchSeq i
-          val f = DGFQ.scheduler5 {depGraph = depgraph, gateIsBranching = branching} in
+      let val f = DGFQ.scheduler5 depgraph in
         fn (_, gates) => f gates
       end
   
@@ -54,22 +49,20 @@ end
 functor DynSchedNaive
   (structure B: BASIS_IDX
    structure C: COMPLEX
-   structure SST: SPARSE_STATE_TABLE
-   structure DS: DENSE_STATE
-   sharing B = SST.B = DS.B
-   sharing C = SST.C = DS.C
+   structure HS: HYBRID_STATE
+   sharing B = HS.B
+   sharing C = HS.C
    val maxBranchingStride: int
    val disableFusion: bool
   ): DEP_GRAPH_DYN_SCHEDULER =
 struct
   structure B = B
   structure C = C
-  structure SST = SST
-  structure DS = DS
+  structure HS = HS
 
   type gate_idx = int
 
-  type t = DepGraph.t -> (SST.t * gate_idx Seq.t -> gate_idx)
+  type t = DepGraph.t -> (HS.t * gate_idx Seq.t -> gate_idx)
 
   fun choose (depgraph: DepGraph.t) = fn (_, gates) => Seq.nth gates 0
   
@@ -79,22 +72,20 @@ end
 functor DynSchedInterference
   (structure B: BASIS_IDX
    structure C: COMPLEX
-   structure SST: SPARSE_STATE_TABLE
-   structure DS: DENSE_STATE
-   sharing B = SST.B = DS.B
-   sharing C = SST.C = DS.C
+   structure HS: HYBRID_STATE
+   sharing B = HS.B
+   sharing C = HS.C
    val maxBranchingStride: int
    val disableFusion: bool
   ): DEP_GRAPH_DYN_SCHEDULER =
 struct
   structure B = B
   structure C = C
-  structure SST = SST
-  structure DS = DS
+  structure HS = HS
 
   type gate_idx = int
 
-  type t = DepGraph.t -> (SST.t * gate_idx Seq.t -> gate_idx)
+  type t = DepGraph.t -> (HS.t * gate_idx Seq.t -> gate_idx)
 
   structure DGFQ = DepGraphSchedulerGreedyFinishQubit
                      (val maxBranchingStride = maxBranchingStride
@@ -125,7 +116,7 @@ struct
       | (_, _) => Superposition
 
   fun calculateBranchedQubits (numQubits, sst) =
-      let val nonZeros = DelayedSeq.mapOption (fn x => x) (SST.unsafeViewContents sst)
+      let val nonZeros = DelayedSeq.mapOption (fn x => x) (HS.SST.unsafeViewContents sst)
           val branchedQubits = Seq.tabulate (fn qi => DelayedSeq.reduce joinBranches Uninitialized (DelayedSeq.map (fn (b, c) => if B.get b qi then One else Zero) nonZeros)) numQubits
           fun isbranched b =
               case b of
@@ -143,7 +134,10 @@ struct
           fun branching i = Seq.nth branchSeq i
           val numQubits = #numQubits depgraph
       in
-        fn (sst, gidxs) =>
+        fn (hs, gidxs) => case hs of
+            HS.Dense d => Seq.nth gidxs 0
+          | HS.DenseKnownNonZeroSize d => Seq.nth gidxs 0
+          | HS.Sparse sst =>
            (* if dense, doesn't really matter what we pick? *)
            let val branchedQubits = calculateBranchedQubits (numQubits, sst)
                fun getBranching i =
