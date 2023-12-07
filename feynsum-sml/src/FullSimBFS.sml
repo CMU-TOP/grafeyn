@@ -164,9 +164,9 @@ struct
       fun getNumZeros state =
           case state of
               HS.Sparse sst => SST.zeroSize sst
-            | HS.Dense ds => raise Fail "Can't do dense stuff!"
+            | HS.Dense ds => 0 (*raise Fail "Can't do dense stuff!"*)
               (*DS.unsafeViewContents ds, DS.nonZeroSize ds, TODO exception*)
-            | HS.DenseKnownNonZeroSize (ds, nz) => raise Fail "Can't do dense stuff!"
+            | HS.DenseKnownNonZeroSize (ds, nz) => 0 (*raise Fail "Can't do dense stuff!"*)
               (*DS.unsafeViewContents ds, nz, TODO exception*)
 
       val initialState = HS.Sparse
