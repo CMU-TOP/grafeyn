@@ -1,4 +1,4 @@
-structure Scheduler =
+structure GateScheduler =
 struct
 
   type gate_idx = int

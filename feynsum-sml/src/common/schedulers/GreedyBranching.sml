@@ -1,6 +1,6 @@
 structure GreedyBranchingScheduler:
 sig
-  val scheduler: Scheduler.t
+  val scheduler: GateScheduler.t
 end =
 struct
 

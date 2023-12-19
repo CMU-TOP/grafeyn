@@ -1,7 +1,7 @@
 functor GreedyNonBranchingScheduler
   (val maxBranchingStride: int val disableFusion: bool):
 sig
-  val scheduler: Scheduler.t
+  val scheduler: GateScheduler.t
 end =
 struct
 

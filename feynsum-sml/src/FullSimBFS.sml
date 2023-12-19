@@ -107,16 +107,16 @@ struct
         | "interference" => DGI.choose
         | _ => raise Fail ("Unknown scheduler '" ^ gateScheduler ^ "'\n")
 
-  fun run depgraph (*{numQubits, gates}*) =
+  fun run dfg (*{numQubits, gates}*) =
     let
-      val gates = Seq.map G.fromGateDefn (#gates depgraph)
-      val numQubits = #numQubits depgraph
+      val gates = Seq.map G.fromGateDefn (#gates dfg)
+      val numQubits = #numQubits dfg
       fun gate i = Seq.nth gates i
       val depth = Seq.length gates
-      val dgstate = DataFlowGraphUtil.initState depgraph
+      val dgstate = DataFlowGraphUtil.initState dfg
 
       val pickNextGate =
-          let val f = gateSched depgraph in
+          let val f = gateSched dfg in
             fn (s, g) => f (s, g)
           end
 
@@ -175,8 +175,8 @@ struct
       fun runloop () =
           DataFlowGraphUtil.scheduleWithOracle'
 
-            (* dependency graph *)
-            depgraph
+            (* data flow graph *)
+            dfg
 
             (* gate is branching *)
             (fn i => G.expectBranching (Seq.nth gates i))

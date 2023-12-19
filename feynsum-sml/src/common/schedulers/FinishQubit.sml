@@ -1,12 +1,12 @@
 functor FinishQubitScheduler
   (val maxBranchingStride: int val disableFusion: bool):
 sig
-  val scheduler: Scheduler.t
-  val scheduler2: Scheduler.t
-  val scheduler3: Scheduler.t
-  val scheduler4: Scheduler.t
-  val scheduler5: Scheduler.t
-  val schedulerRandom: int -> Scheduler.t
+  val scheduler:  GateScheduler.t
+  val scheduler2: GateScheduler.t
+  val scheduler3: GateScheduler.t
+  val scheduler4: GateScheduler.t
+  val scheduler5: GateScheduler.t
+  val schedulerRandom: int -> GateScheduler.t
 end =
 struct
 

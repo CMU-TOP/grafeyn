@@ -1,4 +1,4 @@
-signature DATA_FLOW_GRAPH_DYN_SCHEDULER =
+signature DYN_GATE_SCHEDULER =
 sig
   structure B: BASIS_IDX
   structure C: COMPLEX
@@ -21,7 +21,7 @@ functor DynSchedFinishQubitWrapper
   sharing C = HS.C
    val maxBranchingStride: int
    val disableFusion: bool
-  ): DATA_FLOW_GRAPH_DYN_SCHEDULER =
+  ): DYN_GATE_SCHEDULER =
 struct
   structure B = B
   structure C = C
@@ -54,7 +54,7 @@ functor DynSchedNaive
    sharing C = HS.C
    val maxBranchingStride: int
    val disableFusion: bool
-  ): DATA_FLOW_GRAPH_DYN_SCHEDULER =
+  ): DYN_GATE_SCHEDULER =
 struct
   structure B = B
   structure C = C
@@ -77,7 +77,7 @@ functor DynSchedInterference
    sharing C = HS.C
    val maxBranchingStride: int
    val disableFusion: bool
-  ): DATA_FLOW_GRAPH_DYN_SCHEDULER =
+  ): DYN_GATE_SCHEDULER =
 struct
   structure B = B
   structure C = C
@@ -176,7 +176,7 @@ end
    val blockSize: int
    val maxload: real
    val denseThreshold: real
-   val pullThreshold: real): DATA_FLOW_GRAPH_DYN_SCHEDULER =
+   val pullThreshold: real): DYN_GATE_SCHEDULER =
 struct
   type gate_idx = int
   structure Expander =
