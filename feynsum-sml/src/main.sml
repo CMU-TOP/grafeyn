@@ -95,15 +95,6 @@ val _ =
 
 val disableFusion = CLA.parseFlag "scheduler-disable-fusion"
 val maxBranchingStride = CLA.parseInt "scheduler-max-branching-stride" 2
-(*structure GNB =
-  GateSchedulerGreedyNonBranching
-    (val maxBranchingStride = maxBranchingStride
-     val disableFusion = disableFusion)
-
-structure GFQ =
-  GateSchedulerGreedyFinishQubit
-    (val maxBranchingStride = maxBranchingStride
-     val disableFusion = disableFusion)*)
 
 structure DGNB =
   GreedyNonBranchingScheduler

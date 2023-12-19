@@ -1,10 +1,10 @@
 functor FullSimBFS
   (structure B: BASIS_IDX
    structure C: COMPLEX
-   structure SST: SPARSE_STATE_TABLE
+   structure HS: HYBRID_STATE
    structure G: GATE
-   sharing B = SST.B = G.B
-   sharing C = SST.C = G.C
+   sharing B = HS.B = G.B
+   sharing C = HS.C = G.C
 
    val disableFusion: bool
    val maxBranchingStride: int
@@ -19,12 +19,6 @@ sig
            -> {result: (B.t * C.t) option DelayedSeq.t, counts: int Seq.t}
 end =
 struct
-
-  structure DS = DenseState (structure C = C structure B = B)
-  structure HS = HybridState (structure C = C
-                              structure B = B
-                              structure DS = DS
-                              structure SST = SST)
 
   structure Expander =
     ExpandState
@@ -65,9 +59,9 @@ struct
     let
       val ss =
         case s of
-          HS.Sparse sst => SST.unsafeViewContents sst
-        | HS.Dense ds => DS.unsafeViewContents ds
-        | HS.DenseKnownNonZeroSize (ds, _) => DS.unsafeViewContents ds
+          HS.Sparse sst => HS.SST.unsafeViewContents sst
+        | HS.Dense ds => HS.DS.unsafeViewContents ds
+        | HS.DenseKnownNonZeroSize (ds, _) => HS.DS.unsafeViewContents ds
     in
       Util.for (0, DelayedSeq.length ss) (fn i =>
         case DelayedSeq.nth ss i of
@@ -163,14 +157,14 @@ struct
 
       fun getNumZeros state =
           case state of
-              HS.Sparse sst => SST.zeroSize sst
+              HS.Sparse sst => HS.SST.zeroSize sst
             | HS.Dense ds => 0 (*raise Fail "Can't do dense stuff!"*)
               (*DS.unsafeViewContents ds, DS.nonZeroSize ds, TODO exception*)
             | HS.DenseKnownNonZeroSize (ds, nz) => 0 (*raise Fail "Can't do dense stuff!"*)
               (*DS.unsafeViewContents ds, nz, TODO exception*)
 
       val initialState = HS.Sparse
-        (SST.singleton {numQubits = numQubits} (B.zeros, C.defaultReal 1.0))
+        (HS.SST.singleton {numQubits = numQubits} (B.zeros, C.defaultReal 1.0))
 
       fun runloop () =
           DataFlowGraphUtil.scheduleWithOracle'
@@ -224,9 +218,9 @@ struct
 
       val (finalState, numGateApps, counts, gatesVisited) = runloop ()
       val nonZeros = case finalState of
-                       HS.Sparse sst => SST.unsafeViewContents sst
-                     | HS.Dense ds => DS.unsafeViewContents ds
-                     | HS.DenseKnownNonZeroSize (ds, nz) => DS.unsafeViewContents ds
+                       HS.Sparse sst => HS.SST.unsafeViewContents sst
+                     | HS.Dense ds => HS.DS.unsafeViewContents ds
+                     | HS.DenseKnownNonZeroSize (ds, nz) => HS.DS.unsafeViewContents ds
       val _ = print ("gate app count " ^ Int.toString numGateApps ^ "\n")
     in
       {result = nonZeros, counts = Seq.fromList counts}

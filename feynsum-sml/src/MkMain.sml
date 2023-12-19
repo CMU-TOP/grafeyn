@@ -15,12 +15,23 @@ struct
 
   structure G = Gate (structure B = B structure C = C)
 
+  structure SSTLocked = SparseStateTableLockedSlots (structure B = B structure C = C)
+  structure SSTLockFree = SparseStateTable (structure B = B structure C = C)
+  structure DS = DenseState (structure B = B structure C = C)
+  structure HSLocked = HybridState (structure B = B
+                                    structure C = C
+                                    structure SST = SSTLocked
+                                    structure DS = DS)
+  structure HSLockFree = HybridState (structure B = B
+                                      structure C = C
+                                      structure SST = SSTLockFree
+                                      structure DS = DS)
+
   structure BFSLocked =
     FullSimBFS
       (structure B = B
        structure C = C
-       structure SST =
-         SparseStateTableLockedSlots (structure B = B structure C = C)
+       structure HS = HSLocked
        structure G = G
        val disableFusion = disableFusion
        val maxBranchingStride = maxBranchingStride
@@ -35,7 +46,7 @@ struct
     FullSimBFS
       (structure B = B
        structure C = C
-       structure SST = SparseStateTable (structure B = B structure C = C)
+       structure HS = HSLockFree
        structure G = G
        val disableFusion = disableFusion
        val maxBranchingStride = maxBranchingStride
