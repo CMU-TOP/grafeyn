@@ -10,7 +10,7 @@ sig
   val capacity: 'a table -> int
   val resize: 'a table -> 'a table
   val increaseCapacityTo: int -> 'a table -> 'a table
-  val insertIfNotPresent: 'a table -> 'a -> bool
+  val insert: 'a table -> 'a -> unit
   val lookup: 'a table -> 'a -> bool
   val compact: 'a table -> 'a Seq.t
 
@@ -62,7 +62,7 @@ struct
   fun capacity (T {data, ...}) = Array.length data
 
 
-  fun insertIfNotPresent' (input as T {data, hash, eq, maxload}) x force =
+  fun insert' (T {data, hash, eq, maxload}) x force =
     let
       val n = Array.length data
       val tolerance = 20 * Real.ceil (1.0 / (1.0 - maxload))
@@ -73,16 +73,13 @@ struct
         else if i >= n then
           loop 0 probes
         else
-          let
-            val current = Array.sub (data, i)
-          in
+          let val current = Array.sub (data, i) in
             case current of
               SOME y =>
-                if eq (x, y) then false else loop (i + 1) (probes + 1)
+                if eq (x, y) then () else loop (i + 1) (probes + 1)
             | NONE =>
-                if bcas (data, i) (current, SOME x) then
-                  (* (Concurrency.faa sz 1; true) *)
-                  true
+                if bcas (data, i) (NONE, SOME x) then
+                  ()
                 else
                   loop i probes
           end
@@ -93,8 +90,7 @@ struct
     end
 
 
-  fun insertIfNotPresent s x =
-    insertIfNotPresent' s x false
+  fun insert s x = insert' s x false
 
 
   fun lookup (T {data, hash, eq, ...}) x =
@@ -125,7 +121,7 @@ struct
         ForkJoin.parfor 1000 (0, Array.length data) (fn i =>
           case Array.sub (data, i) of
             NONE => ()
-          | SOME x => (insertIfNotPresent' new x true; ()));
+          | SOME x => (insert' new x true; ()));
 
         new
       end
