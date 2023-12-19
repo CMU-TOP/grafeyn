@@ -1,6 +1,6 @@
-structure DepGraphSchedulerGreedyBranching:
+structure GreedyBranchingScheduler:
 sig
-  val scheduler: DepGraphScheduler.t
+  val scheduler: Scheduler.t
 end =
 struct
 
@@ -17,7 +17,7 @@ struct
 
   (* From a frontier, select which gate to apply next *)
   fun scheduler dg =
-      let val branching = DepGraphUtil.gateIsBranching dg in
+      let val branching = DataFlowGraphUtil.gateIsBranching dg in
         fn gates => pickBranching 0 branching gates
       end
 end

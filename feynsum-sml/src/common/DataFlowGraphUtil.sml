@@ -1,4 +1,4 @@
-structure DepGraphUtil :>
+structure DataFlowGraphUtil :>
 sig
 
   type gate_idx = int
@@ -6,31 +6,37 @@ sig
   (* Traversal Automaton State *)
   type state = { visited: bool array, indegree: int array }
 
-  type dep_graph = DepGraph.t
+  type data_flow_graph = DataFlowGraph.t
 
-  val visit: dep_graph -> gate_idx -> state -> unit
+  val visit: data_flow_graph -> gate_idx -> state -> unit
   val frontier: state -> gate_idx Seq.t
-  val initState: dep_graph -> state
+  val initState: data_flow_graph -> state
 
   (* Switches edge directions *)
-  val transpose: dep_graph -> dep_graph
+  val transpose: data_flow_graph -> data_flow_graph
 
-  val scheduleWithOracle: dep_graph -> (gate_idx -> bool) -> (gate_idx Seq.t -> gate_idx) -> bool -> int -> gate_idx Seq.t Seq.t
+  val scheduleWithOracle: data_flow_graph -> (gate_idx -> bool) -> (gate_idx Seq.t -> gate_idx) -> bool -> int -> gate_idx Seq.t Seq.t
 
-  val scheduleWithOracle': dep_graph -> (gate_idx -> bool) -> ('state * gate_idx Seq.t -> gate_idx) -> bool -> int -> ('state * gate_idx Seq.t -> 'state) -> 'state -> 'state
+  val scheduleWithOracle': data_flow_graph -> (gate_idx -> bool) -> ('state * gate_idx Seq.t -> gate_idx) -> bool -> int -> ('state * gate_idx Seq.t -> 'state) -> 'state -> 'state
 
   val scheduleCost: gate_idx Seq.t Seq.t -> (gate_idx -> bool) -> real
   val chooseSchedule: gate_idx Seq.t Seq.t Seq.t -> (gate_idx -> bool) -> gate_idx Seq.t Seq.t
 
-  val gateIsBranching: dep_graph -> (gate_idx -> bool)
+  val gateIsBranching: data_flow_graph -> (gate_idx -> bool)
 end =
 struct
 
   type gate_idx = int
 
-  type dep_graph = DepGraph.t
+  type data_flow_graph = DataFlowGraph.t
 
-  fun transpose ({gates = gs, deps = ds, indegree = is, numQubits = qs}: dep_graph) =
+  fun transpose ({gates, preds, succs, numQubits}: data_flow_graph) =
+      { gates = gates,
+        preds = succs,
+        succs = preds,
+        numQubits = numQubits }
+
+  (*fun transpose ({gates = gs, deps = ds, indegree = is, numQubits = qs}: data_flow_graph) =
       let val N = Seq.length gs
           val ds2 = Array.array (N, nil)
           fun apply i = Seq.map (fn j => Array.update (ds2, j, i :: Array.sub (ds2, j))) (Seq.nth ds i)
@@ -40,16 +46,16 @@ struct
          deps = Seq.tabulate (fn i => Seq.rev (Seq.fromList (Array.sub (ds2, i)))) N,
          indegree = Seq.map Seq.length ds,
          numQubits = qs}
-      end
+      end*)
 
   type state = { visited: bool array, indegree: int array }
 
-  fun visit {gates = _, deps = ds, indegree = _, numQubits = _} i {visited = vis, indegree = deg} =
+  fun visit {succs = succs, ...} i {visited = vis, indegree = deg} =
       (
         (* Set visited[i] = true *)
         Array.update (vis, i, true);
         (* Decrement indegree of each i dependency *)
-        Seq.map (fn j => Array.update (deg, j, Array.sub (deg, j) - 1)) (Seq.nth ds i);
+        Seq.map (fn j => Array.update (deg, j, Array.sub (deg, j) - 1)) (Seq.nth succs i);
         ()
       )
 
@@ -66,15 +72,15 @@ struct
         Seq.fromList (iter (N - 1) nil)
       end
 
-  fun initState (graph: dep_graph) =
+  fun initState (graph: data_flow_graph) =
       let val N = Seq.length (#gates graph)
           val vis = Array.array (N, false)
-          val deg = Array.tabulate (N, Seq.nth (#indegree graph))
+          val deg = Array.tabulate (N, Seq.length o Seq.nth (#preds graph))
       in
         { visited = vis, indegree = deg }
       end
 
-  fun scheduleWithOracle' (graph: dep_graph) (branching: gate_idx -> bool) (choose: 'state * gate_idx Seq.t -> gate_idx) (disableFusion: bool) (maxBranchingStride: int) (apply: 'state * gate_idx Seq.t -> 'state) state =
+  fun scheduleWithOracle' (graph: data_flow_graph) (branching: gate_idx -> bool) (choose: 'state * gate_idx Seq.t -> gate_idx) (disableFusion: bool) (maxBranchingStride: int) (apply: 'state * gate_idx Seq.t -> 'state) state =
       let val dgst = initState graph
           fun findNonBranching (i: int) (xs: gate_idx Seq.t) =
               if i = Seq.length xs then
@@ -118,7 +124,7 @@ struct
           loadNext 0 (loadNonBranching nil) state
       end
 
-  fun scheduleWithOracle (graph: dep_graph) (branching: gate_idx -> bool) (choose: gate_idx Seq.t -> gate_idx) (disableFusion: bool) (maxBranchingStride: int) = Seq.rev (Seq.fromList (scheduleWithOracle' graph branching (fn (_, x) => choose x) disableFusion maxBranchingStride (fn (gs, g) => g :: gs) nil))
+  fun scheduleWithOracle (graph: data_flow_graph) (branching: gate_idx -> bool) (choose: gate_idx Seq.t -> gate_idx) (disableFusion: bool) (maxBranchingStride: int) = Seq.rev (Seq.fromList (scheduleWithOracle' graph branching (fn (_, x) => choose x) disableFusion maxBranchingStride (fn (gs, g) => g :: gs) nil))
 
   (*fun scheduleCost2 (order: gate_idx Seq.t Seq.t) (branching: gate_idx -> bool) =
       let val gates = Seq.flatten order
@@ -165,7 +171,7 @@ struct
                                    structure C = Complex64)
 
 
-  fun gateIsBranching ({ gates = gates, ...} : dep_graph) =
+  fun gateIsBranching ({ gates = gates, ...} : data_flow_graph) =
       let val branchSeq = Seq.map (fn g => Gate_branching.expectBranching (Gate_branching.fromGateDefn g)) gates in
         fn i => Seq.nth branchSeq i
       end

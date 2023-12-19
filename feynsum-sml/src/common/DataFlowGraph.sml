@@ -1,20 +1,25 @@
-structure DepGraph:
+structure DataFlowGraph:
 sig
 
   type gate_idx = int
 
-  type dep_graph = {
+  type data_flow_graph = {
     gates: GateDefn.t Seq.t,
-    deps: gate_idx Seq.t Seq.t,
-    indegree: int Seq.t,
+    preds: gate_idx Seq.t Seq.t,
+    succs: gate_idx Seq.t Seq.t,
     numQubits: int
   }
 
-  type t = dep_graph
+  type t = data_flow_graph
 
-  val fromJSON: JSON.value -> dep_graph
-  val fromString: string -> dep_graph
-  val fromFile: string -> dep_graph
+  val fromJSON: JSON.value -> data_flow_graph
+  val fromJSONString: string -> data_flow_graph
+  val fromJSONFile: string -> data_flow_graph
+  val fromQasm: Circuit.t -> data_flow_graph
+
+  val toString: data_flow_graph -> string
+  (*val fromQasmString: string -> data_flow_graph*)
+  (*val fromQasmFile: string -> data_flow_graph*)
 
   (*val mkGateDefn: (string * real list option * int list) -> GateDefn.t*)
 
@@ -23,14 +28,14 @@ struct
 
   type gate_idx = int
 
-  type dep_graph = {
+  type data_flow_graph = {
     gates: GateDefn.t Seq.t,
-    deps: gate_idx Seq.t Seq.t,
-    indegree: int Seq.t,
+    preds: gate_idx Seq.t Seq.t,
+    succs: gate_idx Seq.t Seq.t,
     numQubits: int
   }
 
-  type t = dep_graph
+  type t = data_flow_graph
 
   fun expect opt err = case opt of
       NONE => raise Fail err
@@ -90,23 +95,24 @@ struct
 
   fun arrayToSeq a = Seq.tabulate (fn i => Array.sub (a, i)) (Array.length a)
 
-  fun getDepsInDeg (edges, N) =
-      let val deps = Array.array (N, nil);
-          val indeg = Array.array (N, 0);
-          fun incDeg (i) = Array.update (indeg, i, 1 + Array.sub (indeg, i))
+  fun getSuccsPredsFromJSON (edges, N) =
+      let val preds = Array.array (N, nil);
+          val succs = Array.array (N, nil);
+          fun consAt (a, i, x) = Array.update (a, i, (x :: Array.sub (a, i)))
           fun go nil = ()
             | go (JSON.ARRAY [JSON.INT fm, JSON.INT to] :: edges) =
                 let val fm64 = IntInf.toInt fm
                     val to64 = IntInf.toInt to
-                    val () = incDeg to64
-                    val () = Array.update (deps, fm64, (to64 :: Array.sub (deps, fm64)))
+                    val _ = consAt (preds, to64, fm64)
+                    val _ = consAt (succs, fm64, to64)
                 in
                   go edges
                 end
             | go (_ :: edges) = raise Fail "Malformed edge in JSON"
           val () = go edges;
+          val toSeq = Seq.map (Seq.rev o Seq.fromList) o arrayToSeq
       in
-        (Seq.map Seq.fromList (arrayToSeq deps), arrayToSeq indeg)
+        (toSeq preds, toSeq succs)
       end
 
   fun fromJSON (data) =
@@ -126,11 +132,50 @@ struct
         val edges = case JSONUtil.findField data "edges" of
                         SOME (JSON.ARRAY es) => es
                       | _ => raise Fail "Expected array field 'nodes' in JSON"
-        val (deps, indegree) = getDepsInDeg (edges, Seq.length gates)
+        val (preds, succs) = getSuccsPredsFromJSON (edges, Seq.length gates)
     in
-      { gates = gates, deps = deps, indegree = indegree, numQubits = numqs }
+      { gates = gates,
+        preds = preds,
+        succs = succs,
+        numQubits = numqs }
       (*Seq.zipWith (fn (g, (d, i)) => {gate = g, deps = d, indegree = i}) (gates, Seq.zip (deps, indegree))*)
     end
-  fun fromString (str) = fromJSON (JSONParser.parse (JSONParser.openString str))
-  fun fromFile (file) = fromJSON (JSONParser.parseFile file)
+  fun fromJSONString (str) = fromJSON (JSONParser.parse (JSONParser.openString str))
+  fun fromJSONFile (file) = fromJSON (JSONParser.parseFile file)
+
+  (* TODO: convert to dependency graph *)
+  fun fromQasm {numQubits, gates} =
+      let val numGates = Seq.length gates
+          val qubitLastGate = Array.array (numQubits, ~1)
+          val preds = Array.array (numGates, nil)
+          val succs = Array.array (numGates, nil)
+          fun fillPreds gidx =
+              if gidx >= numGates then
+                ()
+              else
+                let val gate = Seq.nth gates gidx
+                    val args = GateDefn.getGateArgs gate
+                    val lasts = List.filter (fn i => i >= 0) (List.map (fn qidx => Array.sub (qubitLastGate, qidx)) args)
+                    val _ = Array.update (preds, gidx, lasts)
+                    val _ = List.map (fn gidx' => Array.update (succs, gidx', gidx :: Array.sub (succs, gidx'))) lasts
+                    val _ = List.map (fn qidx => Array.update (qubitLastGate, qidx, gidx)) args
+                in
+                  fillPreds (gidx + 1)
+                end
+          val _ = fillPreds 0
+          val predsSeq = Seq.map Seq.fromList (arrayToSeq preds)
+          val succsSeq = Seq.map (Seq.rev o Seq.fromList) (arrayToSeq succs)
+      in
+        { gates     = gates,
+          preds     = predsSeq,
+          succs     = succsSeq,
+          numQubits = numQubits }
+      end
+
+fun toString {gates, preds, succs, numQubits} =
+    let val header = "qreg q[" ^ Int.toString numQubits ^ "];\n"
+        fun qi i = "q[" ^ Int.toString i ^ "]"
+    in
+      Seq.iterate op^ header (Seq.map (fn g => GateDefn.toString g qi ^ ";\n") gates)
+    end
 end

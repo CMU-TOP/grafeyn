@@ -15,7 +15,7 @@ functor FullSimBFS
    val denseThreshold: real
    val pullThreshold: real):
 sig
-  val run: DepGraph.t
+  val run: DataFlowGraph.t
            -> {result: (B.t * C.t) option DelayedSeq.t, counts: int Seq.t}
 end =
 struct
@@ -113,7 +113,7 @@ struct
       val numQubits = #numQubits depgraph
       fun gate i = Seq.nth gates i
       val depth = Seq.length gates
-      val dgstate = DepGraphUtil.initState depgraph
+      val dgstate = DataFlowGraphUtil.initState depgraph
 
       val pickNextGate =
           let val f = gateSched depgraph in
@@ -173,7 +173,7 @@ struct
         (SST.singleton {numQubits = numQubits} (B.zeros, C.defaultReal 1.0))
 
       fun runloop () =
-          DepGraphUtil.scheduleWithOracle'
+          DataFlowGraphUtil.scheduleWithOracle'
 
             (* dependency graph *)
             depgraph

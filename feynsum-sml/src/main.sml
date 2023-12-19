@@ -58,28 +58,24 @@ fun parseQasm () =
 
       val simpleCirc = SMLQasmSimpleCircuit.fromAst ast
     in
-      Circuit.fromSMLQasmSimpleCircuit simpleCirc
+      DataFlowGraph.fromQasm (Circuit.fromSMLQasmSimpleCircuit simpleCirc)
     end
 
-val (circuit, depGraph) = (*(circuit, optDepGraph)*)
+val dfg =
   case inputName of
     "" => Util.die ("missing: -input FILE.qasm")
-
   | _ =>
     if String.isSuffix ".qasm" inputName then
-      raise Fail ".qasm no longer supported, use .json dependency graph"
-      (*parseQasm (), NONE*)
+      parseQasm ()
+    else if String.isSuffix ".json" inputName then
+      DataFlowGraph.fromJSONFile inputName
     else
-      let val dg = DepGraph.fromFile inputName
-          val circuit = {numQubits = #numQubits dg, gates = #gates dg}
-      in
-        (circuit, dg)
-      end
+      raise Fail "Unknown file suffix, use .qasm or .json"
 
 val _ = print ("-------------------------------\n")
 
-val _ = print ("gates  " ^ Int.toString (Circuit.numGates circuit) ^ "\n")
-val _ = print ("qubits " ^ Int.toString (Circuit.numQubits circuit) ^ "\n")
+val _ = print ("gates  " ^ Int.toString (Seq.length (#gates dfg)) ^ "\n")
+val _ = print ("qubits " ^ Int.toString (#numQubits dfg) ^ "\n")
 
 val showCircuit = CLA.parseFlag "show-circuit"
 val _ = print ("show-circuit? " ^ (if showCircuit then "yes" else "no") ^ "\n")
@@ -89,7 +85,7 @@ val _ =
   else
     print
       ("=========================================================\n"
-       ^ Circuit.toString circuit
+       ^ DataFlowGraph.toString dfg
        ^ "=========================================================\n")
 
 (* ========================================================================
@@ -99,7 +95,7 @@ val _ =
 
 val disableFusion = CLA.parseFlag "scheduler-disable-fusion"
 val maxBranchingStride = CLA.parseInt "scheduler-max-branching-stride" 2
-structure GNB =
+(*structure GNB =
   GateSchedulerGreedyNonBranching
     (val maxBranchingStride = maxBranchingStride
      val disableFusion = disableFusion)
@@ -107,15 +103,15 @@ structure GNB =
 structure GFQ =
   GateSchedulerGreedyFinishQubit
     (val maxBranchingStride = maxBranchingStride
-     val disableFusion = disableFusion)
+     val disableFusion = disableFusion)*)
 
 structure DGNB =
-  DepGraphSchedulerGreedyNonBranching
+  GreedyNonBranchingScheduler
     (val maxBranchingStride = maxBranchingStride
      val disableFusion = disableFusion)
 
 structure DGFQ =
-  DepGraphSchedulerGreedyFinishQubit
+  FinishQubitScheduler
     (val maxBranchingStride = maxBranchingStride
      val disableFusion = disableFusion)
 
@@ -139,75 +135,76 @@ fun print_sched_info () =
 type gate_idx = int
 type Schedule = gate_idx Seq.t
 
-fun dep_graph_to_schedule (dg: DepGraph.t) (sched: DepGraphScheduler.t) =
+(*fun dep_graph_to_schedule (dg: DataFlowGraph.t) (sched: Scheduler.t) =
     let val choose = sched dg
-        val st = DepGraphUtil.initState dg
+        val st = DataFlowGraphUtil.initState dg
         fun loadNext (acc: gate_idx list) =
-            let val frntr = DepGraphUtil.frontier st in
+            let val frntr = DataFlowGraphUtil.frontier st in
               if Seq.length frntr = 0 then
                 Seq.rev (Seq.fromList acc)
               else
                 (let val next = choose frntr in
-                   DepGraphUtil.visit dg next st;
+                   DataFlowGraphUtil.visit dg next st;
                    loadNext (next :: acc)
                  end)
             end
     in
       GateSchedulerOrder.mkScheduler (Seq.map Seq.singleton (loadNext nil))
     end
+*)
 
 val maxBranchingStride' = if disableFusion then 1 else maxBranchingStride
 
 (*fun greedybranching () =
-  case optDepGraph of
+  case optDataFlowGraph of
     NONE => GateSchedulerGreedyBranching.scheduler
-  | SOME dg => GateSchedulerOrder.mkScheduler (DepGraphUtil.scheduleWithOracle dg (gate_branching dg) (DepGraphSchedulerGreedyBranching.scheduler { depGraph = dg, gateIsBranching = gate_branching dg }) disableFusion  maxBranchingStride')
+  | SOME dg => GateSchedulerOrder.mkScheduler (DataFlowGraphUtil.scheduleWithOracle dg (gate_branching dg) (DataFlowGraphSchedulerGreedyBranching.scheduler { depGraph = dg, gateIsBranching = gate_branching dg }) disableFusion  maxBranchingStride')
 
 fun greedynonbranching () =
-  case optDepGraph of
+  case optDataFlowGraph of
     NONE => GNB.scheduler
-  | SOME dg => GateSchedulerOrder.mkScheduler (DepGraphUtil.scheduleWithOracle dg (gate_branching dg) (DGNB.scheduler { depGraph = dg, gateIsBranching = gate_branching dg }) disableFusion  maxBranchingStride')
+  | SOME dg => GateSchedulerOrder.mkScheduler (DataFlowGraphUtil.scheduleWithOracle dg (gate_branching dg) (DGNB.scheduler { depGraph = dg, gateIsBranching = gate_branching dg }) disableFusion  maxBranchingStride')
 
 fun greedyfinishqubit () =
-  case optDepGraph of
+  case optDataFlowGraph of
     NONE => GFQ.scheduler
   | SOME dg =>
-    GateSchedulerOrder.mkScheduler (DepGraphUtil.scheduleWithOracle dg (gate_branching dg) (DGFQ.scheduler { depGraph = dg, gateIsBranching = gate_branching dg }) disableFusion maxBranchingStride')
+    GateSchedulerOrder.mkScheduler (DataFlowGraphUtil.scheduleWithOracle dg (gate_branching dg) (DGFQ.scheduler { depGraph = dg, gateIsBranching = gate_branching dg }) disableFusion maxBranchingStride')
 
 fun greedyfinishqubit2 () =
-  case optDepGraph of
+  case optDataFlowGraph of
     NONE => GFQ.scheduler
   | SOME dg =>
     (*GateSchedulerOrder.mkScheduler (Seq.fromList (DGFQ.ordered { depGraph = dg, gateIsBranching = gate_branching dg }))*)
     (* dep_graph_to_schedule { depGraph = dg, gateIsBranching = gate_branching dg } DGFQ.scheduler2 *)
-    GateSchedulerOrder.mkScheduler (DepGraphUtil.scheduleWithOracle dg (gate_branching dg) (DGFQ.scheduler2 { depGraph = dg, gateIsBranching = gate_branching dg }) disableFusion maxBranchingStride')
+    GateSchedulerOrder.mkScheduler (DataFlowGraphUtil.scheduleWithOracle dg (gate_branching dg) (DGFQ.scheduler2 { depGraph = dg, gateIsBranching = gate_branching dg }) disableFusion maxBranchingStride')
 
 fun greedyfinishqubit3 () =
-  case optDepGraph of
+  case optDataFlowGraph of
     NONE => GFQ.scheduler
   | SOME dg =>
-    GateSchedulerOrder.mkScheduler (DepGraphUtil.scheduleWithOracle dg (gate_branching dg) (DGFQ.scheduler3 { depGraph = dg, gateIsBranching = gate_branching dg }) disableFusion maxBranchingStride')
+    GateSchedulerOrder.mkScheduler (DataFlowGraphUtil.scheduleWithOracle dg (gate_branching dg) (DGFQ.scheduler3 { depGraph = dg, gateIsBranching = gate_branching dg }) disableFusion maxBranchingStride')
 
 fun greedyfinishqubit4 () =
-  case optDepGraph of
+  case optDataFlowGraph of
     NONE => GFQ.scheduler
   | SOME dg =>
-    GateSchedulerOrder.mkScheduler (DepGraphUtil.scheduleWithOracle dg (gate_branching dg) (DGFQ.scheduler4 { depGraph = dg, gateIsBranching = gate_branching dg }) disableFusion maxBranchingStride')
+    GateSchedulerOrder.mkScheduler (DataFlowGraphUtil.scheduleWithOracle dg (gate_branching dg) (DGFQ.scheduler4 { depGraph = dg, gateIsBranching = gate_branching dg }) disableFusion maxBranchingStride')
 
 fun greedyfinishqubit5 () =
-  case optDepGraph of
+  case optDataFlowGraph of
     NONE => GFQ.scheduler
   | SOME dg =>
-    GateSchedulerOrder.mkScheduler (DepGraphUtil.scheduleWithOracle dg (gate_branching dg) (DGFQ.scheduler5 { depGraph = dg, gateIsBranching = gate_branching dg }) disableFusion maxBranchingStride')
+    GateSchedulerOrder.mkScheduler (DataFlowGraphUtil.scheduleWithOracle dg (gate_branching dg) (DGFQ.scheduler5 { depGraph = dg, gateIsBranching = gate_branching dg }) disableFusion maxBranchingStride')
 
 fun randomsched (samples: int) =
-  case optDepGraph of
+  case optDataFlowGraph of
     NONE => raise Fail "Need dep graph for random scheduler"
   | SOME dg =>
     let val ags = { depGraph = dg, gateIsBranching = gate_branching dg }
-        (*val scheds = Seq.fromList (List.tabulate (samples, fn i => DepGraphUtil.scheduleWithOracle dg (gate_branching dg) (DGFQ.schedulerRandom i ags) maxBranchingStride')) *)
-        val scheds = Seq.tabulate (fn i => DepGraphUtil.scheduleWithOracle dg (gate_branching dg) (DGFQ.schedulerRandom i ags) disableFusion maxBranchingStride') samples
-        val chosen = DepGraphUtil.chooseSchedule scheds (gate_branching dg)
+        (*val scheds = Seq.fromList (List.tabulate (samples, fn i => DataFlowGraphUtil.scheduleWithOracle dg (gate_branching dg) (DGFQ.schedulerRandom i ags) maxBranchingStride')) *)
+        val scheds = Seq.tabulate (fn i => DataFlowGraphUtil.scheduleWithOracle dg (gate_branching dg) (DGFQ.schedulerRandom i ags) disableFusion maxBranchingStride') samples
+        val chosen = DataFlowGraphUtil.chooseSchedule scheds (gate_branching dg)
     in
       GateSchedulerOrder.mkScheduler chosen
     end*)
@@ -301,7 +298,7 @@ structure M_U_64 =
      val denseThreshold = denseThreshold
      val pullThreshold = pullThreshold)
 
-val basisIdx64Okay = Circuit.numQubits circuit <= 62
+val basisIdx64Okay = #numQubits dfg <= 62
 
 val main =
   case precision of
@@ -314,4 +311,4 @@ val main =
 
 (* ======================================================================== *)
 
-val _ = main (inputName, depGraph)
+val _ = main (inputName, dfg)

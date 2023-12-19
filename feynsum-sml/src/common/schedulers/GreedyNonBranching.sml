@@ -1,14 +1,14 @@
-functor DepGraphSchedulerGreedyNonBranching
+functor GreedyNonBranchingScheduler
   (val maxBranchingStride: int val disableFusion: bool):
 sig
-  val scheduler: DepGraphScheduler.t
+  val scheduler: Scheduler.t
 end =
 struct
 
   type gate_idx = int
 
   type args =
-    { depGraph: DepGraph.t
+    { depGraph: DataFlowGraph.t
     , gateIsBranching: gate_idx -> bool
     }
 
@@ -23,7 +23,7 @@ struct
 
   (* From a frontier, select which gate to apply next *)
   fun scheduler dg =
-      let val branching = DepGraphUtil.gateIsBranching dg in
+      let val branching = DataFlowGraphUtil.gateIsBranching dg in
         fn gates => pickNonBranching 0 branching gates
       end
 end

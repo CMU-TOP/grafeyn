@@ -60,22 +60,22 @@ local
   
   ExpandState.sml
 
-  GateScheduler.sml
-  GateSchedulerNaive.sml
-  GateSchedulerGreedyNonBranching.sml
-  GateSchedulerGreedyBranching.sml
-  GateSchedulerGreedyFinishQubit.sml
+  (*GateScheduler.sml*)
+  (*GateSchedulerNaive.sml*)
+  (*GateSchedulerGreedyNonBranching.sml*)
+  (*GateSchedulerGreedyBranching.sml*)
+  (*GateSchedulerGreedyFinishQubit.sml*)
 
   Fingerprint.sml
 
-  DepGraph.sml
-  DepGraphUtil.sml
-  DepGraphScheduler.sml
-  DepGraphSchedulerGreedyBranching.sml
-  DepGraphSchedulerGreedyNonBranching.sml
-  DepGraphSchedulerGreedyFinishQubit.sml
-  DepGraphDynScheduler.sml
-  GateSchedulerOrder.sml
+  DataFlowGraph.sml
+  DataFlowGraphUtil.sml
+  DataFlowGraphScheduler.sml
+  schedulers/GreedyBranching.sml
+  schedulers/GreedyNonBranching.sml
+  schedulers/FinishQubit.sml
+  DataFlowGraphDynScheduler.sml
+  (*GateSchedulerOrder.sml*)
 in
   structure HashTable
   structure ApplyUntilFailure
@@ -124,25 +124,25 @@ in
 
   functor ExpandState
 
-  structure GateScheduler
-  structure GateSchedulerNaive
-  functor GateSchedulerGreedyNonBranching
-  structure GateSchedulerGreedyBranching
-  functor GateSchedulerGreedyFinishQubit
+  (*structure GateScheduler*)
+  (*structure GateSchedulerNaive*)
+  (*functor GateSchedulerGreedyNonBranching*)
+  (*structure GateSchedulerGreedyBranching*)
+  (*functor GateSchedulerGreedyFinishQubit*)
 
   functor RedBlackMapFn
   functor RedBlackSetFn
 
   functor Fingerprint
 
-  structure DepGraph
-  structure DepGraphUtil
-  structure DepGraphScheduler
-  structure DepGraphSchedulerGreedyBranching
-  functor DepGraphSchedulerGreedyNonBranching
-  functor DepGraphSchedulerGreedyFinishQubit
-  structure GateSchedulerOrder
-  signature DEP_GRAPH_DYN_SCHEDULER
+  structure DataFlowGraph
+  structure DataFlowGraphUtil
+  structure Scheduler
+  structure GreedyBranchingScheduler
+  functor GreedyNonBranchingScheduler
+  functor FinishQubitScheduler
+  (*structure GateSchedulerOrder*)
+  signature DATA_FLOW_GRAPH_DYN_SCHEDULER
   functor DynSchedFinishQubitWrapper
   functor DynSchedInterference
   functor DynSchedNaive

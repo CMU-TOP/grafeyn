@@ -1,4 +1,4 @@
-signature DEP_GRAPH_DYN_SCHEDULER =
+signature DATA_FLOW_GRAPH_DYN_SCHEDULER =
 sig
   structure B: BASIS_IDX
   structure C: COMPLEX
@@ -8,7 +8,7 @@ sig
 
   type gate_idx = int
 
-  type t = DepGraph.t -> (HS.t * gate_idx Seq.t -> gate_idx)
+  type t = DataFlowGraph.t -> (HS.t * gate_idx Seq.t -> gate_idx)
 
   val choose: t
 end
@@ -21,7 +21,7 @@ functor DynSchedFinishQubitWrapper
   sharing C = HS.C
    val maxBranchingStride: int
    val disableFusion: bool
-  ): DEP_GRAPH_DYN_SCHEDULER =
+  ): DATA_FLOW_GRAPH_DYN_SCHEDULER =
 struct
   structure B = B
   structure C = C
@@ -29,9 +29,9 @@ struct
 
   type gate_idx = int
 
-  type t = DepGraph.t -> (HS.t * gate_idx Seq.t -> gate_idx)
+  type t = DataFlowGraph.t -> (HS.t * gate_idx Seq.t -> gate_idx)
 
-  structure DGFQ = DepGraphSchedulerGreedyFinishQubit
+  structure FQS = FinishQubitScheduler
                      (val maxBranchingStride = maxBranchingStride
                       val disableFusion = disableFusion)
 
@@ -39,8 +39,8 @@ struct
                   (structure B = B
                    structure C = C)
 
-  fun choose (depgraph: DepGraph.t) =
-      let val f = DGFQ.scheduler5 depgraph in
+  fun choose (depgraph: DataFlowGraph.t) =
+      let val f = FQS.scheduler5 depgraph in
         fn (_, gates) => f gates
       end
   
@@ -54,7 +54,7 @@ functor DynSchedNaive
    sharing C = HS.C
    val maxBranchingStride: int
    val disableFusion: bool
-  ): DEP_GRAPH_DYN_SCHEDULER =
+  ): DATA_FLOW_GRAPH_DYN_SCHEDULER =
 struct
   structure B = B
   structure C = C
@@ -62,9 +62,9 @@ struct
 
   type gate_idx = int
 
-  type t = DepGraph.t -> (HS.t * gate_idx Seq.t -> gate_idx)
+  type t = DataFlowGraph.t -> (HS.t * gate_idx Seq.t -> gate_idx)
 
-  fun choose (depgraph: DepGraph.t) = fn (_, gates) => Seq.nth gates 0
+  fun choose (depgraph: DataFlowGraph.t) = fn (_, gates) => Seq.nth gates 0
   
 end
 
@@ -77,7 +77,7 @@ functor DynSchedInterference
    sharing C = HS.C
    val maxBranchingStride: int
    val disableFusion: bool
-  ): DEP_GRAPH_DYN_SCHEDULER =
+  ): DATA_FLOW_GRAPH_DYN_SCHEDULER =
 struct
   structure B = B
   structure C = C
@@ -85,9 +85,9 @@ struct
 
   type gate_idx = int
 
-  type t = DepGraph.t -> (HS.t * gate_idx Seq.t -> gate_idx)
+  type t = DataFlowGraph.t -> (HS.t * gate_idx Seq.t -> gate_idx)
 
-  structure DGFQ = DepGraphSchedulerGreedyFinishQubit
+  structure FQS = FinishQubitScheduler
                      (val maxBranchingStride = maxBranchingStride
                       val disableFusion = disableFusion)
 
@@ -128,7 +128,7 @@ struct
         Seq.map isbranched branchedQubits
       end
 
-  fun choose (depgraph: DepGraph.t) =
+  fun choose (depgraph: DataFlowGraph.t) =
       let val gates = Seq.map G.fromGateDefn (#gates depgraph)
           val branchSeq = Seq.map G.expectBranching gates
           fun branching i = Seq.nth branchSeq i
@@ -165,7 +165,7 @@ struct
 end
 
 
-(*functor DepGraphDynScheduler
+(*functor DataFlowGraphDynScheduler
   (structure B: BASIS_IDX
    structure C: COMPLEX
    structure SST: SPARSE_STATE_TABLE
@@ -176,7 +176,7 @@ end
    val blockSize: int
    val maxload: real
    val denseThreshold: real
-   val pullThreshold: real): DEP_GRAPH_DYN_SCHEDULER =
+   val pullThreshold: real): DATA_FLOW_GRAPH_DYN_SCHEDULER =
 struct
   type gate_idx = int
   structure Expander =
@@ -194,6 +194,6 @@ struct
   ( * From a frontier, select which gate to apply next * )
   ( *       args    visit gates, update frontier    break fusion      initial frontier  gate batches * )
   ( * type t = args -> (gate_idx -> gate_idx Seq.t) -> (unit -> unit) -> gate_idx Seq.t -> gate_idx Seq.t Seq.t* )
-  type t = DepGraph.t -> (Expander.state * gate_idx Seq.t -> gate_idx)
+  type t = DataFlowGraph.t -> (Expander.state * gate_idx Seq.t -> gate_idx)
 end
 *)
