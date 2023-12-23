@@ -18,6 +18,7 @@ sig
   val pull: gate -> B.t -> (B.t * C.t) Seq.t
   val fuse: gate * gate -> gate
   val fuses: gate Seq.t -> gate
+  val control: gate -> qubit_idx -> gate
 
 end =
 struct
@@ -46,37 +47,101 @@ struct
 
   fun fuses gs = Seq.reduce fuse (Seq.nth gs 0) (Seq.drop gs 1)
 
+  fun control g qi =
+    if Seq.iterate (fn (b, i) => b orelse (i = qi)) false (#args g) then
+      raise Fail "Cannot control a gate with a qubit it already uses"
+    else
+      { args = Seq.append (Seq.singleton qi) (#args g),
+        push = fn b => if B.get b qi then #push g b else Seq.singleton b,
+        pull = fn b => if B.get b qi then #pull g b else Seq.singleton (b, pos_1),
+        maxBranchingFactor = #maxBranchingFactor g }
+
   val pos_1 = one
   val neg_1 = R.~ one
   val pos_i = C.imag pos_1
   val neg_i = C.imag neg_1
-  val pos_h = RECP_SQRT_2
-  val neg_h = NEG_RECP_SQRT_2
+  val pos_h1 = RECP_SQRT_2
+  val neg_h1 = NEG_RECP_SQRT_2
+  val pos_hi = C.imag pos_h1
+  val neg_hi = C.imag neg_h1
 
+  (* Given a basis idx b, return a list of tuples (b', c'), where
+   *   b' = basis idx to pull from
+   *   c' = scalar to multiply the weight of b' by
+   *)
   fun pullFromGateDefn gd b = case gd of
+
     PauliY i => [(B.flip b i, if B.get b i then neg_i else pos_i)]
+
   | PauliZ i => [(b, if B.get b i then neg_1 else pos_1)]
+
   | Hadamard i => [(B.unset b i, pos_h), (B.set b i, if B.get b i then neg_h else pos_h)]
-  | SqrtX i => TODO
-  | Sxdg i => TODO
-  | S i => TODO
-  | Sdg i => TODO
+
+  | SqrtX i => if B.get b i then
+                 [(B.unset b i, C.scale (0.5, C.+ (pos_1, neg_i))),
+                  (b,           C.scale (0.5, C.+ (pos_1, pos_i)))]
+               else
+                 [(b,           C.scale (0.5, C.+ (pos_1, pos_i))),
+                  (b.set b i,   C.scale (0.5, C.+ (pos_1, neg_i)))]
+
+  | Sxdg i => if B.get b i then
+                 [(B.unset b i, C.scale (0.5, C.+ (pos_1, pos_i))),
+                  (b,           C.scale (0.5, C.+ (pos_1, neg_i)))]
+               else
+                 [(b,           C.scale (0.5, C.+ (pos_1, neg_i))),
+                  (b.set b i,   C.scale (0.5, C.+ (pos_1, pos_i)))]
+
+  | S i => [(b, if B.get b i then pos_i else pos_1)]
+
+  | Sdg i => [(b, if B.get b i then neg_i else pos_1)]
+
   | X i => [(B.flip b i, pos_1)]
-  | T i => TODO
-  | Tdg i => TODO
-  | CX {control = i, target = j} => TODO
-  | CZ {control = i, target = j} => TODO
-  | CCX {control1 = i, control2 = j, target = k} => TODO
-  | Phase {target = i, rot = x} => TODO
-  | CPhase {control = i, target = j, rot = x} => TODO
-  | Fsim {left = i, right = j, theta = x, phi = y} => TODO
-  | RZ {rot = x, target = i} => TODO
-  | RY {rot = x, target = i} => TODO
-  | RX {rot = x, target = i} => TODO
-  | Swap {target1 = i, target2 = j} => TODO
-  | CSwap {control = i, target1 = j, target2 = k} => TODO
-  | U {target = i, theta = x, phi = y, lambda = z} => TODO
-  | Other {name = n, params = xs, args = is} => TODO
+
+  | T i => [(b, if B.get b i then C.+ (pos_h1, pos_hi) else pos_1)]
+
+  | Tdg i => [(b, if B.get b i then C.+ (pos_h1, neg_hi) else pos_1)]
+
+  | CX {control = i, target = j} => [(if B.get b i then B.flip b j else b, pos_1)]
+
+  | CZ {control = i, target = j} => [(b, if B.get b i andalso B.get b j then neg_1 else pos_1)]
+
+  | CCX {control1 = i, control2 = j, target = k} => [(if B.get b i andalso B.get b j then B.flip b k else b, pos_1)]
+
+  | Phase {target = i, rot = x} => [(b, if B.get b i then C.rotateBy x else pos_1)]
+
+  | CPhase {control = i, target = j, rot = x} => [(b, if B.get b i andalso B.get b j then C.rotateBy x else pos_1)]
+
+  | Fsim {left = i, right = j, theta = x, phi = y} => raise Fail "Gate2.pushFromGateDefn Fsim unimplemented"
+
+  | RZ {rot = x, target = i} => [(b, C.rotateBy (R.* (x, if B.get b i then ~0.5 else 0.5)))]
+
+  | RY {rot = x, target = i} => if B.get b i then
+                                  [(B.unset b i, R.Math.sin (R.* (0.5, x))),
+                                   (b, R.Math.cos (R.* (0.5, x)))]
+                                else
+                                  [(b, R.Math.cos (R.* (0.5, x))),
+                                   (B.set b i, R.~ (R.Math.sin (R.* (0.5, x))))]
+
+  | RX {rot = x, target = i} => if B.get b i then
+                                  [(B.unset b i, C.imag (R.Math.sin (R.* (0.5, x)))),
+                                   (b, R.Math.cos (R.* (0.5, x)))]
+                                else
+                                  [(b, R.Math.cos (R.* (0.5, x))),
+                                   (B.set b i, C.imag (R.~ (R.Math.sin (R.* (0.5, x)))))]
+
+  | Swap {target1 = i, target2 = j} => [(B.setTo (B.get b i) (B.setTo (B.get b j) b i) j, pos_1)]
+
+  | CSwap {control = i, target1 = j, target2 = k} => [(if B.get b i then B.setTo (B.get b j) (B.setTo (B.get b k) b j) k else b, pos_1)]
+
+  | U {target = i, theta = x, phi = y, lambda = z} =>
+    if B.get b i then
+      [(B.unset b i, C.scale (R.Math.sin (R.* (0.5, x)), C.rotateBy y)),
+       (b, C.scale (R.Math.cos (R.* (0.5, x)), C.rotateBy (R.+ (y, z))))]
+    else
+      [(b, R.Math.cos (R.* (0.5, x))),
+       (B.set b i, C.~ (C.scale (R.Math.sin (R.* (0.5, x)), C.rotateBy z)))]
+
+  | Other {name = n, params = xs, args = is} => raise Fail "Gate2.pushFromGateDefn Other unimplemented"
 
   fun pushFromGateDefn gd b = case gd of
     PauliY i => [B.flip b i]
