@@ -1,15 +1,13 @@
 functor HybridState
-  (structure B: BASIS_IDX
-   structure C: COMPLEX
-   structure SST: SPARSE_STATE_TABLE
+  (structure SST: SPARSE_STATE_TABLE
    structure DS: DENSE_STATE
-   sharing B = SST.B = DS.B
-   sharing C = SST.C = DS.C): HYBRID_STATE =
+   sharing SST.B = DS.B
+   sharing SST.C = DS.C): HYBRID_STATE =
 struct
-  structure B = B
-  structure C = C
   structure SST = SST
   structure DS = DS
+  structure B = DS.B
+  structure C = DS.C
 
   datatype state =
     Sparse of SST.t

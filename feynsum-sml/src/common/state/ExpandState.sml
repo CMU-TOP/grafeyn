@@ -1,10 +1,8 @@
 functor ExpandState
-  (structure B: BASIS_IDX
-   structure C: COMPLEX
-   structure HS: HYBRID_STATE
+  (structure HS: HYBRID_STATE
    structure G: GATE
-   sharing B = HS.B = G.B
-   sharing C = HS.C = G.C
+   sharing HS.SST.B = HS.DS.B = G.B
+   sharing HS.SST.C = HS.DS.C = G.C
    val blockSize: int
    val maxload: real
    val denseThreshold: real
@@ -22,6 +20,9 @@ sig
 
 end =
 struct
+
+  structure B = G.B
+  structure C = G.C
 
   (* 0 < r < 1
    *

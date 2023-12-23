@@ -1,10 +1,6 @@
 signature DYN_GATE_SCHEDULER =
 sig
-  structure B: BASIS_IDX
-  structure C: COMPLEX
   structure HS: HYBRID_STATE
-  sharing B = HS.B
-  sharing C = HS.C
 
   type gate_idx = int
 
@@ -14,18 +10,13 @@ sig
 end
 
 functor DynSchedFinishQubitWrapper
-  (structure B: BASIS_IDX
-   structure C: COMPLEX
-  structure HS: HYBRID_STATE
-  sharing B = HS.B
-  sharing C = HS.C
+  (structure HS: HYBRID_STATE
    val maxBranchingStride: int
-   val disableFusion: bool
-  ): DYN_GATE_SCHEDULER =
+   val disableFusion: bool): DYN_GATE_SCHEDULER =
 struct
-  structure B = B
-  structure C = C
   structure HS = HS
+  structure B = HS.B
+  structure C = HS.C
 
   type gate_idx = int
 
