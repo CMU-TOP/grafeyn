@@ -23,9 +23,6 @@ sig
 end =
 struct
 
-  structure SST = HS.SST
-  structure DS = HS.DS
-
   (* 0 < r < 1
    *
    * I wish this wasn't so difficult
@@ -89,16 +86,16 @@ struct
    *)
   fun tryPut table widx =
     let
-      val n = SST.capacity table
+      val n = HS.SST.capacity table
       val probablyLongestProbe = Real.ceil
         (log2 (Real.fromInt n) / (maxload - 1.0 - log2 maxload))
       val tolerance = 4 * Int.max (10, probablyLongestProbe)
       val tolerance = Int.min (tolerance, n)
     in
-      SST.insertAddWeightsLimitProbes {probes = tolerance} table widx;
+      HS.SST.insertAddWeightsLimitProbes {probes = tolerance} table widx;
       true
     end
-    handle SST.Full => false
+    handle HS.SST.Full => false
 
 
   datatype successors_result =
@@ -112,9 +109,9 @@ struct
 
       val stateSeq =
         case state of
-          HS.Sparse sst => DelayedSeq.map SOME (SST.compact sst)
-        | HS.Dense state => DS.unsafeViewContents state
-        | HS.DenseKnownNonZeroSize (state, _) => DS.unsafeViewContents state
+          HS.Sparse sst => DelayedSeq.map SOME (HS.SST.compact sst)
+        | HS.Dense state => HS.DS.unsafeViewContents state
+        | HS.DenseKnownNonZeroSize (state, _) => HS.DS.unsafeViewContents state
 
       (* number of initial elements *)
       val n = DelayedSeq.length stateSeq
@@ -258,19 +255,19 @@ struct
             (numGateApps', table)
           else
             ( (*print
-                ("growing from " ^ Int.toString (SST.capacity table) ^ " to "
+                ("growing from " ^ Int.toString (HS.SST.capacity table) ^ " to "
                  ^
                  Int.toString (Real.ceil
-                   (1.5 * Real.fromInt (SST.capacity table))) ^ "\n")
+                   (1.5 * Real.fromInt (HS.SST.capacity table))) ^ "\n")
               ;*)
               loop numGateApps' remainingBlocks'
-                (SST.increaseCapacityByFactor 1.5 table))
+                (HS.SST.increaseCapacityByFactor 1.5 table))
         end
 
       val initialCapacity = Real.ceil
         (1.1 * (1.0 / maxload) * Real.fromInt (IntInf.toInt expected))
       val initialTable =
-        SST.make {capacity = initialCapacity, numQubits = numQubits}
+        HS.SST.make {capacity = initialCapacity, numQubits = numQubits}
       val initialBlocks = Seq.tabulate (fn b => b) numBlocks
 
       val (apps, output) = loop 0 initialBlocks initialTable
@@ -286,15 +283,15 @@ struct
 
       val stateSeq =
         case state of
-          HS.Sparse sst => DelayedSeq.map SOME (SST.compact sst)
-        | HS.Dense state => DS.unsafeViewContents state
-        | HS.DenseKnownNonZeroSize (state, _) => DS.unsafeViewContents state
+          HS.Sparse sst => DelayedSeq.map SOME (HS.SST.compact sst)
+        | HS.Dense state => HS.DS.unsafeViewContents state
+        | HS.DenseKnownNonZeroSize (state, _) => HS.DS.unsafeViewContents state
 
       (* number of initial elements *)
       val n = DelayedSeq.length stateSeq
 
-      val output = DS.make {numQubits = numQubits}
-      fun put widx = DS.insertAddWeights output widx
+      val output = HS.DS.make {numQubits = numQubits}
+      fun put widx = HS.DS.insertAddWeights output widx
 
       fun doGates apps (widx, gatenum) =
         if C.isZero (#2 widx) then
@@ -333,9 +330,9 @@ struct
 
       val lookup =
         case state of
-          HS.Sparse sst => (fn bidx => Option.getOpt (SST.lookup sst bidx, C.zero))
-        | HS.Dense ds => DS.lookupDirect ds
-        | HS.DenseKnownNonZeroSize (ds, _) => DS.lookupDirect ds
+          HS.Sparse sst => (fn bidx => Option.getOpt (HS.SST.lookup sst bidx, C.zero))
+        | HS.Dense ds => HS.DS.lookupDirect ds
+        | HS.DenseKnownNonZeroSize (ds, _) => HS.DS.lookupDirect ds
 
       fun doGates (bidx, gatenum) =
         if gatenum < 0 then
@@ -362,7 +359,7 @@ struct
               end
 
       val {result, totalCount, nonZeroSize} =
-        DS.pull {numQubits = numQubits} (fn bidx =>
+        HS.DS.pull {numQubits = numQubits} (fn bidx =>
           doGates (bidx, numGates - 1))
     in
       { result = HS.DenseKnownNonZeroSize (result, nonZeroSize)
@@ -375,8 +372,8 @@ struct
     let
       val nonZeroSize =
         case state of
-          HS.Sparse sst => SST.nonZeroSize sst
-        | HS.Dense ds => DS.nonZeroSize ds
+          HS.Sparse sst => HS.SST.nonZeroSize sst
+        | HS.Dense ds => HS.DS.nonZeroSize ds
         | HS.DenseKnownNonZeroSize (_, nz) => nz
 
       val rate = Real.max

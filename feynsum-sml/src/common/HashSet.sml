@@ -1,27 +1,27 @@
 structure HashSet :>
 sig
   type 'a t
-  type 'a table = 'a t
+  type 'a set = 'a t
 
   exception Full
 
-  val make: {hash: 'a -> int, eq: 'a * 'a -> bool, capacity: int, maxload: real} -> 'a table
-  val size: 'a table -> int
-  val capacity: 'a table -> int
-  val resize: 'a table -> 'a table
-  val increaseCapacityTo: int -> 'a table -> 'a table
-  val insert: 'a table -> 'a -> unit
-  val lookup: 'a table -> 'a -> bool
-  val compact: 'a table -> 'a Seq.t
+  val make: {hash: 'a -> int, eq: 'a * 'a -> bool, capacity: int, maxload: real} -> 'a set
+  val size: 'a set -> int
+  val capacity: 'a set -> int
+  val resize: 'a set -> 'a set
+  val increaseCapacityTo: int -> 'a set -> 'a set
+  val insert: 'a set -> 'a -> unit
+  val lookup: 'a set -> 'a -> bool
+  val compact: 'a set -> 'a Seq.t
 
-  (* Unsafe because underlying array is shared. If the table is mutated,
-   * then the Seq would not appear to be immutable.
+  (* Unsafe because underlying array is shared. If the set is mutated,
+   * then the Seq would not appear to be immuset.
    *
    * Could also imagine a function `freezeViewContents` which marks the
-   * table as immutable (preventing further inserts). That would be a safer
+   * set as immuset (preventing further inserts). That would be a safer
    * version of this function.
    *)
-  val unsafeViewContents: 'a table -> 'a option Seq.t
+  val unsafeViewContents: 'a set -> 'a option Seq.t
 end =
 struct
 
@@ -35,12 +35,12 @@ struct
 
   exception Full
 
-  type 'a table = 'a t
+  type 'a set = 'a t
 
 
   fun make {hash, eq, capacity, maxload} =
     if capacity = 0 then
-      raise Fail "HashTable.make: capacity 0"
+      raise Fail "HashSet.make: capacity 0"
     else
       let val data = SeqBasis.tabulate 5000 (0, capacity) (fn _ => NONE)
       in T {data = data, hash = hash, eq = eq, maxload = maxload}
@@ -112,7 +112,7 @@ struct
 
   fun increaseCapacityTo newcap (input as T {data, hash, eq, maxload}) =
     if newcap < capacity input then
-      raise Fail "HashTable.increaseCapacityTo: new cap is too small"
+      raise Fail "HashSet.increaseCapacityTo: new cap is too small"
     else
       let
         val new = make
