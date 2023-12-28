@@ -36,6 +36,8 @@ local
   complex/Complex64.sml
   complex/Complex.sml
 
+  MathHelpers.sml
+
   basis/BASIS_IDX.sml
   ann "allowExtendedTextConsts true" in
     basis/BasisIdx64.sml
@@ -119,6 +121,8 @@ in
 
   functor RedBlackMapFn
   functor RedBlackSetFn
+
+  structure MathHelpers
 
   functor Fingerprint
 

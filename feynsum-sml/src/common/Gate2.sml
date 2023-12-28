@@ -71,67 +71,87 @@ struct
    *)
   fun pullFromGateDefn gd b = case gd of
 
-    PauliY i => [(B.flip b i, if B.get b i then neg_i else pos_i)]
+    PauliY i =>
+    [(B.flip b i, if B.get b i then neg_i else pos_i)]
 
-  | PauliZ i => [(b, if B.get b i then neg_1 else pos_1)]
+  | PauliZ i =>
+    [(b, if B.get b i then neg_1 else pos_1)]
 
-  | Hadamard i => [(B.unset b i, pos_h), (B.set b i, if B.get b i then neg_h else pos_h)]
+  | Hadamard i =>
+    [(B.unset b i, pos_h), (B.set b i, if B.get b i then neg_h else pos_h)]
 
-  | SqrtX i => if B.get b i then
-                 [(B.unset b i, C.scale (0.5, C.+ (pos_1, neg_i))),
-                  (b,           C.scale (0.5, C.+ (pos_1, pos_i)))]
-               else
-                 [(b,           C.scale (0.5, C.+ (pos_1, pos_i))),
-                  (b.set b i,   C.scale (0.5, C.+ (pos_1, neg_i)))]
+  | SqrtX i =>
+    if B.get b i then
+      [(B.unset b i, C.scale (0.5, C.+ (pos_1, neg_i))),
+       (b,           C.scale (0.5, C.+ (pos_1, pos_i)))]
+    else
+      [(b,           C.scale (0.5, C.+ (pos_1, pos_i))),
+       (b.set b i,   C.scale (0.5, C.+ (pos_1, neg_i)))]
 
-  | Sxdg i => if B.get b i then
-                 [(B.unset b i, C.scale (0.5, C.+ (pos_1, pos_i))),
-                  (b,           C.scale (0.5, C.+ (pos_1, neg_i)))]
-               else
-                 [(b,           C.scale (0.5, C.+ (pos_1, neg_i))),
-                  (b.set b i,   C.scale (0.5, C.+ (pos_1, pos_i)))]
+  | Sxdg i =>
+    if B.get b i then
+      [(B.unset b i, C.scale (0.5, C.+ (pos_1, pos_i))),
+       (b,           C.scale (0.5, C.+ (pos_1, neg_i)))]
+    else
+      [(b,           C.scale (0.5, C.+ (pos_1, neg_i))),
+       (b.set b i,   C.scale (0.5, C.+ (pos_1, pos_i)))]
 
-  | S i => [(b, if B.get b i then pos_i else pos_1)]
+  | S i =>
+    [(b, if B.get b i then pos_i else pos_1)]
 
-  | Sdg i => [(b, if B.get b i then neg_i else pos_1)]
+  | Sdg i =>
+    [(b, if B.get b i then neg_i else pos_1)]
 
-  | X i => [(B.flip b i, pos_1)]
+  | X i =>
+    [(B.flip b i, pos_1)]
 
-  | T i => [(b, if B.get b i then C.+ (pos_h1, pos_hi) else pos_1)]
+  | T i =>
+    [(b, if B.get b i then C.+ (pos_h1, pos_hi) else pos_1)]
 
   | Tdg i => [(b, if B.get b i then C.+ (pos_h1, neg_hi) else pos_1)]
 
-  | CX {control = i, target = j} => [(if B.get b i then B.flip b j else b, pos_1)]
+  | CX {control = i, target = j} =>
+    [(if B.get b i then B.flip b j else b, pos_1)]
 
-  | CZ {control = i, target = j} => [(b, if B.get b i andalso B.get b j then neg_1 else pos_1)]
+  | CZ {control = i, target = j} =>
+    [(b, if B.get b i andalso B.get b j then neg_1 else pos_1)]
 
-  | CCX {control1 = i, control2 = j, target = k} => [(if B.get b i andalso B.get b j then B.flip b k else b, pos_1)]
+  | CCX {control1 = i, control2 = j, target = k} =>
+    [(if B.get b i andalso B.get b j then B.flip b k else b, pos_1)]
 
-  | Phase {target = i, rot = x} => [(b, if B.get b i then C.rotateBy x else pos_1)]
+  | Phase {target = i, rot = x} =>
+    [(b, if B.get b i then C.rotateBy x else pos_1)]
 
-  | CPhase {control = i, target = j, rot = x} => [(b, if B.get b i andalso B.get b j then C.rotateBy x else pos_1)]
+  | CPhase {control = i, target = j, rot = x} =>
+    [(b, if B.get b i andalso B.get b j then C.rotateBy x else pos_1)]
 
-  | Fsim {left = i, right = j, theta = x, phi = y} => raise Fail "Gate2.pushFromGateDefn Fsim unimplemented"
+  | Fsim {left = i, right = j, theta = x, phi = y} =>
+    raise Fail "Gate2.pushFromGateDefn Fsim unimplemented"
 
-  | RZ {rot = x, target = i} => [(b, C.rotateBy (R.* (x, if B.get b i then ~0.5 else 0.5)))]
+  | RZ {rot = x, target = i} =>
+    [(b, C.rotateBy (R.* (x, if B.get b i then ~0.5 else 0.5)))]
 
-  | RY {rot = x, target = i} => if B.get b i then
-                                  [(B.unset b i, R.Math.sin (R.* (0.5, x))),
-                                   (b, R.Math.cos (R.* (0.5, x)))]
-                                else
-                                  [(b, R.Math.cos (R.* (0.5, x))),
-                                   (B.set b i, R.~ (R.Math.sin (R.* (0.5, x))))]
+  | RY {rot = x, target = i} =>
+    if B.get b i then
+      [(B.unset b i, R.Math.sin (R.* (0.5, x))),
+       (b, R.Math.cos (R.* (0.5, x)))]
+    else
+      [(b, R.Math.cos (R.* (0.5, x))),
+       (B.set b i, R.~ (R.Math.sin (R.* (0.5, x))))]
 
-  | RX {rot = x, target = i} => if B.get b i then
-                                  [(B.unset b i, C.imag (R.Math.sin (R.* (0.5, x)))),
-                                   (b, R.Math.cos (R.* (0.5, x)))]
-                                else
-                                  [(b, R.Math.cos (R.* (0.5, x))),
-                                   (B.set b i, C.imag (R.~ (R.Math.sin (R.* (0.5, x)))))]
+  | RX {rot = x, target = i} =>
+    if B.get b i then
+      [(B.unset b i, C.imag (R.Math.sin (R.* (0.5, x)))),
+       (b, R.Math.cos (R.* (0.5, x)))]
+    else
+      [(b, R.Math.cos (R.* (0.5, x))),
+       (B.set b i, C.imag (R.~ (R.Math.sin (R.* (0.5, x)))))]
 
-  | Swap {target1 = i, target2 = j} => [(B.setTo (B.get b i) (B.setTo (B.get b j) b i) j, pos_1)]
+  | Swap {target1 = i, target2 = j} =>
+    [(B.setTo (B.get b i) (B.setTo (B.get b j) b i) j, pos_1)]
 
-  | CSwap {control = i, target1 = j, target2 = k} => [(if B.get b i then B.setTo (B.get b j) (B.setTo (B.get b k) b j) k else b, pos_1)]
+  | CSwap {control = i, target1 = j, target2 = k} =>
+    [(if B.get b i then B.setTo (B.get b j) (B.setTo (B.get b k) b j) k else b, pos_1)]
 
   | U {target = i, theta = x, phi = y, lambda = z} =>
     if B.get b i then
@@ -141,7 +161,8 @@ struct
       [(b, R.Math.cos (R.* (0.5, x))),
        (B.set b i, C.~ (C.scale (R.Math.sin (R.* (0.5, x)), C.rotateBy z)))]
 
-  | Other {name = n, params = xs, args = is} => raise Fail "Gate2.pushFromGateDefn Other unimplemented"
+  | Other {name = n, params = xs, args = is} =>
+    raise Fail "Gate2.pushFromGateDefn Other unimplemented"
 
   fun pushFromGateDefn gd b = case gd of
     PauliY i => [B.flip b i]

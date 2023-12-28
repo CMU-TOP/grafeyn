@@ -24,45 +24,6 @@ struct
   structure B = G.B
   structure C = G.C
 
-  (* 0 < r < 1
-   *
-   * I wish this wasn't so difficult
-   *
-   * The problem is that I can't always convert the IntInf into a real,
-   * because it might be too large.
-   *)
-  fun riMult (r: real) (i: IntInf.int) : IntInf.int =
-    if IntInf.abs i <= 1000000000000 then
-      Real.toLargeInt IEEEReal.TO_NEAREST
-        (r * Real.fromLargeInt (IntInf.toLarge i))
-    else
-      let
-        val digits = Real.fmt StringCvt.EXACT r
-        val digits =
-          if String.isPrefix "0." digits then String.extract (digits, 2, NONE)
-          else raise Fail "riMult: uh oh"
-
-        fun loop acc depth =
-          if depth >= String.size digits then
-            acc
-          else
-            let
-              val d = Char.ord (String.sub (digits, depth)) - Char.ord #"0"
-              val _ =
-                if 0 <= d andalso d <= 9 then ()
-                else raise Fail ("riMult: bad digit " ^ digits ^ ", " ^ Real.toString r ^ ", " ^ IntInf.toString i)
-              val acc =
-                acc + (i * IntInf.fromInt d) div (IntInf.pow (10, depth + 1))
-            in
-              loop acc (depth + 1)
-            end
-      in
-        loop 0 0
-      end
-
-
-  fun log2 x = Math.log10 x / Math.log10 2.0
-
   (* tryPut will fail (and return false) if the table is full, or almost full.
    *
    * We use here a trick to avoid needing to scan the whole table to figure out
@@ -89,7 +50,7 @@ struct
     let
       val n = HS.SST.capacity table
       val probablyLongestProbe = Real.ceil
-        (log2 (Real.fromInt n) / (maxload - 1.0 - log2 maxload))
+        (MathHelpers.log2 (Real.fromInt n) / (maxload - 1.0 - MathHelpers.log2 maxload))
       val tolerance = 4 * Int.max (10, probablyLongestProbe)
       val tolerance = Int.min (tolerance, n)
     in
@@ -395,12 +356,12 @@ struct
 
       val (method, {result, numGateApps}) =
         if
-          denseThreshold >= 1.0 orelse expectedCost < riMult denseThreshold maxNumStates
+          denseThreshold >= 1.0 orelse expectedCost < MathHelpers.riMult denseThreshold maxNumStates
         then
           ("push sparse", expandSparse args)
 
         else if
-          expectedCost >= riMult pullThreshold maxNumStates
+          expectedCost >= MathHelpers.riMult pullThreshold maxNumStates
           andalso allGatesPullable ()
         then
           ("pull dense", expandPullDense args)
