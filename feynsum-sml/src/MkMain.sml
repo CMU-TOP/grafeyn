@@ -29,9 +29,7 @@ struct
 
   structure BFSLocked =
     FullSimBFS
-      (structure B = B
-       structure C = C
-       structure HS = HSLocked
+      (structure HS = HSLocked
        structure G = G
        val disableFusion = disableFusion
        val maxBranchingStride = maxBranchingStride
@@ -44,9 +42,7 @@ struct
 
   structure BFSLockfree =
     FullSimBFS
-      (structure B = B
-       structure C = C
-       structure HS = HSLockFree
+      (structure HS = HSLockFree
        structure G = G
        val disableFusion = disableFusion
        val maxBranchingStride = maxBranchingStride

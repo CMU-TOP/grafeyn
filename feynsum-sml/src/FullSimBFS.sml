@@ -1,10 +1,8 @@
 functor FullSimBFS
-  (structure B: BASIS_IDX
-   structure C: COMPLEX
-   structure HS: HYBRID_STATE
+  (structure HS: HYBRID_STATE
    structure G: GATE
-   sharing B = HS.B = G.B
-   sharing C = HS.C = G.C
+   sharing HS.B = G.B
+   sharing HS.C = G.C
 
    val disableFusion: bool
    val maxBranchingStride: int
@@ -16,15 +14,16 @@ functor FullSimBFS
    val pullThreshold: real):
 sig
   val run: DataFlowGraph.t
-           -> {result: (B.t * C.t) option DelayedSeq.t, counts: int Seq.t}
+           -> {result: (HS.B.t * HS.C.t) option DelayedSeq.t, counts: int Seq.t}
 end =
 struct
 
+  structure B = HS.B
+  structure C = HS.C
+
   structure Expander =
     ExpandState
-      (structure B = B
-       structure C = C
-       structure HS = HS
+      (structure HS = HS
        structure G = G
        val denseThreshold = denseThreshold
        val blockSize = blockSize
@@ -75,22 +74,16 @@ struct
     end
 
   structure DGFQ = DynSchedFinishQubitWrapper
-                     (structure B = B
-                      structure C = C
-                      structure HS = HS
+                     (structure HS = HS
                       val maxBranchingStride = maxBranchingStride
                       val disableFusion = disableFusion)
 
   structure DGI = DynSchedInterference
-                    (structure B = B
-                     structure C = C
-                     structure HS = HS
+                    (structure HS = HS
                      val maxBranchingStride = maxBranchingStride
                      val disableFusion = disableFusion)
   structure DGN = DynSchedNaive
-                    (structure B = B
-                     structure C = C
-                     structure HS = HS
+                    (structure HS = HS
                      val maxBranchingStride = maxBranchingStride
                      val disableFusion = disableFusion)
 

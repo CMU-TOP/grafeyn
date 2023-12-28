@@ -15,9 +15,7 @@ functor DynSchedFinishQubitWrapper
    val disableFusion: bool): DYN_GATE_SCHEDULER =
 struct
   structure HS = HS
-  structure B = HS.B
-  structure C = HS.C
-
+  
   type gate_idx = int
 
   type t = DataFlowGraph.t -> (HS.t * gate_idx Seq.t -> gate_idx)
@@ -26,9 +24,8 @@ struct
                      (val maxBranchingStride = maxBranchingStride
                       val disableFusion = disableFusion)
 
-  structure G = Gate
-                  (structure B = B
-                   structure C = C)
+  structure G = Gate (structure B = HS.B
+                      structure C = HS.C)
 
   fun choose (depgraph: DataFlowGraph.t) =
       let val f = FQS.scheduler5 depgraph in
@@ -38,17 +35,11 @@ struct
 end
 
 functor DynSchedNaive
-  (structure B: BASIS_IDX
-   structure C: COMPLEX
-   structure HS: HYBRID_STATE
-   sharing B = HS.B
-   sharing C = HS.C
+  (structure HS: HYBRID_STATE
    val maxBranchingStride: int
    val disableFusion: bool
   ): DYN_GATE_SCHEDULER =
 struct
-  structure B = B
-  structure C = C
   structure HS = HS
 
   type gate_idx = int
@@ -61,17 +52,11 @@ end
 
 
 functor DynSchedInterference
-  (structure B: BASIS_IDX
-   structure C: COMPLEX
-   structure HS: HYBRID_STATE
-   sharing B = HS.B
-   sharing C = HS.C
+  (structure HS: HYBRID_STATE
    val maxBranchingStride: int
    val disableFusion: bool
   ): DYN_GATE_SCHEDULER =
 struct
-  structure B = B
-  structure C = C
   structure HS = HS
 
   type gate_idx = int
@@ -82,9 +67,8 @@ struct
                      (val maxBranchingStride = maxBranchingStride
                       val disableFusion = disableFusion)
 
-  structure G = Gate
-                  (structure B = B
-                   structure C = C)
+  structure G = Gate (structure B = HS.B
+                      structure C = HS.C)
 
   datatype Branched = Uninitialized | Zero | One | Superposition
 
@@ -108,7 +92,7 @@ struct
 
   fun calculateBranchedQubits (numQubits, sst) =
       let val nonZeros = DelayedSeq.mapOption (fn x => x) (HS.SST.unsafeViewContents sst)
-          val branchedQubits = Seq.tabulate (fn qi => DelayedSeq.reduce joinBranches Uninitialized (DelayedSeq.map (fn (b, c) => if B.get b qi then One else Zero) nonZeros)) numQubits
+          val branchedQubits = Seq.tabulate (fn qi => DelayedSeq.reduce joinBranches Uninitialized (DelayedSeq.map (fn (b, c) => if HS.B.get b qi then One else Zero) nonZeros)) numQubits
           fun isbranched b =
               case b of
                   Uninitialized => raise Fail "Uninitialized in isbranched! This shouldn't happen"
