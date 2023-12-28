@@ -1,4 +1,4 @@
-functor Gate
+functor Gate2
   (structure B: BASIS_IDX
    structure C: COMPLEX) :>
 sig

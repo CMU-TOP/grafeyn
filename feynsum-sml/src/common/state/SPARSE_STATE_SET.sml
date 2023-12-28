@@ -12,8 +12,6 @@ sig
   val singleton: {numQubits: int} -> B.t -> set
 
   val size: set -> int
-  val nonZeroSize: set -> int
-  val zeroSize: set -> int
   val capacity: set -> int
 
   val insert: set -> B.t -> unit

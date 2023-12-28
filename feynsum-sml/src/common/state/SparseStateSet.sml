@@ -36,7 +36,6 @@ struct
               emptykey = B.set B.zeros numQubits
             }
 
-
   fun capacity {keys = keys, ...} = Array.length keys
 
   fun keyIsEmpty {emptykey, ...} k = B.equal (k, emptykey)
@@ -91,7 +90,7 @@ struct
 
 
   fun contains set x =
-    let val n = Array.capacity set
+    let val n = capacity set
         val start = (B.hash x) mod n
 
         fun loop i =
@@ -107,30 +106,9 @@ struct
       if n = 0 then false else loop start
     end
 
-
-  fun nonZeroSize state =
-    let val currentElems = unsafeViewContents state in
-      SeqBasis.reduce 1000 op+ 0 (0, DelayedSeq.length currentElems) (fn i =>
-        case DelayedSeq.nth currentElems i of
-          NONE => 0
-        | SOME bidx => if (TODO bidx nonzero) then 1 else 0)
-    end
-
-
-  fun zeroSize state =
-    let val currentElems = unsafeViewContents state in
-      SeqBasis.reduce 1000 op+ 0 (0, DelayedSeq.length currentElems) (fn i =>
-        case DelayedSeq.nth currentElems i of
-          NONE => 0
-        | SOME bidx => if TODO bidx nonzero then 0 else 1)
-    end
-
-
   fun compact set =
-    let fun isNonZero x = not (C.realIsZero x)
-        val keepers = SeqBasis.filter 5000 (0, Array.length keys)
-                                      (fn i => i) (not o keyIdxIsEmpty set)
-    in
+    let val keepers = SeqBasis.filter 5000 (0, capacity set)
+                                      (fn i => i) (not o keyIdxIsEmpty set) in
       DelayedSeq.tabulate
         (fn i => keyAt set (Array.sub (keepers, i)))
         (Array.length keepers)
@@ -144,7 +122,7 @@ struct
     in
       ForkJoin.parfor 1000 (0, capacity set) (fn i =>
         let val key = keyAt set i in
-          if (TODO C.isNonZero weight) then insertForceUnique newSet (key, weight) else ()
+          if keyIsEmpty key then () else insertForceUnique newSet key
         end);
       newSet
     end
