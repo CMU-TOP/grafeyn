@@ -28,7 +28,8 @@ sig
 
   val increaseCapacityByFactor: real -> table -> table
 
-  structure SSS = SparseStateSet (structure B = B)
+  structure SSS: SPARSE_STATE_SET
+  sharing SSS.B = B
   val fromKeys: SSS.t -> (B.t -> C.t) -> table
 
   (* Unsafe because underlying array is shared. If the table is mutated,

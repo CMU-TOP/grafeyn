@@ -44,7 +44,7 @@ struct
   fun keyIdxIsEmpty {keys, emptykey, ...} i = B.equal (Array.sub (keys, i), emptykey)
   val ampIsZero = C.isZero
   fun ampIdxIsZero {amps, ...} i = C.isZero (Array.sub (amps, i))
-  fun slotEmpty table i = keyIdxIsEmpty table i orelse ampIdxIsZero i
+  fun slotEmpty table i = keyIdxIsEmpty table i orelse ampIdxIsZero table i
 
   fun keyAt {keys, ...} i = Array.sub (keys, i)
   fun ampAt {amps, ...} i = Array.sub (amps, i)
@@ -62,7 +62,7 @@ struct
 
   fun unsafeViewContents table =
     DelayedSeq.tabulate
-      (fn i => if slotEmpty table i then NONE else SOME (kvAt i))
+      (fn i => if slotEmpty table i then NONE else SOME (kvAt table i))
       (capacity table)
 
   fun bcas (arr, i, old, new) =
@@ -96,6 +96,9 @@ struct
   fun insertForceUnique table x =
     insert' {probes = capacity table, forceUnique = true} table x
 
+  fun insertLimitProbes {probes = tolerance} table x =
+    insert' {probes = tolerance, forceUnique = false} table x
+
 
   fun lookup table x =
     let val n = capacity table
@@ -104,7 +107,7 @@ struct
         fun loop i =
           let val k = keyAt table i in
             if keyIsEmpty table k then NONE
-            else if B.equal (k, x) then SOME (amp table i)
+            else if B.equal (k, x) then SOME (ampAt table i)
             else loopCheck (i + 1)
           end
 
@@ -118,7 +121,7 @@ struct
     let val keepers = SeqBasis.filter 5000 (0, capacity table)
                                       (fn i => i) (not o slotEmpty table) in
       DelayedSeq.tabulate
-        (fn i => kvAt (Array.sub (keepers, i)))
+        (fn i => kvAt table (Array.sub (keepers, i)))
         (Array.length keepers)
     end
 
@@ -139,7 +142,7 @@ struct
     { keys = #keys set,
       amps = Array.tabulate (SSS.capacity set,
                              fn i => let val k = Array.sub (#keys set, i) in
-                                       if k = #emptykey set then C.zero else amp k),
+                                       if B.equal (k, #emptykey set) then C.zero else amp k end),
       emptykey = #emptykey set }
 
   fun singleton {numQubits} x =

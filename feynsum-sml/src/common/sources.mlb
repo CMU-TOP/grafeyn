@@ -54,6 +54,15 @@ local
   state/SparseStateTable.sml
   state/SparseStateTableLockedSlots.sml
 
+  Gate2.sml
+
+  state/SPARSE_STATE_SET.sml
+  state/SparseStateSet.sml
+  state/SPARSE_STATE_TABLE2.sml
+  state/SparseStateTable2.sml
+
+  state/PushPull.sml
+
   state/DENSE_STATE.sml
   state/DenseState.sml
 
@@ -104,6 +113,9 @@ in
   signature GATE
   functor Gate
 
+  signature GATE2
+  functor Gate2
+
   structure Circuit
   (* structure ParseQASM *)
 
@@ -116,6 +128,13 @@ in
   
   signature HYBRID_STATE
   functor HybridState
+
+  signature SPARSE_STATE_TABLE2
+  functor SparseStateTable2
+  signature SPARSE_STATE_SET
+  functor SparseStateSet
+
+  functor PushPull
 
   functor ExpandState
 

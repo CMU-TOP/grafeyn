@@ -2,8 +2,8 @@ functor SparseStateSet (structure B: BASIS_IDX):
   SPARSE_STATE_SET =
 struct
   structure B = B
-  structure R =
-  struct open C.R val fromLarge = fromLarge IEEEReal.TO_NEAREST end
+  (*structure R =
+  struct open C.R val fromLarge = fromLarge IEEEReal.TO_NEAREST end*)
 
   type t = { keys: B.t array,
              emptykey: B.t }
@@ -88,6 +88,9 @@ struct
   fun insertForceUnique set x =
     insert' {probes = capacity set, forceUnique = true} set x
 
+  fun insertLimitProbes {probes = tolerance} set x =
+    insert' {probes = tolerance, forceUnique = false} set x
+
 
   fun contains set x =
     let val n = capacity set
@@ -122,7 +125,7 @@ struct
     in
       ForkJoin.parfor 1000 (0, capacity set) (fn i =>
         let val key = keyAt set i in
-          if keyIsEmpty key then () else insertForceUnique newSet key
+          if keyIsEmpty set key then () else insertForceUnique newSet key
         end);
       newSet
     end
