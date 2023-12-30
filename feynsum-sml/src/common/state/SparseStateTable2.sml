@@ -69,7 +69,6 @@ struct
     MLton.eq (old, Concurrency.casArray (arr, i) (old, new))
 
   fun insert' {probes = tolerance, join = join} table (x, y) =
-    (print ("insert'\n"); (
     let val n = capacity table
 
         fun joinAmps i =
@@ -97,7 +96,7 @@ struct
       val start = (B.hash x) mod n
     in
       loop start 0
-    end))
+    end
 
   fun insert table x =
     insert' {probes = capacity table, join = (fn (old, new) => new)} table x

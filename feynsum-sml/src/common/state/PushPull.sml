@@ -98,9 +98,9 @@ struct
 
   fun apply ((kern, state): G.t * SST.t) =
       let val nonzeros = SST.compact state
-          val _ = print ("Num nonzeros: " ^ Int.toString (DelayedSeq.length nonzeros) ^ "\n")
+          (* val _ = print ("Num nonzeros: " ^ Int.toString (DelayedSeq.length nonzeros) ^ "\n") *)
           val pushed = push (kern, DelayedSeq.map (fn (b, c) => b) nonzeros)
-          val _ = print ("Num pushed: " ^ Int.toString (SSS.size pushed) ^ "\n")
+          (* val _ = print ("Num pushed: " ^ Int.toString (SSS.size pushed) ^ "\n") *)
           val (pulled, nums) = pullCount (kern, state) pushed
           val numVerts = Seq.length nums
           val numEdges = Seq.reduce op+ 0 nums
