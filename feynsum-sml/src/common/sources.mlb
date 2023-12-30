@@ -23,8 +23,8 @@ local
   $(SML_LIB)/smlnj-lib/JSON/json-lib.mlb
   $(SML_LIB)/smlnj-lib/Util/smlnj-lib.mlb
 
-  HashTable.sml
-  HashSet.sml
+  (*HashTable.sml*)
+  (*HashSet.sml*)
 
   Rat.sml
 
@@ -54,20 +54,19 @@ local
   state/SparseStateTable.sml
   state/SparseStateTableLockedSlots.sml
 
-  Gate2.sml
-
   state/SPARSE_STATE_SET.sml
   state/SparseStateSet.sml
   state/SPARSE_STATE_TABLE2.sml
   state/SparseStateTable2.sml
-
-  state/PushPull.sml
 
   state/DENSE_STATE.sml
   state/DenseState.sml
 
   state/HYBRID_STATE.sml
   state/HybridState.sml
+
+  Gate2.sml
+  state/PushPull.sml
   
   state/ExpandState.sml
 
@@ -81,8 +80,8 @@ local
   schedulers/FinishQubit.sml
   DynGateScheduler.sml
 in
-  structure HashTable
-  structure HashSet
+  (*structure HashTable*)
+  (*structure HashSet*)
 
   structure Rat
 
