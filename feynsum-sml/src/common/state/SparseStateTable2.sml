@@ -68,9 +68,17 @@ struct
   fun bcas (arr, i, old, new) =
     MLton.eq (old, Concurrency.casArray (arr, i) (old, new))
 
-  fun insert' {probes = tolerance, forceUnique = forceUnique} table (x, y) =
+  fun insert' {probes = tolerance, join = join} table (x, y) =
     let val n = capacity table
-        fun insertAmp i = Array.update (#amps table, i, y)
+
+        fun joinAmps i =
+            let val amps = #amps table
+                val oldAmp = Array.sub (amps, i) in
+              if bcas (amps, i, oldAmp, join (oldAmp, y)) then () else joinAmps i
+            end
+
+        fun insertAmp i = if bcas (#amps table, i, C.zero, y) then () else joinAmps i
+        
         fun loop i probes =
           if probes >= tolerance then
             raise Full
@@ -81,7 +89,7 @@ struct
               if keyIsEmpty table k then
                 if bcas (#keys table, i, k, x) then insertAmp i else loop i probes
               else if B.equal (k, x) then
-                if forceUnique then raise DuplicateKey else insertAmp i
+                joinAmps i
               else
                 loop (i + 1) (probes + 1)
             end
@@ -91,13 +99,16 @@ struct
     end
 
   fun insert table x =
-    insert' {probes = capacity table, forceUnique = false} table x
+    insert' {probes = capacity table, join = (fn (old, new) => new)} table x
 
   fun insertForceUnique table x =
-    insert' {probes = capacity table, forceUnique = true} table x
+    insert' {probes = capacity table, join = (fn (old, new) => if C.isZero old then new else raise DuplicateKey)} table x
 
   fun insertLimitProbes {probes = tolerance} table x =
-    insert' {probes = tolerance, forceUnique = false} table x
+    insert' {probes = tolerance, join = (fn (old, new) => new)} table x
+
+  fun insertAndAdd {probes = tolerance} table x =
+    insert' {probes = tolerance, join = C.+} table x
 
 
   fun lookup table x =

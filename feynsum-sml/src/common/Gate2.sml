@@ -8,11 +8,12 @@ sig
   type gate = { args: qubit_idx Seq.t,
                 push: B.t -> B.t Seq.t,
                 pull: B.t -> (B.t * C.t) Seq.t,
-                maxBranchingFactor: int }
+                maxBranchingFactor: int,
+                numQubits: int }
 
   type t = gate
 
-  val fromGateDefn: GateDefn.t -> gate
+  val fromGateDefn: {numQubits: int} -> GateDefn.t -> gate
   val maxBranchingFactor: gate -> int
   val push: gate -> B.t -> B.t Seq.t
   val pull: gate -> B.t -> (B.t * C.t) Seq.t
@@ -37,24 +38,48 @@ struct
   type gate = { args: qubit_idx Seq.t,
                 push: B.t -> B.t Seq.t,
                 pull: B.t -> (B.t * C.t) Seq.t,
-                maxBranchingFactor: int }
+                maxBranchingFactor: int,
+                numQubits: int }
 
   type t = gate
 
-  fun fuse (({args = args1, push = push1, pull = pull1, maxBranchingFactor = mbf1},
-             {args = args2, push = push2, pull = pull2, maxBranchingFactor = mbf2}) : gate * gate) =
+  structure SST = SparseStateTable2 (structure B = B structure C = C)
+  fun flattenAndJoin numQubits amps =
+      let val len = Seq.reduce op+ 0 (Seq.map Seq.length amps)
+          val st = SST.make { capacity = len * 2, numQubits = numQubits }
+          fun iter i =
+              let val ampi = Seq.nth amps i in
+                Seq.tabulate (fn j => SST.insertAndAdd {probes = len} st (Seq.nth ampi j))
+                             (Seq.length ampi)
+              end
+          val _ = Seq.tabulate iter (Seq.length amps)
+          val delayedSeq = SST.compact st
+      in
+        Seq.tabulate (DelayedSeq.nth delayedSeq) (DelayedSeq.length delayedSeq)
+      end
+
+  fun fuse (({args = args1, push = push1, pull = pull1, maxBranchingFactor = mbf1, numQubits = nq1 },
+             {args = args2, push = push2, pull = pull2, maxBranchingFactor = mbf2, numQubits = nq2 }) : gate * gate) =
       let fun is_arg qi args = Seq.iterate (fn (b, i) => b orelse (i = qi)) false args
           val args3 = Seq.append (args1, Seq.filter (fn a2 => not (is_arg a2 args1)) args2)
           fun push3 b = Seq.flatten (Seq.map push2 (push1 b))
           (* TODO: need to merge duplicate basis indices in pull3! *)
-          fun pull3 b = Seq.flatten (Seq.map (fn bc => let val (b', c') = bc in
-                                                         Seq.map (fn bc' => let val (b'', c'') = bc' in (b'', C.* (c', c'')) end) (pull1 b') end) (pull2 b))
+          fun pull3 b = flattenAndJoin nq1
+                          (Seq.map
+                             (fn bc => let val (b', c') = bc in
+                                         Seq.map
+                                           (fn bc' => let val (b'', c'') = bc' in
+                                                        (b'', C.* (c', c'')) end)
+                                           (pull1 b') end) (pull2 b))
           val mbf3 = mbf1 * mbf2
+          val nq3 = if nq1 = nq2 then nq1
+                    else raise Fail "Cannot fuse gates for different number of qubits"
       in
         { args = args3,
           push = push3,
           pull = pull3,
-          maxBranchingFactor = mbf3 }
+          maxBranchingFactor = mbf3,
+          numQubits = nq3 }
       end
 
   fun fuses (gs: gate Seq.t) = Seq.reduce fuse (Seq.nth gs 0) (Seq.drop gs 1)
@@ -72,6 +97,8 @@ struct
   val pos_hi = C.imag recp_sqrt_2
   val neg_hi = C.imag neg_recp_sqrt_2
 
+  fun superpos ab = C.scale (half, C.+ ab)
+
   fun control (g: gate) qi =
     if Seq.iterate (fn (b, i) => b orelse (i = qi)) false (#args g) then
       raise Fail "Cannot control a gate with a qubit it already uses"
@@ -79,130 +106,143 @@ struct
       { args = Seq.append (Seq.singleton qi, #args g),
         push = fn b => if B.get b qi then #push g b else Seq.singleton b,
         pull = fn b => if B.get b qi then #pull g b else Seq.singleton (b, pos_1),
-        maxBranchingFactor = #maxBranchingFactor g }
+        maxBranchingFactor = #maxBranchingFactor g,
+        numQubits = #numQubits g }
 
   (* Given a basis idx b, return a list of tuples (b', c'), where
    *   b' = basis idx to pull from
    *   c' = scalar to multiply the weight of b' by
    *)
-  fun pullFromGateDefn gd b = case gd of
+  fun pullFromGateDefn gd = case gd of
 
     GateDefn.PauliY i =>
-    [(B.flip b i, if B.get b i then neg_i else pos_i)]
+    (fn b => [(B.flip b i, if B.get b i then neg_i else pos_i)])
 
   | GateDefn.PauliZ i =>
-    [(b, if B.get b i then neg_1 else pos_1)]
+    (fn b => [(b, if B.get b i then neg_1 else pos_1)])
 
   | GateDefn.Hadamard i =>
-    [(B.unset b i, pos_h1), (B.set b i, if B.get b i then neg_h1 else pos_h1)]
+    (fn b => [(B.unset b i, pos_h1), (B.set b i, if B.get b i then neg_h1 else pos_h1)])
 
   | GateDefn.SqrtX i =>
-    if B.get b i then
-      [(B.unset b i, C.scale (half, C.+ (pos_1, neg_i))),
-       (b,           C.scale (half, C.+ (pos_1, pos_i)))]
-    else
-      [(b,           C.scale (half, C.+ (pos_1, pos_i))),
-       (B.set b i,   C.scale (half, C.+ (pos_1, neg_i)))]
+    let val pos_1_pos_i = superpos (pos_1, pos_i)
+        val pos_1_neg_i = superpos (pos_1, neg_i)
+    in
+      fn b => [(b, pos_1_pos_i), (B.flip b i, pos_1_neg_i)]
+    end
 
   | GateDefn.Sxdg i =>
-    if B.get b i then
-      [(B.unset b i, C.scale (half, C.+ (pos_1, pos_i))),
-       (b,           C.scale (half, C.+ (pos_1, neg_i)))]
-    else
-      [(b,           C.scale (half, C.+ (pos_1, neg_i))),
-       (B.set b i,   C.scale (half, C.+ (pos_1, pos_i)))]
+    let val pos_1_pos_i = superpos (pos_1, pos_i)
+        val pos_1_neg_i = superpos (pos_1, neg_i)
+    in
+      fn b => [(b, pos_1_neg_i), (B.flip b i, pos_1_pos_i)]
+    end
 
   | GateDefn.S i =>
-    [(b, if B.get b i then pos_i else pos_1)]
+    (fn b => [(b, if B.get b i then pos_i else pos_1)])
 
   | GateDefn.Sdg i =>
-    [(b, if B.get b i then neg_i else pos_1)]
+    (fn b => [(b, if B.get b i then neg_i else pos_1)])
 
   | GateDefn.X i =>
-    [(B.flip b i, pos_1)]
+    (fn b => [(B.flip b i, pos_1)])
 
   | GateDefn.T i =>
-    [(b, if B.get b i then C.+ (pos_h1, pos_hi) else pos_1)]
+    (fn b => [(b, if B.get b i then C.+ (pos_h1, pos_hi) else pos_1)])
 
-  | GateDefn.Tdg i => [(b, if B.get b i then C.+ (pos_h1, neg_hi) else pos_1)]
+  | GateDefn.Tdg i =>
+    (fn b => [(b, if B.get b i then C.+ (pos_h1, neg_hi) else pos_1)])
 
   | GateDefn.CX {control = i, target = j} =>
-    [(if B.get b i then B.flip b j else b, pos_1)]
+    (fn b => [(if B.get b i then B.flip b j else b, pos_1)])
 
   | GateDefn.CZ {control = i, target = j} =>
-    [(b, if B.get b i andalso B.get b j then neg_1 else pos_1)]
+    (fn b => [(b, if B.get b i andalso B.get b j then neg_1 else pos_1)])
 
   | GateDefn.CCX {control1 = i, control2 = j, target = k} =>
-    [(if B.get b i andalso B.get b j then B.flip b k else b, pos_1)]
+    (fn b => [(if B.get b i andalso B.get b j then B.flip b k else b, pos_1)])
 
   | GateDefn.Phase {target = i, rot = x} =>
-    [(b, if B.get b i then C.rotateBy (R.fromLarge x) else pos_1)]
+    let val rot = C.rotateBy (R.fromLarge x) in
+      fn b => [(b, if B.get b i then rot else pos_1)]
+    end
 
   | GateDefn.CPhase {control = i, target = j, rot = x} =>
-    [(b, if B.get b i andalso B.get b j then C.rotateBy (R.fromLarge x) else pos_1)]
+    let val rot = C.rotateBy (R.fromLarge x) in
+      fn b => [(b, if B.get b i andalso B.get b j then rot else pos_1)]
+    end
 
   | GateDefn.FSim {left = i, right = j, theta = x, phi = y} =>
     raise Fail "Gate2.pushFromGateDefn FSim unimplemented"
 
   | GateDefn.RZ {rot = x, target = i} =>
-    [(b, C.rotateBy (R.fromLarge (x * (if B.get b i then ~0.5 else 0.5))))]
+    let val rot1 = C.rotateBy (R.fromLarge (x * 0.5))
+        val rot2 = C.rotateBy (R.fromLarge (x * ~0.5))
+    in
+      fn b => [(b, if B.get b i then rot2 else rot1)]
+    end
 
   | GateDefn.RY {rot = x, target = i} =>
-    if B.get b i then
-      [(B.unset b i, C.real (R.Math.sin (R.* (half, R.fromLarge x)))),
-       (b, C.real (R.Math.cos (R.* (half, R.fromLarge x))))]
-    else
-      [(b, C.real (R.Math.cos (R.* (half, R.fromLarge x)))),
-       (B.set b i, C.real (R.~ (R.Math.sin (R.* (half, R.fromLarge x)))))]
+    let val sin = C.real (R.Math.sin (R.* (half, R.fromLarge x)))
+        val cos = C.real (R.Math.cos (R.* (half, R.fromLarge x)))
+        val negsin = C.~ sin
+    in
+      fn b => [(b, cos), (B.flip b i, if B.get b i then sin else negsin)]
+    end
 
   | GateDefn.RX {rot = x, target = i} =>
-    if B.get b i then
-      [(B.unset b i, C.imag (R.Math.sin (R.* (half, R.fromLarge x)))),
-       (b, C.real (R.Math.cos (R.* (half, R.fromLarge x))))]
-    else
-      [(b, C.real (R.Math.cos (R.* (half, R.fromLarge x)))),
-       (B.set b i, C.imag (R.~ (R.Math.sin (R.* (half, R.fromLarge x)))))]
+    let val isin = C.imag (R.Math.sin (R.* (half, R.fromLarge x)))
+        val rcos = C.real (R.Math.cos (R.* (half, R.fromLarge x)))
+        val inegsin = C.~ isin
+    in
+      fn b => [(b, rcos), (B.flip b i, if B.get b i then isin else inegsin)]
+    end
 
   | GateDefn.Swap {target1 = i, target2 = j} =>
-    [(B.setTo (B.get b i) (B.setTo (B.get b j) b i) j, pos_1)]
+    (fn b => [(B.setTo (B.get b i) (B.setTo (B.get b j) b i) j, pos_1)])
 
   | GateDefn.CSwap {control = i, target1 = j, target2 = k} =>
-    [(if B.get b i then B.setTo (B.get b j) (B.setTo (B.get b k) b j) k else b, pos_1)]
+    (fn b => [(if B.get b i then B.setTo (B.get b j) (B.setTo (B.get b k) b j) k else b, pos_1)])
 
   | GateDefn.U {target = i, theta = x, phi = y, lambda = z} =>
-    if B.get b i then
-      [(B.unset b i, C.scale (R.Math.sin (R.* (half, R.fromLarge x)), C.rotateBy (R.fromLarge y))),
-       (b, C.scale (R.Math.cos (R.* (half, R.fromLarge x)), C.rotateBy (R.fromLarge (y + z))))]
-    else
-      [(b, C.real (R.Math.cos (R.* (half, R.fromLarge x)))),
-       (B.set b i, C.~ (C.scale (R.Math.sin (R.* (half, R.fromLarge x)), C.rotateBy (R.fromLarge z))))]
+    let val rot1 = C.scale (R.Math.sin (R.* (half, R.fromLarge x)),
+                            C.rotateBy (R.fromLarge y))
+        val rot2 = C.scale (R.Math.cos (R.* (half, R.fromLarge x)),
+                            C.rotateBy (R.fromLarge (y + z)))
+        val rot3 = C.real (R.Math.cos (R.* (half, R.fromLarge x)))
+        val rot4 = C.~ (C.scale (R.Math.sin (R.* (half, R.fromLarge x)),
+                                 C.rotateBy (R.fromLarge z)))
+    in
+      fn b => if B.get b i then [(B.unset b i, rot1), (b, rot2)]
+              else [(b, rot3), (B.set b i, rot4)]
+    end
 
   | GateDefn.Other {name = n, params = xs, args = is} =>
     raise Fail "Gate2.pushFromGateDefn Other unimplemented"
 
-  fun pushFromGateDefn gd b = case gd of
-    GateDefn.PauliY i => [B.flip b i]
-  | GateDefn.PauliZ i => [b]
-  | GateDefn.Hadamard i => [B.unset b i, B.set b i]
-  | GateDefn.SqrtX i => [B.unset b i, B.set b i]
-  | GateDefn.Sxdg i => [B.unset b i, B.set b i]
-  | GateDefn.S i => [b]
-  | GateDefn.Sdg i => [b]
-  | GateDefn.X i => [B.flip b i]
-  | GateDefn.T i => [b]
-  | GateDefn.Tdg i => [b]
-  | GateDefn.CX {control = i, target = j} => [if B.get b i then B.flip b j else b]
-  | GateDefn.CZ {control = i, target = j} => [b]
-  | GateDefn.CCX {control1 = i, control2 = j, target = k} => [if B.get b i andalso B.get b j then B.flip b k else b]
-  | GateDefn.Phase {target = i, rot = x} => [b]
-  | GateDefn.CPhase {control = i, target = j, rot = x} => [b]
+  fun pushFromGateDefn gd = case gd of
+    GateDefn.PauliY i => (fn b => [B.flip b i])
+  | GateDefn.PauliZ i => (fn b => [b])
+  | GateDefn.Hadamard i => (fn b => [B.unset b i, B.set b i])
+  | GateDefn.SqrtX i => (fn b => [B.unset b i, B.set b i])
+  | GateDefn.Sxdg i => (fn b => [B.unset b i, B.set b i])
+  | GateDefn.S i => (fn b => [b])
+  | GateDefn.Sdg i => (fn b => [b])
+  | GateDefn.X i => (fn b => [B.flip b i])
+  | GateDefn.T i => (fn b => [b])
+  | GateDefn.Tdg i => (fn b => [b])
+  | GateDefn.CX {control = i, target = j} => (fn b => [if B.get b i then B.flip b j else b])
+  | GateDefn.CZ {control = i, target = j} => (fn b => [b])
+  | GateDefn.CCX {control1 = i, control2 = j, target = k} => (fn b => [if B.get b i andalso B.get b j then B.flip b k else b])
+  | GateDefn.Phase {target = i, rot = x} => (fn b => [b])
+  | GateDefn.CPhase {control = i, target = j, rot = x} => (fn b => [b])
   | GateDefn.FSim {left = i, right = j, theta = x, phi = y} => raise Fail "Gate2.pullFromGateDefn FSim unimplemented"
-  | GateDefn.RZ {rot = x, target = i} => [b]
-  | GateDefn.RY {rot = x, target = i} => [B.unset b i, B.set b i]
-  | GateDefn.RX {rot = x, target = i} => [B.unset b i, B.set b i]
-  | GateDefn.Swap {target1 = i, target2 = j} => [B.setTo (B.get b i) (B.setTo (B.get b j) b i) j]
-  | GateDefn.CSwap {control = i, target1 = j, target2 = k} => [if B.get b i then B.setTo (B.get b j) (B.setTo (B.get b k) b j) k else b]
-  | GateDefn.U {target = i, theta = x, phi = y, lambda = z} => [B.unset b i, B.set b i]
+  | GateDefn.RZ {rot = x, target = i} => (fn b => [b])
+  | GateDefn.RY {rot = x, target = i} => (fn b => [B.unset b i, B.set b i])
+  | GateDefn.RX {rot = x, target = i} => (fn b => [B.unset b i, B.set b i])
+  | GateDefn.Swap {target1 = i, target2 = j} => (fn b => [B.setTo (B.get b i) (B.setTo (B.get b j) b i) j])
+  | GateDefn.CSwap {control = i, target1 = j, target2 = k} => (fn b => [if B.get b i then B.setTo (B.get b j) (B.setTo (B.get b k) b j) k else b])
+  | GateDefn.U {target = i, theta = x, phi = y, lambda = z} => (fn b => [B.unset b i, B.set b i])
   | GateDefn.Other {name = n, params = xs, args = is} => raise Fail "Gate2.pullFromGateDefn Other unimplemented"
 
   fun maxBranchingFactorFromGateDefn gd = case gd of
@@ -230,11 +270,12 @@ struct
   | GateDefn.U {target = i, theta = x, phi = y, lambda = z} => 2
   | GateDefn.Other {name = n, params = xs, args = is} => raise Fail "Gate2.pullFromGateDefn Other unimplemented"
 
-  fun fromGateDefn gd =
+  fun fromGateDefn {numQubits = numQubits} gd =
     { args = Seq.fromList (GateDefn.getGateArgs gd),
-      push = fn b => Seq.fromList (pushFromGateDefn gd b),
-      pull = fn b => Seq.fromList (pullFromGateDefn gd b),
-      maxBranchingFactor = maxBranchingFactorFromGateDefn gd
+      push = (Seq.fromList o pushFromGateDefn gd),
+      pull = (Seq.fromList o pullFromGateDefn gd),
+      maxBranchingFactor = maxBranchingFactorFromGateDefn gd,
+      numQubits = numQubits
     }
 
   fun maxBranchingFactor (g: gate) = #maxBranchingFactor g
