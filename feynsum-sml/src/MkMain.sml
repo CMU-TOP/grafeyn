@@ -41,6 +41,16 @@ struct
         val kernels = Seq.map (G.fuses o Seq.map (Seq.nth gates)) sched
         val initState = SST.singleton {numQubits = numQubits} (B.zeros, C.one)
         val { state, numVerts, numEdges } = PP.applyAll (kernels, initState)
+        val (fp, tm) = Util.getTime (fn _ => F.fingerprint (SST.unsafeViewContents state))
+        val _ = print ("computed fingerprint in " ^ Time.fmt 4 tm ^ "s\n")
+        val _ = Util.for (0, Seq.length fp)
+                         (fn i =>
+                             let val (b, c) = Seq.nth fp i in
+                               print
+                                 ("fp" ^ Int.toString i ^ " "
+                                  ^ B.toString {numQubits = numQubits, pretty = false} b ^ " "
+                                  ^ C.toString c ^ "\n")
+                             end)
     in
       print ("Completed with vertices = " ^ Int.toString numVerts ^ " and edges = " ^ Int.toString numEdges ^ "\n")
     end
