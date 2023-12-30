@@ -69,6 +69,7 @@ struct
     MLton.eq (old, Concurrency.casArray (arr, i) (old, new))
 
   fun insert' {probes = tolerance, join = join} table (x, y) =
+    (print ("insert'\n"); (
     let val n = capacity table
 
         fun joinAmps i =
@@ -96,7 +97,7 @@ struct
       val start = (B.hash x) mod n
     in
       loop start 0
-    end
+    end))
 
   fun insert table x =
     insert' {probes = capacity table, join = (fn (old, new) => new)} table x
@@ -155,6 +156,27 @@ struct
                              fn i => let val k = Array.sub (#keys set, i) in
                                        if B.equal (k, #emptykey set) then C.zero else amp k end),
       emptykey = #emptykey set }
+
+  fun fromKeysWith (set: SSS.t) (amp: B.t -> C.t * 'a) =
+    let val keys = #keys set
+        val emptykey = #emptykey set
+        val cap = SSS.capacity set
+        val arr = Array.tabulate
+                    (cap,
+                     fn i => let val k = Array.sub (keys, i) in
+                               if B.equal (k, emptykey) then NONE else SOME (amp k) end)
+        val seq = Seq.mapOption (Option.map (fn (c, a) => a))
+                                (Seq.tabulate (fn i => Array.sub (arr, i)) cap)
+        val amps = Array.tabulate (cap, fn i => case Array.sub (arr, i) of
+                                                    NONE => C.zero | SOME (c, _) => c)
+        val table = {
+          keys = keys,
+          amps = amps,
+          emptykey = emptykey
+        }
+    in
+      (table, seq)
+    end
 
   fun singleton {numQubits} x =
     let val table = make {capacity = 1, numQubits = numQubits} in

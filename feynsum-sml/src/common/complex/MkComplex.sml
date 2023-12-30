@@ -24,6 +24,7 @@ sig
   val isNonZero: t -> bool
 
   val zero: t
+  val one: t
   val i: t
 
   val magnitude: t -> r
@@ -87,6 +88,7 @@ struct
     imag (fromLarge r)
 
   val zero = C {re = fromLarge 0.0, im = fromLarge 0.0}
+  val one = C {re = fromLarge 1.0, im = fromLarge 0.0}
   val i = C {re = fromLarge 0.0, im = fromLarge 1.0}
 
   fun neg (C {re, im}) =

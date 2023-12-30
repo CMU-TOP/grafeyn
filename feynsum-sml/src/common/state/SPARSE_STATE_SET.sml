@@ -14,6 +14,9 @@ sig
   val size: set -> int
   val capacity: set -> int
 
+  (*val keys: set -> B.t array
+  val emptykey: set -> B.t*)
+
   val insert: set -> B.t -> unit
 
   val insertLimitProbes: {probes: int} -> set -> B.t -> unit

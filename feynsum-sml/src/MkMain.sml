@@ -13,55 +13,39 @@ struct
 
   structure CLA = CommandLineArgs
 
-  structure G = Gate (structure B = B structure C = C)
-
-  structure SSTLocked = SparseStateTableLockedSlots (structure B = B structure C = C)
-  structure SSTLockFree = SparseStateTable (structure B = B structure C = C)
-  structure DS = DenseState (structure B = B structure C = C)
-  structure HSLocked = HybridState (structure B = B
-                                    structure C = C
-                                    structure SST = SSTLocked
-                                    structure DS = DS)
-  structure HSLockFree = HybridState (structure B = B
-                                      structure C = C
-                                      structure SST = SSTLockFree
-                                      structure DS = DS)
-
-  structure BFSLocked =
-    FullSimBFS
-      (structure HS = HSLocked
-       structure G = G
-       val disableFusion = disableFusion
-       val maxBranchingStride = maxBranchingStride
-       val blockSize = blockSize
-       val maxload = maxload
-       val gateScheduler = gateScheduler
-       val doMeasureZeros = doMeasureZeros
-       val denseThreshold = denseThreshold
-       val pullThreshold = pullThreshold)
-
-  structure BFSLockfree =
-    FullSimBFS
-      (structure HS = HSLockFree
-       structure G = G
-       val disableFusion = disableFusion
-       val maxBranchingStride = maxBranchingStride
-       val blockSize = blockSize
-       val maxload = maxload
-       val gateScheduler = gateScheduler
-       val doMeasureZeros = doMeasureZeros
-       val denseThreshold = denseThreshold
-       val pullThreshold = pullThreshold)
-
+  structure G = Gate2 (structure B = B structure C = C)
+  structure SST = SparseStateTable2 (structure B = B structure C = C)
 
   structure F = Fingerprint (structure B = B structure C = C)
+
+  structure PP = PushPull (structure SST = SST
+                           val blockSize = blockSize
+                           val maxload = maxload
+                           val denseThreshold = denseThreshold
+                           val pullThreshold = pullThreshold)
 
 
   (* =======================================================================
    * main
    *)
 
-  fun main (inputName, circuit) =
+
+  structure FQ = FinishQubitScheduler (val maxBranchingStride = maxBranchingStride
+                                       val disableFusion = disableFusion)
+  val sched = FQ.scheduler5
+
+  fun main ((inputName, circuit): string * DataFlowGraph.t) =
+    let val numQubits = #numQubits circuit
+        val gates = Seq.map (G.fromGateDefn {numQubits = numQubits}) (#gates circuit)
+        val sched = DataFlowGraphUtil.scheduleWithOracle circuit (fn i => #maxBranchingFactor (Seq.nth gates i) > 1) (sched circuit) disableFusion maxBranchingStride
+        val kernels = Seq.map (G.fuses o Seq.map (Seq.nth gates)) sched
+        val initState = SST.singleton {numQubits = numQubits} (B.zeros, C.one)
+        val { state, numVerts, numEdges } = PP.applyAll (kernels, initState)
+    in
+      print ("Completed with vertices = " ^ Int.toString numVerts ^ " and edges = " ^ Int.toString numEdges ^ "\n")
+    end
+
+  (*fun main (inputName, circuit) =
     let
       val numQubits = #numQubits circuit
       val impl = CLA.parseString "impl" "lockfree"
@@ -164,6 +148,6 @@ struct
            , Real.fmt (StringCvt.FIX (SOME 12)) (Rat.approx maxDensity)
            , Real.fmt (StringCvt.FIX (SOME 12)) (Rat.approx avgDensity)
            ] ^ "\n")
-    end
+    end*)
 
 end

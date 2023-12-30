@@ -36,6 +36,9 @@ struct
               emptykey = B.set B.zeros numQubits
             }
 
+  (*fun keys {keys, emptykey} = keys
+  fun emptykey {keys, emptykey} = emptykey*)
+
   fun capacity {keys = keys, ...} = Array.length keys
 
   fun keyIsEmpty {emptykey, ...} k = B.equal (k, emptykey)

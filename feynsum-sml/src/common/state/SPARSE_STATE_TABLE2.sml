@@ -33,6 +33,7 @@ sig
   structure SSS: SPARSE_STATE_SET
   sharing SSS.B = B
   val fromKeys: SSS.t -> (B.t -> C.t) -> table
+  val fromKeysWith: SSS.t -> (B.t -> C.t * 'a) -> table * 'a Seq.t
 
   (* Unsafe because underlying array is shared. If the table is mutated,
    * then the Seq would not appear to be immutable.
