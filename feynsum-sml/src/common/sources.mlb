@@ -50,9 +50,9 @@ local
     Circuit.sml
   end
 
-  state/SPARSE_STATE_TABLE.sml
+  (*state/SPARSE_STATE_TABLE.sml
   state/SparseStateTable.sml
-  state/SparseStateTableLockedSlots.sml
+  state/SparseStateTableLockedSlots.sml*)
 
   state/SPARSE_STATE_SET.sml
   state/SparseStateSet.sml
@@ -62,13 +62,13 @@ local
   state/DENSE_STATE.sml
   state/DenseState.sml
 
-  state/HYBRID_STATE.sml
-  state/HybridState.sml
+  (*state/HYBRID_STATE.sml
+  state/HybridState.sml*)
 
   Gate2.sml
   state/PushPull.sml
   
-  state/ExpandState.sml
+  (*state/ExpandState.sml*)
 
   Fingerprint.sml
 
@@ -78,7 +78,7 @@ local
   schedulers/GreedyBranching.sml
   schedulers/GreedyNonBranching.sml
   schedulers/FinishQubit.sml
-  DynGateScheduler.sml
+  (*DynGateScheduler.sml*)
 in
   (*structure HashTable*)
   (*structure HashSet*)
@@ -118,15 +118,15 @@ in
   structure Circuit
   (* structure ParseQASM *)
 
-  signature SPARSE_STATE_TABLE
+  (*signature SPARSE_STATE_TABLE
   functor SparseStateTable
-  functor SparseStateTableLockedSlots
+  functor SparseStateTableLockedSlots*)
 
   signature DENSE_STATE
   functor DenseState
   
-  signature HYBRID_STATE
-  functor HybridState
+  (*signature HYBRID_STATE
+  functor HybridState*)
 
   signature SPARSE_STATE_TABLE2
   functor SparseStateTable2
@@ -135,7 +135,7 @@ in
 
   functor PushPull
 
-  functor ExpandState
+  (*functor ExpandState*)
 
   functor RedBlackMapFn
   functor RedBlackSetFn
@@ -151,8 +151,8 @@ in
   functor GreedyNonBranchingScheduler
   functor FinishQubitScheduler
   (*structure GateSchedulerOrder*)
-  signature DYN_GATE_SCHEDULER
+  (*signature DYN_GATE_SCHEDULER
   functor DynSchedFinishQubitWrapper
   functor DynSchedInterference
-  functor DynSchedNaive
+  functor DynSchedNaive*)
 end

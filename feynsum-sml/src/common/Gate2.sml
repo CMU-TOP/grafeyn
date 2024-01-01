@@ -63,7 +63,6 @@ struct
       let fun is_arg qi args = Seq.iterate (fn (b, i) => b orelse (i = qi)) false args
           val args3 = Seq.append (args1, Seq.filter (fn a2 => not (is_arg a2 args1)) args2)
           fun push3 b = Seq.flatten (Seq.map push2 (push1 b))
-          (* TODO: need to merge duplicate basis indices in pull3! *)
           fun pull3 b = flattenAndJoin nq1
                           (Seq.map
                              (fn bc => let val (b', c') = bc in
