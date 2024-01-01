@@ -46,7 +46,7 @@ local
   
   ann "allowExtendedTextConsts true" in
     GateDefn.sml
-    Gate.sml
+    (*Gate.sml*)
     Circuit.sml
   end
 
@@ -109,8 +109,8 @@ in
   (* structure SMLQasmGate *)
   structure GateDefn
 
-  signature GATE
-  functor Gate
+  (*signature GATE
+  functor Gate*)
 
   signature GATE2
   functor Gate2

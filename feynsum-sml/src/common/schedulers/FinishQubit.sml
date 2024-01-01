@@ -134,14 +134,11 @@ struct
                      pickGreatestDepth g0 (gateDepth g0 dfg) 1 gates dfg
                    end)
 
-  structure G = Gate (structure B = BasisIdxUnlimited
-                      structure C = Complex64)
-
   (* Hybrid of scheduler2 (avoid branching on unbranched qubits) and also scheduler3 (choose in reverse topological order, sorted by easiest qubit to finish) *)
   fun scheduler5 (dfg: DataFlowGraph.t) =
-      let val gates = Seq.map G.fromGateDefn (#gates dfg)
-          fun touches i = #touches (Seq.nth gates i)
-          fun branches i = case #action (Seq.nth gates i) of G.NonBranching _ => 0 | G.MaybeBranching _ => 1 | G.Branching _ => 2
+      let val gates = #gates dfg
+          fun touches i = Seq.fromList (GateDefn.getGateArgs (Seq.nth gates i))
+          fun branches i = GateDefn.maxBranchingFactor (Seq.nth gates i)
 
           val dfgt = DataFlowGraphUtil.transpose dfg
           val depths = computeGateDepths dfg
@@ -159,8 +156,7 @@ struct
               Seq.length (Seq.filter (fn j => not (Array.sub (touched, j))) (touches i))
           fun pickLeastNewTouches best_idx best_newTouches best_ord i gates =
               if i = Seq.length gates then
-                ((* print ("Picked " ^ Int.toString best_idx ^ ", new touches " ^ Int.toString best_newTouches ^ "\n"); *)
-                 best_idx)
+                best_idx
               else
                 let val cur_idx = Seq.nth gates i
                     val cur_newTouches = newTouches cur_idx
@@ -184,17 +180,17 @@ struct
   (* Avoids branching on unbranched qubits *)
   fun scheduler2 (dfg: DataFlowGraph.t) =
       let val touched = Array.array (#numQubits dfg, false)
-          val gates = Seq.map G.fromGateDefn (#gates dfg)
-          fun touches i = #touches (Seq.nth gates i)
-          fun branches i = case #action (Seq.nth gates i) of G.NonBranching _ => 0 | G.MaybeBranching _ => 1 | G.Branching _ => 2
+          val gates = #gates dfg
+          val numGates = Seq.length gates
+          fun touches i = Seq.fromList (GateDefn.getGateArgs (Seq.nth gates i))
+          fun branches i = GateDefn.maxBranchingFactor (Seq.nth gates i)
           fun touch i = Array.update (touched, i, true)
           fun touchAll gidx = let val ts = touches gidx in List.tabulate (Seq.length ts, fn i => touch (Seq.nth ts i)); () end
           fun newTouches i =
               Seq.length (Seq.filter (fn j => not (Array.sub (touched, j))) (touches i))
           fun pickLeastNewTouches best_idx best_newTouches i gates =
-              if i = Seq.length gates then
-                ((* print ("Picked " ^ Int.toString best_idx ^ ", new touches " ^ Int.toString best_newTouches ^ "\n"); *)
-                 best_idx)
+              if i = numGates then
+                best_idx
               else
                 let val cur_idx = Seq.nth gates i
                     val cur_newTouches = newTouches cur_idx

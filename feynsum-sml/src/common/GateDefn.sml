@@ -66,6 +66,31 @@ struct
     | U {target = i, ...} => [i]
     | Other {args = args, ...} => Seq.toList args
 
+  fun maxBranchingFactor (g: gate) = case g of
+    PauliY i => 1
+  | PauliZ i => 1
+  | Hadamard i => 2
+  | SqrtX i => 2
+  | Sxdg i => 2
+  | S i => 1
+  | Sdg i => 1
+  | X i => 1
+  | T i => 1
+  | Tdg i => 1
+  | CX {control = i, target = j} => 1
+  | CZ {control = i, target = j} => 1
+  | CCX {control1 = i, control2 = j, target = k} => 1
+  | Phase {target = i, rot = x} => 1
+  | CPhase {control = i, target = j, rot = x} => 1
+  | FSim {left = i, right = j, theta = x, phi = y} => raise Fail "GateDefn.maxBranchingFactor FSim unimplemented"
+  | RZ {rot = x, target = i} => 1
+  | RY {rot = x, target = i} => 2
+  | RX {rot = x, target = i} => 2
+  | Swap {target1 = i, target2 = j} => 1
+  | CSwap {control = i, target1 = j, target2 = k} => 1
+  | U {target = i, theta = x, phi = y, lambda = z} => 2
+  | Other {name = n, params = xs, args = is} => raise Fail "GateDefn.maxBranchingFactor Other unimplemented"
+
   fun toString (g: gate) (qi: qubit_idx -> string) = case g of
       PauliY i => "y " ^ qi i
     | PauliZ i => "z " ^ qi i

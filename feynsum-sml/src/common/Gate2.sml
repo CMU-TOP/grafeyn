@@ -244,36 +244,11 @@ struct
   | GateDefn.U {target = i, theta = x, phi = y, lambda = z} => (fn b => [B.unset b i, B.set b i])
   | GateDefn.Other {name = n, params = xs, args = is} => raise Fail "Gate2.pullFromGateDefn Other unimplemented"
 
-  fun maxBranchingFactorFromGateDefn gd = case gd of
-    GateDefn.PauliY i => 1
-  | GateDefn.PauliZ i => 1
-  | GateDefn.Hadamard i => 2
-  | GateDefn.SqrtX i => 2
-  | GateDefn.Sxdg i => 2
-  | GateDefn.S i => 1
-  | GateDefn.Sdg i => 1
-  | GateDefn.X i => 1
-  | GateDefn.T i => 1
-  | GateDefn.Tdg i => 1
-  | GateDefn.CX {control = i, target = j} => 1
-  | GateDefn.CZ {control = i, target = j} => 1
-  | GateDefn.CCX {control1 = i, control2 = j, target = k} => 1
-  | GateDefn.Phase {target = i, rot = x} => 1
-  | GateDefn.CPhase {control = i, target = j, rot = x} => 1
-  | GateDefn.FSim {left = i, right = j, theta = x, phi = y} => raise Fail "Gate2.pullFromGateDefn FSim unimplemented"
-  | GateDefn.RZ {rot = x, target = i} => 1
-  | GateDefn.RY {rot = x, target = i} => 2
-  | GateDefn.RX {rot = x, target = i} => 2
-  | GateDefn.Swap {target1 = i, target2 = j} => 1
-  | GateDefn.CSwap {control = i, target1 = j, target2 = k} => 1
-  | GateDefn.U {target = i, theta = x, phi = y, lambda = z} => 2
-  | GateDefn.Other {name = n, params = xs, args = is} => raise Fail "Gate2.pullFromGateDefn Other unimplemented"
-
   fun fromGateDefn {numQubits = numQubits} gd =
     { args = Seq.fromList (GateDefn.getGateArgs gd),
       push = (Seq.fromList o pushFromGateDefn gd),
       pull = (Seq.fromList o pullFromGateDefn gd),
-      maxBranchingFactor = maxBranchingFactorFromGateDefn gd,
+      maxBranchingFactor = GateDefn.maxBranchingFactor gd,
       numQubits = numQubits
     }
 

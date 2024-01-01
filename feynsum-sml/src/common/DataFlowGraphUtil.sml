@@ -167,13 +167,10 @@ struct
       end
 
   (* B and C don't affect gate_branching, so pick arbitrarily *)
-  structure Gate_branching = Gate (structure B = BasisIdxUnlimited
-                                   structure C = Complex64)
+  (*structure Gate_branching = Gate (structure B = BasisIdxUnlimited
+                                   structure C = Complex64)*)
 
 
-  fun gateIsBranching ({ gates = gates, ...} : data_flow_graph) =
-      let val branchSeq = Seq.map (fn g => Gate_branching.expectBranching (Gate_branching.fromGateDefn g)) gates in
-        fn i => Seq.nth branchSeq i
-      end
-
+  fun gateIsBranching ({ gates = gates, ...} : data_flow_graph) i =
+      GateDefn.maxBranchingFactor (Seq.nth gates i) > 1
 end
