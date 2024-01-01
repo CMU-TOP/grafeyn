@@ -13,8 +13,8 @@ struct
 
   structure CLA = CommandLineArgs
 
-  structure G = Gate2 (structure B = B structure C = C)
-  structure SST = SparseStateTable2 (structure B = B structure C = C)
+  structure G = Gate (structure B = B structure C = C)
+  structure SST = SparseStateTable (structure B = B structure C = C)
 
   structure F = Fingerprint (structure B = B structure C = C)
 

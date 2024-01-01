@@ -23,9 +23,6 @@ local
   $(SML_LIB)/smlnj-lib/JSON/json-lib.mlb
   $(SML_LIB)/smlnj-lib/Util/smlnj-lib.mlb
 
-  (*HashTable.sml*)
-  (*HashSet.sml*)
-
   Rat.sml
 
   QubitIdx.sml
@@ -43,21 +40,17 @@ local
     basis/BasisIdx64.sml
     basis/BasisIdxUnlimited.sml
   end
-  
-  ann "allowExtendedTextConsts true" in
-    GateDefn.sml
-    (*Gate.sml*)
-    Circuit.sml
-  end
-
-  (*state/SPARSE_STATE_TABLE.sml
-  state/SparseStateTable.sml
-  state/SparseStateTableLockedSlots.sml*)
 
   state/SPARSE_STATE_SET.sml
   state/SparseStateSet.sml
-  state/SPARSE_STATE_TABLE2.sml
-  state/SparseStateTable2.sml
+  state/SPARSE_STATE_TABLE.sml
+  state/SparseStateTable.sml
+
+  ann "allowExtendedTextConsts true" in
+    GateDefn.sml
+    Gate.sml
+    Circuit.sml
+  end
 
   state/DENSE_STATE.sml
   state/DenseState.sml
@@ -65,10 +58,7 @@ local
   (*state/HYBRID_STATE.sml
   state/HybridState.sml*)
 
-  Gate2.sml
   state/PushPull.sml
-  
-  (*state/ExpandState.sml*)
 
   Fingerprint.sml
 
@@ -78,11 +68,7 @@ local
   schedulers/GreedyBranching.sml
   schedulers/GreedyNonBranching.sml
   schedulers/FinishQubit.sml
-  (*DynGateScheduler.sml*)
 in
-  (*structure HashTable*)
-  (*structure HashSet*)
-
   structure Rat
 
   signature COMPLEX
@@ -96,8 +82,6 @@ in
   signature BASIS_IDX
   structure BasisIdx64
   structure BasisIdxUnlimited
-  
-  (* structure SparseState *)
 
   structure SMLQasmError
   structure SMLQasmParser
@@ -106,21 +90,11 @@ in
   structure SMLQasmSimpleCircuit
   structure TerminalColorString
 
-  (* structure SMLQasmGate *)
   structure GateDefn
-
-  (*signature GATE
-  functor Gate*)
-
-  signature GATE2
-  functor Gate2
+  signature GATE
+  functor Gate
 
   structure Circuit
-  (* structure ParseQASM *)
-
-  (*signature SPARSE_STATE_TABLE
-  functor SparseStateTable
-  functor SparseStateTableLockedSlots*)
 
   signature DENSE_STATE
   functor DenseState
@@ -128,8 +102,8 @@ in
   (*signature HYBRID_STATE
   functor HybridState*)
 
-  signature SPARSE_STATE_TABLE2
-  functor SparseStateTable2
+  signature SPARSE_STATE_TABLE
+  functor SparseStateTable
   signature SPARSE_STATE_SET
   functor SparseStateSet
 
@@ -150,9 +124,4 @@ in
   structure GreedyBranchingScheduler
   functor GreedyNonBranchingScheduler
   functor FinishQubitScheduler
-  (*structure GateSchedulerOrder*)
-  (*signature DYN_GATE_SCHEDULER
-  functor DynSchedFinishQubitWrapper
-  functor DynSchedInterference
-  functor DynSchedNaive*)
 end

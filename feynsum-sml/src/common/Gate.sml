@@ -1,4 +1,4 @@
-signature GATE2 =
+signature GATE =
 sig
   structure B: BASIS_IDX
   structure C: COMPLEX
@@ -23,9 +23,9 @@ sig
 end
 
 
-functor Gate2
+functor Gate
   (structure B: BASIS_IDX
-   structure C: COMPLEX): GATE2 =
+   structure C: COMPLEX): GATE =
 struct
   structure B = B
   structure C = C
@@ -43,7 +43,7 @@ struct
 
   type t = gate
 
-  structure SST = SparseStateTable2 (structure B = B structure C = C)
+  structure SST = SparseStateTable (structure B = B structure C = C)
   fun flattenAndJoin numQubits amps =
       let val len = Seq.reduce op+ 0 (Seq.map Seq.length amps)
           val st = SST.make { capacity = len * 2, numQubits = numQubits }
@@ -172,7 +172,7 @@ struct
     end
 
   | GateDefn.FSim {left = i, right = j, theta = x, phi = y} =>
-    raise Fail "Gate2.pushFromGateDefn FSim unimplemented"
+    raise Fail "Gate.pushFromGateDefn FSim unimplemented"
 
   | GateDefn.RZ {rot = x, target = i} =>
     let val rot1 = C.rotateBy (R.fromLarge (x * 0.5))
@@ -217,7 +217,7 @@ struct
     end
 
   | GateDefn.Other {name = n, params = xs, args = is} =>
-    raise Fail "Gate2.pushFromGateDefn Other unimplemented"
+    raise Fail "Gate.pushFromGateDefn Other unimplemented"
 
   fun pushFromGateDefn gd = case gd of
     GateDefn.PauliY i => (fn b => [B.flip b i])
@@ -235,14 +235,14 @@ struct
   | GateDefn.CCX {control1 = i, control2 = j, target = k} => (fn b => [if B.get b i andalso B.get b j then B.flip b k else b])
   | GateDefn.Phase {target = i, rot = x} => (fn b => [b])
   | GateDefn.CPhase {control = i, target = j, rot = x} => (fn b => [b])
-  | GateDefn.FSim {left = i, right = j, theta = x, phi = y} => raise Fail "Gate2.pullFromGateDefn FSim unimplemented"
+  | GateDefn.FSim {left = i, right = j, theta = x, phi = y} => raise Fail "Gate.pullFromGateDefn FSim unimplemented"
   | GateDefn.RZ {rot = x, target = i} => (fn b => [b])
   | GateDefn.RY {rot = x, target = i} => (fn b => [B.unset b i, B.set b i])
   | GateDefn.RX {rot = x, target = i} => (fn b => [B.unset b i, B.set b i])
   | GateDefn.Swap {target1 = i, target2 = j} => (fn b => [B.setTo (B.get b i) (B.setTo (B.get b j) b i) j])
   | GateDefn.CSwap {control = i, target1 = j, target2 = k} => (fn b => [if B.get b i then B.setTo (B.get b j) (B.setTo (B.get b k) b j) k else b])
   | GateDefn.U {target = i, theta = x, phi = y, lambda = z} => (fn b => [B.unset b i, B.set b i])
-  | GateDefn.Other {name = n, params = xs, args = is} => raise Fail "Gate2.pullFromGateDefn Other unimplemented"
+  | GateDefn.Other {name = n, params = xs, args = is} => raise Fail "Gate.pullFromGateDefn Other unimplemented"
 
   fun fromGateDefn {numQubits = numQubits} gd =
     { args = Seq.fromList (GateDefn.getGateArgs gd),

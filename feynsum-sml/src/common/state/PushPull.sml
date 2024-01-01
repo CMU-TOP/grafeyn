@@ -1,7 +1,7 @@
 signature PUSH_PULL =
 sig
-  structure SST: SPARSE_STATE_TABLE2
-  structure G: GATE2
+  structure SST: SPARSE_STATE_TABLE
+  structure G: GATE
   structure B: BASIS_IDX
   structure C: COMPLEX
   sharing SST.B = G.B = B
@@ -16,7 +16,7 @@ sig
 end
 
 functor PushPull
-  (structure SST: SPARSE_STATE_TABLE2
+  (structure SST: SPARSE_STATE_TABLE
    val blockSize: int
    val maxload: real
    val denseThreshold: real
@@ -26,11 +26,9 @@ struct
   structure SST = SST
   structure B = SST.B
   structure C = SST.C
-  structure G = Gate2 (structure B = B
-                       structure C = C)
+  structure G = Gate (structure B = B
+                      structure C = C)
   structure SSS = SST.SSS
-
-
 
   (*
   val seed = Random.rand (50, 14125)
