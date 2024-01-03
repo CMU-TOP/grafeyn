@@ -140,7 +140,8 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
     }
     pub fn get(&self, x: &B) -> Option<Complex> {
         let n = self.keys.len();
-        let mut i: usize = calculate_hash(&x) as usize % n;
+        let init_hash = calculate_hash(&x) as usize % n;
+        let mut i = init_hash;
         let y = x;
         loop {
             let k = self.keys[i].load();
@@ -150,6 +151,10 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
                 return Some(self.get_value_at(i));
             } else {
                 i = (i + 1) % n
+            }
+
+            if i == init_hash {
+                return None;
             }
         }
     }
