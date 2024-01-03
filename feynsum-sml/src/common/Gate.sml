@@ -43,7 +43,7 @@ struct
 
   type t = gate
 
-  structure SST = SparseStateTable (structure B = B structure C = C)
+  (*structure SST = SparseStateTable (structure B = B structure C = C)
   fun flattenAndJoin numQubits amps =
       let val len = Seq.reduce op+ 0 (Seq.map Seq.length amps)
           val st = SST.make { capacity = len * 2, numQubits = numQubits }
@@ -56,23 +56,49 @@ struct
           val delayedSeq = SST.compact st
       in
         Seq.tabulate (DelayedSeq.nth delayedSeq) (DelayedSeq.length delayedSeq)
+      end*)
+
+  fun flattenAndJoin2 amps =
+      if Seq.length amps <= 1 then
+        Seq.flatten amps
+      else
+        let val len = Seq.reduce op+ 0 (Seq.map Seq.length amps)
+            (* val _ = print ("flattenAndJoin2, # seqs = " ^ Int.toString (Seq.length amps) ^ ", total length = " ^ Int.toString len ^ "\n") *)
+            val pos = ref 0
+            val arr = Array.array (len, NONE)
+            fun ampIdx b i = case Array.sub (arr, i) of
+                                 NONE => (pos := !pos + 1; (!pos - 1, C.zero))
+                               | SOME (b', c') => if B.equal (b, b') then (i, c') else ampIdx b (i + 1)
+            fun addAmp (b, c) = let val (i, c') = ampIdx b 0 in Array.update (arr, i, SOME (b, C.+ (c, c'))) end
+            val flattened = Seq.flatten amps
+            val _ = Array.tabulate (len, addAmp o Seq.nth flattened)
+        in
+          Seq.tabulate (fn i => Option.valOf (Array.sub (arr, i))) (!pos)
+        end
+
+  fun flattenAndJoinNoAmp amps =
+      let val len = Seq.reduce op+ 0 (Seq.map Seq.length amps)
+          val pos = ref 0
+          val arr = Array.array (len, NONE)
+          fun touch i b = case Array.sub (arr, i) of
+                               NONE => (pos := !pos + 1; Array.update (arr, i, SOME b))
+                             | SOME b' => if B.equal (b, b') then () else touch (i + 1) b
+          val flattened = Seq.flatten amps
+          val _ = Array.tabulate (len, touch 0 o Seq.nth flattened)
+      in
+        Seq.tabulate (fn i => Option.valOf (Array.sub (arr, i))) (!pos)
       end
 
   fun fuse (({args = args1, push = push1, pull = pull1, maxBranchingFactor = mbf1, numQubits = nq1 },
              {args = args2, push = push2, pull = pull2, maxBranchingFactor = mbf2, numQubits = nq2 }) : gate * gate) =
       let fun is_arg qi args = Seq.iterate (fn (b, i) => b orelse (i = qi)) false args
           val args3 = Seq.append (args1, Seq.filter (fn a2 => not (is_arg a2 args1)) args2)
-          fun push3 b = Seq.flatten (Seq.map push2 (push1 b))
-          fun pull3 b = flattenAndJoin nq1
-                          (Seq.map
-                             (fn bc => let val (b', c') = bc in
-                                         Seq.map
-                                           (fn bc' => let val (b'', c'') = bc' in
-                                                        (b'', C.* (c', c'')) end)
-                                           (pull1 b') end) (pull2 b))
+          fun push3 b = (*flattenAndJoinNoAmp*) Seq.flatten (Seq.map push2 (push1 b))
+          fun pull3 b = flattenAndJoin2 (*nq1*)
+                          (Seq.map (fn (b', c') => Seq.map (fn (b'', c'') => (b'', C.* (c', c''))) (pull1 b')) (pull2 b))
           val mbf3 = mbf1 * mbf2
           val nq3 = if nq1 = nq2 then nq1
-                    else raise Fail "Cannot fuse gates for different number of qubits"
+                    else raise Fail "Cannot fuse gates for circuits with different numbers of qubits"
       in
         { args = args3,
           push = push3,
@@ -81,7 +107,57 @@ struct
           numQubits = nq3 }
       end
 
-  fun fuses (gs: gate Seq.t) = Seq.reduce fuse (Seq.nth gs 0) (Seq.drop gs 1)
+  (*fun fuses (gs: gate Seq.t) =
+      Seq.reduce fuse (Seq.nth gs 0) (Seq.drop gs 1)*)
+
+  fun fusesR (gs: gate Seq.t) =
+      let val len = Seq.length gs
+          fun iter g i = if i >= len then g else iter (fuse (g, Seq.nth gs i)) (i + 1)
+      in
+        iter (Seq.nth gs 0) 1
+      end
+
+  fun fusesL (gs: gate Seq.t) =
+      let val len = Seq.length gs
+          fun iter g i = if i < 0 then g else iter (fuse (Seq.nth gs i, g)) (i - 1)
+      in
+        iter (Seq.nth gs (len - 1)) (len - 2)
+      end
+
+  (*fun fuses (gs: gate Seq.t) = fusesL gs*)
+
+  fun fuses (gs: gate Seq.t) =
+      let val numQubits =
+              Seq.iterate
+                (fn (nq, g) => if #numQubits g = nq then nq else raise Fail "Cannot fuse gates for circuits with different numbers of qubits")
+                (#numQubits (Seq.nth gs 0)) gs
+                                      
+          val argArr = Array.array (numQubits, false)
+          val _ = Seq.map (Seq.map (fn qi => Array.update (argArr, qi, true)) o #args) gs
+          val args = Seq.mapOption (fn x => x) (Seq.tabulate (fn i => if Array.sub (argArr, i) then SOME i else NONE) numQubits)
+
+          fun pushIter (f, f') b = Seq.flatten (Seq.map f' (f b))
+          val push = Seq.iterate (fn (f, g) => pushIter (f, #push g))
+                                 Seq.singleton gs
+
+          fun pullIter (f, f') b =
+              Seq.flatten
+                (Seq.map (fn (b', c') =>
+                             Seq.map (fn (b'', c'') =>
+                                         (b'', C.* (c', c'')))
+                                     (f b'))
+                         (f' b))
+          val pull = Seq.iterate (fn (f, g) => pullIter (f, #pull g))
+                                 (fn b => Seq.singleton (b, C.one)) gs
+
+          val maxBranchingFactor = Seq.reduce op* 1 (Seq.map #maxBranchingFactor gs)
+      in
+        { args = args,
+          push = push,
+          pull = (fn b => flattenAndJoin2 (Seq.singleton (pull b))),
+          maxBranchingFactor = maxBranchingFactor,
+          numQubits = numQubits }
+      end
 
   val one = R.fromLarge 1.0
   val half = R.fromLarge 0.5
@@ -116,7 +192,6 @@ struct
 
     GateDefn.PauliY i =>
     (fn b => [(B.flip b i, if B.get b i then neg_i else pos_i)])
-
   | GateDefn.PauliZ i =>
     (fn b => [(b, if B.get b i then neg_1 else pos_1)])
 

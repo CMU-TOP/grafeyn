@@ -37,8 +37,8 @@ struct
   fun main ((inputName, circuit): string * DataFlowGraph.t) =
     let val numQubits = #numQubits circuit
         val gates = Seq.map (G.fromGateDefn {numQubits = numQubits}) (#gates circuit)
-        val sched = DataFlowGraphUtil.scheduleWithOracle circuit (fn i => #maxBranchingFactor (Seq.nth gates i) > 1) (sched circuit) disableFusion maxBranchingStride
-        val kernels = Seq.map (G.fuses o Seq.map (Seq.nth gates)) sched
+        val sched' = DataFlowGraphUtil.scheduleWithOracle circuit (fn i => #maxBranchingFactor (Seq.nth gates i) > 1) (sched circuit) disableFusion maxBranchingStride
+        val kernels = Seq.map (G.fuses o Seq.map (Seq.nth gates)) sched'
         val initState = SST.singleton {numQubits = numQubits} (B.zeros, C.one)
         val { state, numVerts, numEdges } = PP.applyAll (kernels, initState)
         val (fp, tm) = Util.getTime (fn _ => F.fingerprint (SST.unsafeViewContents state))

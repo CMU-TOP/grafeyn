@@ -50,12 +50,12 @@ struct
   fun ampAt {amps, ...} i = Array.sub (amps, i)
   fun kvAt {keys, amps, ...} i = (Array.sub (keys, i), Array.sub (amps, i))
 
-  fun size table =
+  (*fun size table =
       SeqBasis.reduce
         10000 op+ 0 (0, capacity table)
-        (fn i => if keyIdxIsEmpty table i then 0 else 1)
+        (fn i => if keyIdxIsEmpty table i then 0 else 1)*)
 
-  fun nonZeroSize table =
+  fun size table =
       SeqBasis.reduce
         10000 op+ 0 (0, capacity table)
         (fn i => if slotEmpty table i then 0 else 1)

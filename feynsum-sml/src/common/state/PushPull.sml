@@ -56,7 +56,7 @@ struct
 
   fun push ((kern, amps): G.t * B.t DelayedSeq.t) =
     let val cap = G.maxBranchingFactor kern * DelayedSeq.length amps
-        val sss = SSS.make { capacity = cap * 4, numQubits = #numQubits kern }
+        val sss = SSS.make { capacity = cap * 2, numQubits = #numQubits kern }
         (*fun pushB b = Seq.iterate (fn ((), b) => SSS.insert sss b) () (G.push kern b)*)
         fun pushB b = (Seq.map (fn b => SSS.insert sss b) (G.push kern b); ())
         val _ = Seq.map pushB (Seq.tabulate (DelayedSeq.nth amps) (DelayedSeq.length amps))
@@ -69,7 +69,7 @@ struct
       SST.fromKeys tgts (fn b => let val bs = G.pull kern b in
                                    SeqBasis.reduce
                                      1000
-                                     (C.+)
+                                     C.+
                                      C.zero
                                      (0, Seq.length bs)
                                      (fn i => let val (b, c) = Seq.nth bs i in
@@ -85,7 +85,7 @@ struct
         (fn b => let val bs = G.pull kern b in
                    (SeqBasis.reduce
                       1000
-                      (C.+)
+                      C.+
                       C.zero
                       (0, Seq.length bs)
                       (fn i => let val (b, c) = Seq.nth bs i in
@@ -122,8 +122,9 @@ struct
                     val new = { state = state',
                                 numVerts = numVerts + numVerts',
                                 numEdges = numEdges + numEdges' }
+                    fun divPow2 r n = if n <= 0 then r else divPow2 (r / 2.0) (n - 1)
                 in
-                  print ("kernel = " ^ Int.toString i ^ "/" ^ Int.toString numkerns ^ ", verts = " ^ Int.toString numVerts' ^ ", edges = " ^ Int.toString numEdges' ^ "\n");
+                  print ("kernel " ^ Int.toString (i + 1) ^ "/" ^ Int.toString numkerns ^ ", " ^ Int.toString numVerts' ^ " vertices, " ^ Int.toString numEdges' ^ " edges, " ^ Int.toString (SST.size state') ^ " states, " ^ Real.fmt (StringCvt.FIX (SOME 8)) (divPow2 (Real.fromInt (SST.size state')) (#numQubits kern)) ^ " density\n");
                   iter (i + 1) new
                 end
       in
