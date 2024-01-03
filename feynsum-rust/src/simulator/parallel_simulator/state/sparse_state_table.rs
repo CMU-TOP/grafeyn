@@ -142,12 +142,11 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
         let n = self.keys.len();
         let init_hash = calculate_hash(&x) as usize % n;
         let mut i = init_hash;
-        let y = x;
         loop {
             let k = self.keys[i].load();
             if k == self.empty_key {
                 return None;
-            } else if k == *y {
+            } else if k == *x {
                 return Some(self.get_value_at(i));
             } else {
                 i = (i + 1) % n
