@@ -115,12 +115,12 @@ mod tests {
             disable_gate_fusion: true,
             ..Config::default()
         };
-        let source = fs::read_to_string(test_case!("adder_n10.qasm")).unwrap();
+        let source = fs::read_to_string(test_case!("basis_change_n3.qasm")).unwrap();
         let program = parser::parse_program(&source).unwrap();
         let circuit = Circuit::<BasisIdx64>::new(program).unwrap();
 
         let result = run::<BasisIdx64, AtomicU64>(&config, circuit);
-        let expected = fs::read_to_string(test_case!("adder_n10_expected.txt"))
+        let expected = fs::read_to_string(test_case!("basis_change_n3_expected.txt"))
             .unwrap()
             .lines()
             .map(|line| {
