@@ -1,10 +1,12 @@
 mod gate;
+mod unitary;
 
 use std::collections::HashMap;
 
 use crate::parser::{Argument, Expression, OpCode, QasmStatement};
 use crate::types::{BasisIdx, QubitIndex, Real};
 pub use gate::{Gate, GateDefn, PullApplyOutput, PushApplicable, PushApplyOutput};
+pub use unitary::{Unitary, UnitaryMatrix};
 
 #[derive(Debug)]
 pub enum CircuitBuildError {

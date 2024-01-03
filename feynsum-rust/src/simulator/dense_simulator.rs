@@ -1,8 +1,6 @@
-mod unitary;
-
 use log;
 
-use crate::circuit::Circuit;
+use crate::circuit::{Circuit, Unitary};
 use crate::config::Config;
 use crate::futhark::{self, FutharkVector};
 use crate::gate_scheduler;
@@ -11,8 +9,6 @@ use crate::types::{BasisIdx, Complex};
 use crate::utility;
 
 use super::Compactifiable;
-pub use unitary::Unitary;
-pub use unitary::UnitaryMatrix;
 
 type State = Vec<Complex>;
 
