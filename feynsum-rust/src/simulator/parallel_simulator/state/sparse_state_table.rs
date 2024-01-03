@@ -50,7 +50,6 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> SparseStateTable<B, AB> {
     ) -> Self {
         let t = SparseStateTable::new(num_qubits, maxload, expected);
         t.force_insert_unique(bidx, weight);
-        println!("singleton nonzeros: {}", t.num_nonzeros());
         t
     }
     pub fn capacity(&self) -> usize {
