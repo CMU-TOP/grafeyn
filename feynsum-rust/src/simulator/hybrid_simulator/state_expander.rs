@@ -1,9 +1,8 @@
 use std::fmt::{self, Display, Formatter};
 
-use crate::circuit::Gate;
+use crate::circuit::{Gate, Unitary};
 use crate::config::Config;
 use crate::futhark::{self, Context, FutharkVector};
-use crate::simulator::dense_simulator::Unitary;
 use crate::simulator::parallel_simulator::SparseStateTable;
 use crate::types::{AtomicBasisIdx, BasisIdx, Complex};
 

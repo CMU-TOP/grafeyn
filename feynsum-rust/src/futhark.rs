@@ -2,7 +2,7 @@
 mod internal {
     #![allow(warnings)]
     include!(concat!(env!("OUT_DIR"), "/futhark_lib.rs"));
-    use crate::simulator::dense_simulator::UnitaryMatrix;
+    use crate::circuit::UnitaryMatrix;
     use crate::types::Complex;
 
     pub fn create_context() -> Context {
