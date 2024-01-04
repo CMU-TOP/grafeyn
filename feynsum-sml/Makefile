@@ -13,5 +13,12 @@ main.mpl: phony
 main.mlton: phony
 	mlton $(FLAGS) -mlb-path-var 'COMPILER mlton' -output main.mlton src/main.mlb
 
+main-prof.mpl: phony
+	mpl $(FLAGS) -mlb-path-var 'COMPILER mpl' -profile time -profile-stack true -output main-prof.mpl src/main.mlb
+
+main-prof.mlton: phony
+	mlton $(FLAGS) -mlb-path-var 'COMPILER mlton' -profile time -profile-stack true -output main-prof.mlton src/main.mlb
+
+
 .PHONY: phony
 phony:
