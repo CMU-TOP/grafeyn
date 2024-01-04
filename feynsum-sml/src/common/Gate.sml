@@ -130,9 +130,10 @@ struct
       let val numQubits = #numQubits (Seq.nth gs 0)
           val _ = Seq.applyIdx gs (fn (_, g) => if #numQubits g = numQubits then () else raise Fail "Cannot fuse gates for circuits with different numbers of qubits")
                                       
-          val argArr = Array.array (numQubits, false)
+          (*val argArr = Array.array (numQubits, false)
           val _ = Seq.applyIdx gs (fn (_, g) => DelayedSeq.applyIdx (#args g) (fn (_, qi) => Array.update (argArr, qi, true)))
-          val args = DelayedSeq.mapOption (fn x => x) (DelayedSeq.tabulate (fn i => if Array.sub (argArr, i) then SOME i else NONE) numQubits)
+          val args = DelayedSeq.mapOption (fn x => x) (DelayedSeq.tabulate (fn i => if Array.sub (argArr, i) then SOME i else NONE) numQubits)*)
+          val args = DelayedSeq.singleton 0
 
           fun pushIter (f, f') b = DelayedSeq.flatten (DelayedSeq.map f' (f b))
           val push = Seq.iterate (fn (f, g) => pushIter (f, #push g))
@@ -173,9 +174,9 @@ struct
   fun superpos ab = C.scale (half, C.+ ab)
 
   fun control (g: gate) qi =
-    if DelayedSeq.iterate (fn (b, i) => b orelse (i = qi)) false (#args g) then
+    (*if DelayedSeq.iterate (fn (b, i) => b orelse (i = qi)) false (#args g) then
       raise Fail "Cannot control a gate with a qubit it already uses"
-    else
+    else*)
       { args = DelayedSeq.append (DelayedSeq.singleton qi, #args g),
         push = fn b => if B.get b qi then #push g b else DelayedSeq.singleton b,
         pull = fn b => if B.get b qi then #pull g b else DelayedSeq.singleton (b, pos_1),
@@ -318,7 +319,7 @@ struct
   | GateDefn.Other {name = n, params = xs, args = is} => raise Fail "Gate.pullFromGateDefn Other unimplemented"
 
   fun fromGateDefn {numQubits = numQubits} gd =
-    { args = DelayedSeq.fromList (GateDefn.getGateArgs gd),
+    { args = DelayedSeq.singleton 0 (*DelayedSeq.fromList (GateDefn.getGateArgs gd)*),
       push = (DelayedSeq.fromList o pushFromGateDefn gd),
       pull = (DelayedSeq.fromList o pullFromGateDefn gd),
       maxBranchingFactor = GateDefn.maxBranchingFactor gd,
