@@ -57,10 +57,8 @@ struct
   fun push ((kern, amps): G.t * B.t DelayedSeq.t) =
     let val cap = G.maxBranchingFactor kern * DelayedSeq.length amps
         val sss = SSS.make { capacity = cap * 2, numQubits = #numQubits kern }
-        (*fun pushB b = Seq.iterate (fn ((), b) => SSS.insert sss b) () (G.push kern b)*)
-        fun pushB b = (Seq.map (fn b => SSS.insert sss b) (G.push kern b); ())
-        val _ = Seq.map pushB (Seq.tabulate (DelayedSeq.nth amps) (DelayedSeq.length amps))
-        (* val _ = DelayedSeq.map (fn b => pushB b) amps *)
+        fun pushB b = DelayedSeq.applyIdx (G.push kern b) (fn (_, b) => SSS.insert sss b)
+        val _ = DelayedSeq.applyIdx amps (fn (_, b) => pushB b)
     in
       sss
     end
@@ -71,8 +69,8 @@ struct
                                      1000
                                      C.+
                                      C.zero
-                                     (0, Seq.length bs)
-                                     (fn i => let val (b, c) = Seq.nth bs i in
+                                     (0, DelayedSeq.length bs)
+                                     (fn i => let val (b, c) = DelayedSeq.nth bs i in
                                                 case SST.lookup amps b of
                                                     NONE => C.zero
                                                   | SOME c' => C.* (c, c')
@@ -83,17 +81,13 @@ struct
       SST.fromKeysWith
         tgts
         (fn b => let val bs = G.pull kern b in
-                   (SeqBasis.reduce
-                      1000
-                      C.+
-                      C.zero
-                      (0, Seq.length bs)
-                      (fn i => let val (b, c) = Seq.nth bs i in
-                                 case SST.lookup amps b of
-                                     NONE => C.zero
-                                   | SOME c' => C.* (c, c')
-                               end),
-                    Seq.length bs)
+                   (SeqBasis.reduce 1000 C.+ C.zero (0, DelayedSeq.length bs)
+                         (fn i => let val (b, c) = DelayedSeq.nth bs i in
+                                    case SST.lookup amps b of
+                                        NONE => C.zero
+                                      | SOME c' => C.* (c, c')
+                                  end),
+                   DelayedSeq.length bs)
                  end)
 
   fun apply ((kern, state): G.t * SST.t) =
@@ -102,6 +96,8 @@ struct
           val pushed = push (kern, DelayedSeq.map (fn (b, c) => b) nonzeros)
           (* val _ = print ("Num pushed: " ^ Int.toString (SSS.size pushed) ^ "\n") *)
           val (pulled, nums) = pullCount (kern, state) pushed
+          (*val pulled = pull (kern, state) pushed
+          val nums = Seq.singleton 0*)
           val numVerts = Seq.length nums
           val numEdges = Seq.reduce op+ 0 nums
       in
