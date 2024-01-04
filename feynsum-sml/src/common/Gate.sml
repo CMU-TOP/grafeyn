@@ -177,7 +177,7 @@ struct
     (*if DelayedSeq.iterate (fn (b, i) => b orelse (i = qi)) false (#args g) then
       raise Fail "Cannot control a gate with a qubit it already uses"
     else*)
-      { args = DelayedSeq.append (DelayedSeq.singleton qi, #args g),
+      { args = DelayedSeq.singleton 1 (*DelayedSeq.append (DelayedSeq.singleton qi, #args g)*),
         push = fn b => if B.get b qi then #push g b else DelayedSeq.singleton b,
         pull = fn b => if B.get b qi then #pull g b else DelayedSeq.singleton (b, pos_1),
         maxBranchingFactor = #maxBranchingFactor g,
