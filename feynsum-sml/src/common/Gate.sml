@@ -17,7 +17,7 @@ sig
   val maxBranchingFactor: gate -> int
   val push: gate -> B.t -> B.t DelayedSeq.t
   val pull: gate -> B.t -> (B.t * C.t) DelayedSeq.t
-  val fuse: gate * gate -> gate
+  (* val fuse: gate * gate -> gate *)
   val fuses: gate Seq.t -> gate
   val control: gate -> qubit_idx -> gate
 end
@@ -89,7 +89,7 @@ struct
         DelayedSeq.tabulate (fn i => Option.valOf (Array.sub (arr, i))) (!pos)
       end
 
-  fun fuse (({args = args1, push = push1, pull = pull1, maxBranchingFactor = mbf1, numQubits = nq1 },
+  (*fun fuse (({args = args1, push = push1, pull = pull1, maxBranchingFactor = mbf1, numQubits = nq1 },
              {args = args2, push = push2, pull = pull2, maxBranchingFactor = mbf2, numQubits = nq2 }) : gate * gate) =
       let fun is_arg qi args = DelayedSeq.iterate (fn (b, i) => b orelse (i = qi)) false args
           val args3 = DelayedSeq.append (args1, DelayedSeq.filter (fn a2 => not (is_arg a2 args1)) args2)
@@ -107,9 +107,6 @@ struct
           numQubits = nq3 }
       end
 
-  (*fun fuses (gs: gate Seq.t) =
-      Seq.reduce fuse (Seq.nth gs 0) (Seq.drop gs 1)*)
-
   fun fusesR (gs: gate Seq.t) =
       let val len = Seq.length gs
           fun iter g i = if i >= len then g else iter (fuse (g, Seq.nth gs i)) (i + 1)
@@ -122,15 +119,16 @@ struct
           fun iter g i = if i < 0 then g else iter (fuse (Seq.nth gs i, g)) (i - 1)
       in
         iter (Seq.nth gs (len - 1)) (len - 2)
-      end
+      end*)
+
+  (*fun fuses (gs: gate Seq.t) =
+      Seq.reduce fuse (Seq.nth gs 0) (Seq.drop gs 1)*)
 
   (*fun fuses (gs: gate Seq.t) = fusesL gs*)
 
   fun fuses (gs: gate Seq.t) =
-      let val numQubits =
-              Seq.iterate
-                (fn (nq, g) => if #numQubits g = nq then nq else raise Fail "Cannot fuse gates for circuits with different numbers of qubits")
-                (#numQubits (Seq.nth gs 0)) gs
+      let val numQubits = #numQubits (Seq.nth gs 0)
+          val _ = Seq.applyIdx gs (fn (_, g) => if #numQubits g = numQubits then () else raise Fail "Cannot fuse gates for circuits with different numbers of qubits")
                                       
           val argArr = Array.array (numQubits, false)
           val _ = Seq.applyIdx gs (fn (_, g) => DelayedSeq.applyIdx (#args g) (fn (_, qi) => Array.update (argArr, qi, true)))
