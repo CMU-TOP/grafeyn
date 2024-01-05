@@ -5,8 +5,7 @@ sig
 
   type qubit_idx = int
 
-  type gate = { args: qubit_idx DelayedSeq.t,
-                push: B.t -> B.t DelayedSeq.t,
+  type gate = { push: B.t -> B.t DelayedSeq.t,
                 pull: B.t -> (B.t * C.t) DelayedSeq.t,
                 maxBranchingFactor: int,
                 numQubits: int }
@@ -35,8 +34,7 @@ struct
 
   type qubit_idx = int
 
-  type gate = { args: qubit_idx DelayedSeq.t,
-                push: B.t -> B.t DelayedSeq.t,
+  type gate = { push: B.t -> B.t DelayedSeq.t,
                 pull: B.t -> (B.t * C.t) DelayedSeq.t,
                 maxBranchingFactor: int,
                 numQubits: int }
@@ -89,51 +87,9 @@ struct
         DelayedSeq.tabulate (fn i => Option.valOf (Array.sub (arr, i))) (!pos)
       end
 
-  (*fun fuse (({args = args1, push = push1, pull = pull1, maxBranchingFactor = mbf1, numQubits = nq1 },
-             {args = args2, push = push2, pull = pull2, maxBranchingFactor = mbf2, numQubits = nq2 }) : gate * gate) =
-      let fun is_arg qi args = DelayedSeq.iterate (fn (b, i) => b orelse (i = qi)) false args
-          val args3 = DelayedSeq.append (args1, DelayedSeq.filter (fn a2 => not (is_arg a2 args1)) args2)
-          fun push3 b = (*flattenAndJoinNoAmp*) DelayedSeq.flatten (DelayedSeq.map push2 (push1 b))
-          fun pull3 b = flattenAndJoin2 (*nq1*)
-                          (DelayedSeq.map (fn (b', c') => DelayedSeq.map (fn (b'', c'') => (b'', C.* (c', c''))) (pull1 b')) (pull2 b))
-          val mbf3 = mbf1 * mbf2
-          val nq3 = if nq1 = nq2 then nq1
-                    else raise Fail "Cannot fuse gates for circuits with different numbers of qubits"
-      in
-        { args = args3,
-          push = push3,
-          pull = pull3,
-          maxBranchingFactor = mbf3,
-          numQubits = nq3 }
-      end
-
-  fun fusesR (gs: gate Seq.t) =
-      let val len = Seq.length gs
-          fun iter g i = if i >= len then g else iter (fuse (g, Seq.nth gs i)) (i + 1)
-      in
-        iter (Seq.nth gs 0) 1
-      end
-
-  fun fusesL (gs: gate Seq.t) =
-      let val len = Seq.length gs
-          fun iter g i = if i < 0 then g else iter (fuse (Seq.nth gs i, g)) (i - 1)
-      in
-        iter (Seq.nth gs (len - 1)) (len - 2)
-      end*)
-
-  (*fun fuses (gs: gate Seq.t) =
-      Seq.reduce fuse (Seq.nth gs 0) (Seq.drop gs 1)*)
-
-  (*fun fuses (gs: gate Seq.t) = fusesL gs*)
-
   fun fuses (gs: gate Seq.t) =
       let val numQubits = #numQubits (Seq.nth gs 0)
           val _ = Seq.applyIdx gs (fn (_, g) => if #numQubits g = numQubits then () else raise Fail "Cannot fuse gates for circuits with different numbers of qubits")
-                                      
-          (*val argArr = Array.array (numQubits, false)
-          val _ = Seq.applyIdx gs (fn (_, g) => DelayedSeq.applyIdx (#args g) (fn (_, qi) => Array.update (argArr, qi, true)))
-          val args = DelayedSeq.mapOption (fn x => x) (DelayedSeq.tabulate (fn i => if Array.sub (argArr, i) then SOME i else NONE) numQubits)*)
-          val args = DelayedSeq.singleton 0
 
           fun pushIter (f, f') b = DelayedSeq.flatten (DelayedSeq.map f' (f b))
           val push = Seq.iterate (fn (f, g) => pushIter (f, #push g))
@@ -151,8 +107,7 @@ struct
 
           val maxBranchingFactor = Seq.reduce op* 1 (Seq.map #maxBranchingFactor gs)
       in
-        { args = args,
-          push = push,
+        { push = push,
           pull = (fn b => flattenAndJoin2 (DelayedSeq.singleton (pull b))),
           maxBranchingFactor = maxBranchingFactor,
           numQubits = numQubits }
@@ -174,11 +129,7 @@ struct
   fun superpos ab = C.scale (half, C.+ ab)
 
   fun control (g: gate) qi =
-    (*if DelayedSeq.iterate (fn (b, i) => b orelse (i = qi)) false (#args g) then
-      raise Fail "Cannot control a gate with a qubit it already uses"
-    else*)
-      { args = DelayedSeq.singleton 1 (*DelayedSeq.append (DelayedSeq.singleton qi, #args g)*),
-        push = fn b => if B.get b qi then #push g b else DelayedSeq.singleton b,
+      { push = fn b => if B.get b qi then #push g b else DelayedSeq.singleton b,
         pull = fn b => if B.get b qi then #pull g b else DelayedSeq.singleton (b, pos_1),
         maxBranchingFactor = #maxBranchingFactor g,
         numQubits = #numQubits g }
@@ -319,8 +270,7 @@ struct
   | GateDefn.Other {name = n, params = xs, args = is} => raise Fail "Gate.pullFromGateDefn Other unimplemented"
 
   fun fromGateDefn {numQubits = numQubits} gd =
-    { args = DelayedSeq.singleton 0 (*DelayedSeq.fromList (GateDefn.getGateArgs gd)*),
-      push = (DelayedSeq.fromList o pushFromGateDefn gd),
+    { push = (DelayedSeq.fromList o pushFromGateDefn gd),
       pull = (DelayedSeq.fromList o pullFromGateDefn gd),
       maxBranchingFactor = GateDefn.maxBranchingFactor gd,
       numQubits = numQubits
