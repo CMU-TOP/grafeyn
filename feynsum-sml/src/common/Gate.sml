@@ -41,12 +41,24 @@ struct
 
   type t = gate
 
-  fun flattenAndJoin2 amps =
+  (*fun flattenAndJoinNoAmp amps =
+      let val len = DelayedSeq.reduce op+ 0 (DelayedSeq.map DelayedSeq.length amps)
+          val pos = ref 0
+          val arr = Array.array (len, NONE)
+          fun touch i b = case Array.sub (arr, i) of
+                               NONE => (pos := !pos + 1; Array.update (arr, i, SOME b))
+                             | SOME b' => if B.equal (b, b') then () else touch (i + 1) b
+          val flattened = DelayedSeq.flatten amps
+          val _ = Array.tabulate (len, touch 0 o DelayedSeq.nth flattened)
+      in
+        DelayedSeq.tabulate (fn i => Option.valOf (Array.sub (arr, i))) (!pos)
+      end*)
+
+  fun flattenAndJoin amps =
       if DelayedSeq.length amps <= 1 then
         DelayedSeq.flatten amps
       else
         let val len = DelayedSeq.reduce op+ 0 (DelayedSeq.map DelayedSeq.length amps)
-            (* val _ = print ("flattenAndJoin2, # seqs = " ^ Int.toString (DelayedSeq.length amps) ^ ", total length = " ^ Int.toString len ^ "\n") *)
             val pos = ref 0
             val arr = Array.array (len, NONE)
             fun ampIdx b i = case Array.sub (arr, i) of
@@ -58,19 +70,6 @@ struct
         in
           DelayedSeq.tabulate (fn i => Option.valOf (Array.sub (arr, i))) (!pos)
         end
-
-  fun flattenAndJoinNoAmp amps =
-      let val len = DelayedSeq.reduce op+ 0 (DelayedSeq.map DelayedSeq.length amps)
-          val pos = ref 0
-          val arr = Array.array (len, NONE)
-          fun touch i b = case Array.sub (arr, i) of
-                               NONE => (pos := !pos + 1; Array.update (arr, i, SOME b))
-                             | SOME b' => if B.equal (b, b') then () else touch (i + 1) b
-          val flattened = DelayedSeq.flatten amps
-          val _ = Array.tabulate (len, touch 0 o DelayedSeq.nth flattened)
-      in
-        DelayedSeq.tabulate (fn i => Option.valOf (Array.sub (arr, i))) (!pos)
-      end
 
   fun fuses (gs: gate Seq.t) =
       let val numQubits = #numQubits (Seq.nth gs 0)
@@ -93,7 +92,7 @@ struct
           val maxBranchingFactor = Seq.reduce op* 1 (Seq.map #maxBranchingFactor gs)
       in
         { push = push,
-          pull = (fn b => flattenAndJoin2 (DelayedSeq.singleton (pull b))),
+          pull = (fn b => flattenAndJoin (DelayedSeq.singleton (pull b))),
           maxBranchingFactor = maxBranchingFactor,
           numQubits = numQubits }
       end

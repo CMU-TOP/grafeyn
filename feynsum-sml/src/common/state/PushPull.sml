@@ -11,7 +11,6 @@ sig
   val apply: G.t * SST.t -> {state: SST.t, numVerts: int, numEdges: int}
   val pullCount: G.t * SST.t -> SST.SSS.t -> SST.t * int Seq.t
   val applyAll: G.t Seq.t * SST.t -> {state: SST.t, numVerts: int, numEdges: int}
-  (*val run: 'dfg * SST.t * (SST.t * 'dfg -> (G.t * 'dfg) option) -> {state: SST.t, numVerts: int, numEdges: int}*)
   (*val sampleStates: SST.t -> int -> B.t Seq.t*)
 end
 
@@ -92,12 +91,8 @@ struct
 
   fun apply ((kern, state): G.t * SST.t) =
       let val nonzeros = SST.compact state
-          (* val _ = print ("Num nonzeros: " ^ Int.toString (DelayedSeq.length nonzeros) ^ "\n") *)
           val pushed = push (kern, DelayedSeq.map (fn (b, c) => b) nonzeros)
-          (* val _ = print ("Num pushed: " ^ Int.toString (SSS.size pushed) ^ "\n") *)
           val (pulled, nums) = pullCount (kern, state) pushed
-          (*val pulled = pull (kern, state) pushed
-          val nums = Seq.singleton 0*)
           val numVerts = Seq.length nums
           val numEdges = Seq.reduce op+ 0 nums
       in
@@ -126,25 +121,4 @@ struct
       in
         iter 0 {state = state, numVerts = 0, numEdges = 0}
       end
-
-
-  (*fun run ((kerns, state, next): 'dfg * SST.t * (SST.t * 'dfg -> (G.t * 'dfg) option)) =
-      let fun iter i (old as {state, numVerts, numEdges}) =
-              if i >= numkerns then
-                old
-              else
-                let val kern = Seq.nth kerns i
-                    val {state = state', numVerts = numVerts', numEdges = numEdges'} =
-                        apply (kern, state)
-                    val new = { state = state',
-                                numVerts = numVerts + numVerts',
-                                numEdges = numEdges + numEdges' }
-                in
-                  print ("kernel = " ^ Int.toString i ^ ", verts = " ^ Int.toString numVerts' ^ ", edges = " ^ Int.toString numEdges' ^ "\n");
-                  iter (i + 1) new
-                end
-      in
-        iter 0 {state = state, numVerts = 0, numEdges = 0}
-      end*)
-
 end

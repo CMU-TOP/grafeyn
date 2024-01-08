@@ -150,11 +150,13 @@ struct
       newTable
     end
 
+  val GRAIN = 1000
+
   (* Converts an array A_c of complex numbers into an
    * array A_r of reals with twice its length, such
    * that A_c[i] = C.make (A_r[2*i], A_r[2*i+1]) *)
   fun arrayComplexToReals a_c =
-      SeqBasis.tabulate 1000 (0, 2 * Array.length a_c)
+      SeqBasis.tabulate GRAIN (0, 2 * Array.length a_c)
                         (fn i => let val (re, im) = C.view (Array.sub (a_c, i div 2)) in
                                    if i mod 2 = 0 then re else im
                                  end)
@@ -163,7 +165,7 @@ struct
   fun fromKeys (set: SSS.t) (amp: B.t -> C.t) =
       let val cap = SSS.capacity set
           val amps = SeqBasis.tabulate
-                      1000 (0, cap)
+                      GRAIN (0, cap)
                       (fn i => let val k = Array.sub (#keys set, i) in
                                  if B.equal (k, #emptykey set) then C.zero else amp k end)
       in
@@ -177,13 +179,13 @@ struct
         val emptykey = #emptykey set
         val cap = SSS.capacity set
         val arr = SeqBasis.tabulate
-                      1000 (0, cap)
+                      GRAIN (0, cap)
                       (fn i => let val k = Array.sub (#keys set, i) in
                                  if B.equal (k, #emptykey set) then NONE else SOME (amp k) end)
         val seq = Seq.mapOption (Option.map (fn (c, a) => a))
                                 (Seq.tabulate (fn i => Array.sub (arr, i)) cap)
         val amps = SeqBasis.tabulate
-                     1000 (0, cap)
+                     GRAIN (0, cap)
                      (fn i => case Array.sub (arr, i) of NONE => C.zero | SOME (c, _) => c)
         val table = {
           keys = keys,
