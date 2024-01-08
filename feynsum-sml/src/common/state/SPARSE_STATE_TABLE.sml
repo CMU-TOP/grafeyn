@@ -21,8 +21,6 @@ sig
 
   val insertForceUnique: table -> (B.t * C.t) -> unit
 
-  val insertAndAdd: {probes: int} -> table -> (B.t * C.t) -> unit
-
   (* not safe for concurrency with insertions *)
   val lookup: table -> B.t -> C.t option
 

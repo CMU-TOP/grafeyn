@@ -7,17 +7,19 @@ struct
   structure R = struct open C.R val fromLarge = fromLarge IEEEReal.TO_NEAREST end
 
   type t = { keys: B.t array,
-             amps: C.t array,
+             amps: C.r array,
              emptykey: B.t }
 
   exception Full
   exception DuplicateKey
 
+  (*val fromLarge = *)
+
   type table = t
 
   fun make' {capacity, emptykey} =
     { keys = SeqBasis.tabulate 5000 (0, capacity) (fn _ => emptykey),
-      amps = SeqBasis.tabulate 5000 (0, capacity) (fn _ => C.zero),
+      amps = SeqBasis.tabulate 5000 (0, 2 * capacity) (fn _ => R.fromLarge 0.0),
       emptykey = emptykey }
 
 
@@ -43,12 +45,14 @@ struct
   fun keyIsEmpty {emptykey, ...} k = B.equal (k, emptykey)
   fun keyIdxIsEmpty {keys, emptykey, ...} i = B.equal (Array.sub (keys, i), emptykey)
   val ampIsZero = C.isZero
-  fun ampIdxIsZero {amps, ...} i = C.isZero (Array.sub (amps, i))
+  fun ampIdxIsZero {amps, ...} i =
+      C.realIsZero (Array.sub (amps, 2 * i)) andalso
+      C.realIsZero (Array.sub (amps, 2 * i + 1))
   fun slotEmpty table i = keyIdxIsEmpty table i orelse ampIdxIsZero table i
 
   fun keyAt {keys, ...} i = Array.sub (keys, i)
-  fun ampAt {amps, ...} i = Array.sub (amps, i)
-  fun kvAt {keys, amps, ...} i = (Array.sub (keys, i), Array.sub (amps, i))
+  fun ampAt {amps, ...} i = C.make (Array.sub (amps, 2 * i), Array.sub (amps, 2 * i + 1))
+  fun kvAt table i = (keyAt table i, ampAt table i)
 
   (*fun size table =
       SeqBasis.reduce
@@ -68,16 +72,14 @@ struct
   fun bcas (arr, i, old, new) =
     MLton.eq (old, Concurrency.casArray (arr, i) (old, new))
 
-  fun insert' {probes = tolerance, join = join} table (x, y) =
+  fun insert' {probes = tolerance, forceUnique} table (x, y) =
     let val n = capacity table
 
-        fun joinAmps i =
-            let val amps = #amps table
-                val oldAmp = Array.sub (amps, i) in
-              if bcas (amps, i, oldAmp, join (oldAmp, y)) then () else joinAmps i
+        fun insertAmp i =
+            let val (yre, yim) = C.view y in
+              Array.update (#amps table, 2 * i, yre);
+              Array.update (#amps table, 2 * i + 1, yim)
             end
-
-        fun insertAmp i = if bcas (#amps table, i, C.zero, y) then () else joinAmps i
         
         fun loop i probes =
           if probes >= tolerance then
@@ -89,7 +91,7 @@ struct
               if keyIsEmpty table k then
                 if bcas (#keys table, i, k, x) then insertAmp i else loop i probes
               else if B.equal (k, x) then
-                joinAmps i
+                if forceUnique then raise DuplicateKey else insertAmp i
               else
                 loop (i + 1) (probes + 1)
             end
@@ -99,16 +101,16 @@ struct
     end
 
   fun insert table x =
-    insert' {probes = capacity table, join = (fn (old, new) => new)} table x
+    insert' {probes = capacity table, forceUnique = false} table x
 
   fun insertForceUnique table x =
-    insert' {probes = capacity table, join = (fn (old, new) => if C.isZero old then new else raise DuplicateKey)} table x
+    insert' {probes = capacity table, forceUnique = true} table x
 
   fun insertLimitProbes {probes = tolerance} table x =
-    insert' {probes = tolerance, join = (fn (old, new) => new)} table x
+    insert' {probes = tolerance, forceUnique = false} table x
 
-  fun insertAndAdd {probes = tolerance} table x =
-    insert' {probes = tolerance, join = C.+} table x
+  (*fun insertAndAdd {probes = tolerance} table x =
+    insert' {probes = tolerance, join = C.+} table x*)
 
 
   fun lookup table x =
@@ -148,29 +150,44 @@ struct
       newTable
     end
 
+  (* Converts an array A_c of complex numbers into an
+   * array A_r of reals with twice its length, such
+   * that A_c[i] = C.make (A_r[2*i], A_r[2*i+1]) *)
+  fun arrayComplexToReals a_c =
+      SeqBasis.tabulate 1000 (0, 2 * Array.length a_c)
+                        (fn i => let val (re, im) = C.view (Array.sub (a_c, i div 2)) in
+                                   if i mod 2 = 0 then re else im
+                                 end)
+
   structure SSS = SparseStateSet (structure B = B)
   fun fromKeys (set: SSS.t) (amp: B.t -> C.t) =
-    { keys = #keys set,
-      amps = Array.tabulate (SSS.capacity set,
-                             fn i => let val k = Array.sub (#keys set, i) in
-                                       if B.equal (k, #emptykey set) then C.zero else amp k end),
-      emptykey = #emptykey set }
+      let val cap = SSS.capacity set
+          val amps = SeqBasis.tabulate
+                      1000 (0, cap)
+                      (fn i => let val k = Array.sub (#keys set, i) in
+                                 if B.equal (k, #emptykey set) then C.zero else amp k end)
+      in
+        { keys = #keys set,
+          amps = arrayComplexToReals amps,
+          emptykey = #emptykey set }
+      end
 
   fun fromKeysWith (set: SSS.t) (amp: B.t -> C.t * 'a) =
     let val keys = #keys set
         val emptykey = #emptykey set
         val cap = SSS.capacity set
-        val arr = Array.tabulate
-                    (cap,
-                     fn i => let val k = Array.sub (keys, i) in
-                               if B.equal (k, emptykey) then NONE else SOME (amp k) end)
+        val arr = SeqBasis.tabulate
+                      1000 (0, cap)
+                      (fn i => let val k = Array.sub (#keys set, i) in
+                                 if B.equal (k, #emptykey set) then NONE else SOME (amp k) end)
         val seq = Seq.mapOption (Option.map (fn (c, a) => a))
                                 (Seq.tabulate (fn i => Array.sub (arr, i)) cap)
-        val amps = Array.tabulate (cap, fn i => case Array.sub (arr, i) of
-                                                    NONE => C.zero | SOME (c, _) => c)
+        val amps = SeqBasis.tabulate
+                     1000 (0, cap)
+                     (fn i => case Array.sub (arr, i) of NONE => C.zero | SOME (c, _) => c)
         val table = {
           keys = keys,
-          amps = amps,
+          amps = arrayComplexToReals amps,
           emptykey = emptykey
         }
     in

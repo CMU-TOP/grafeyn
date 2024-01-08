@@ -41,21 +41,6 @@ struct
 
   type t = gate
 
-  (*structure SST = SparseStateTable (structure B = B structure C = C)
-  fun flattenAndJoin numQubits amps =
-      let val len = Seq.reduce op+ 0 (Seq.map Seq.length amps)
-          val st = SST.make { capacity = len * 2, numQubits = numQubits }
-          fun iter i =
-              let val ampi = Seq.nth amps i in
-                Seq.tabulate (fn j => SST.insertAndAdd {probes = len} st (Seq.nth ampi j))
-                             (Seq.length ampi)
-              end
-          val _ = Seq.tabulate iter (Seq.length amps)
-          val delayedSeq = SST.compact st
-      in
-        Seq.tabulate (DelayedSeq.nth delayedSeq) (DelayedSeq.length delayedSeq)
-      end*)
-
   fun flattenAndJoin2 amps =
       if DelayedSeq.length amps <= 1 then
         DelayedSeq.flatten amps
