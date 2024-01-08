@@ -18,9 +18,11 @@ struct
   type table = t
 
   fun make' {capacity, emptykey} =
-    { keys = SeqBasis.tabulate 5000 (0, capacity) (fn _ => emptykey),
-      amps = SeqBasis.tabulate 5000 (0, 2 * capacity) (fn _ => R.fromLarge 0.0),
-      emptykey = emptykey }
+      let val zero = R.fromLarge 0.0 in
+        { keys = SeqBasis.tabulate 5000 (0, capacity) (fn _ => emptykey),
+          amps = SeqBasis.tabulate 5000 (0, 2 * capacity) (fn _ => zero),
+          emptykey = emptykey }
+      end
 
 
   fun checkSpaceForEmptyKey numQubits =
@@ -152,44 +154,65 @@ struct
 
   val GRAIN = 1000
 
-  (* Converts an array A_c of complex numbers into an
-   * array A_r of reals with twice its length, such
-   * that A_c[i] = C.make (A_r[2*i], A_r[2*i+1]) *)
-  fun arrayComplexToReals a_c =
-      SeqBasis.tabulate GRAIN (0, 2 * Array.length a_c)
-                        (fn i => let val (re, im) = C.view (Array.sub (a_c, i div 2)) in
-                                   if i mod 2 = 0 then re else im
-                                 end)
-
   structure SSS = SparseStateSet (structure B = B)
+
   fun fromKeys (set: SSS.t) (amp: B.t -> C.t) =
-      let val cap = SSS.capacity set
-          val amps = SeqBasis.tabulate
-                      GRAIN (0, cap)
-                      (fn i => let val k = Array.sub (#keys set, i) in
-                                 if B.equal (k, #emptykey set) then C.zero else amp k end)
-      in
-        { keys = #keys set,
-          amps = arrayComplexToReals amps,
-          emptykey = #emptykey set }
-      end
+    let val keys = #keys set
+        val emptykey = #emptykey set
+        val cap = SSS.capacity set
+        val zero = R.fromLarge 0.0
+        val arr = SeqBasis.tabulate GRAIN (0, 2 * cap) (fn _ => zero)
+        fun put i x y = (Array.update (arr, 2 * i, x);
+                         Array.update (arr, 2 * i + 1, y))
+        fun pararr i =
+            let val k = Array.sub (keys, i) in
+              if B.equal (k, emptykey) then
+                ()
+              else
+                let val (re, im) = C.view (amp k) in
+                  put i re im
+                end
+            end
+        val _ = ForkJoin.parfor GRAIN (0, cap) pararr
+
+        val table = {
+          keys = keys,
+          amps = arr,
+          emptykey = emptykey
+        }
+    in
+      table
+    end
 
   fun fromKeysWith (set: SSS.t) (amp: B.t -> C.t * 'a) =
     let val keys = #keys set
         val emptykey = #emptykey set
         val cap = SSS.capacity set
-        val arr = SeqBasis.tabulate
-                      GRAIN (0, cap)
-                      (fn i => let val k = Array.sub (#keys set, i) in
-                                 if B.equal (k, #emptykey set) then NONE else SOME (amp k) end)
-        val seq = Seq.mapOption (Option.map (fn (c, a) => a))
-                                (Seq.tabulate (fn i => Array.sub (arr, i)) cap)
-        val amps = SeqBasis.tabulate
-                     GRAIN (0, cap)
-                     (fn i => case Array.sub (arr, i) of NONE => C.zero | SOME (c, _) => c)
+        val zero = R.fromLarge 0.0
+        val arr = SeqBasis.tabulate GRAIN (0, 2 * cap) (fn _ => zero)
+        val accs = ForkJoin.alloc cap
+        val touched = SeqBasis.tabulate GRAIN (0, cap) (fn _ => false)
+        fun put i a x y = (Array.update (accs, i, a);
+                           Array.update (touched, i, true);
+                           Array.update (arr, 2 * i, x);
+                           Array.update (arr, 2 * i + 1, y))
+        fun pararr i =
+            let val k = Array.sub (keys, i) in
+              if B.equal (k, emptykey) then
+                ()
+              else
+                let val (c, a) = amp k
+                    val (re, im) = C.view c in
+                  put i a re im
+                end
+            end
+        val _ = ForkJoin.parfor GRAIN (0, cap) pararr
+
+        val seq = Seq.fromArray (SeqBasis.filter GRAIN (0, cap) (fn i => Array.sub (accs, i)) (fn i => Array.sub (touched, i)))
+
         val table = {
           keys = keys,
-          amps = arrayComplexToReals amps,
+          amps = arr,
           emptykey = emptykey
         }
     in
