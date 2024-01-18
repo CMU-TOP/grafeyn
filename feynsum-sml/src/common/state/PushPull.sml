@@ -9,9 +9,10 @@ sig
   val push: G.t * B.t DelayedSeq.t -> SST.SSS.t
   val pull: G.t * SST.t -> SST.SSS.t -> SST.t
   val apply: G.t * SST.t -> {state: SST.t, numVerts: int, numEdges: int}
-  val pullCount: G.t * SST.t -> SST.SSS.t -> SST.t * int Seq.t
+  val pushApply: G.t * SST.t -> {state: SST.t, numVerts: int, numEdges: int}
+  val pullCount: G.t * SST.t -> SST.SSS.t -> SST.t * int
   val applyAll: G.t Seq.t * SST.t -> {state: SST.t, numVerts: int, numEdges: int}
-  (*val sampleStates: SST.t -> int -> B.t Seq.t*)
+  val sampleStates: SST.t -> int -> B.t DelayedSeq.t
 end
 
 functor PushPull
@@ -29,29 +30,29 @@ struct
                       structure C = C)
   structure SSS = SST.SSS
 
-  (*
+  
   val seed = Random.rand (50, 14125)
   (* Randomly selects k distinct elements from array xs *)
   fun sampleArray (xs: 'a array) (k: int) =
       let val len = Array.length xs
           fun swapAndRet i j =
               let val xi = Array.sub (xs, i)
-                  val xj = Array.sub (xs, j)
-                  val _ = Array.update (xs, i, xj)
-                  val _ = Array.update (xs, j, xi)
-              in
+                  val xj = Array.sub (xs, j) in
+                Array.update (xs, i, xj);
+                Array.update (xs, j, xi);
                 xj
               end
-      Array.tabulate (k, fn i => swapAndRet i (Random.randRange (i, len)))
+      in
+        Array.tabulate (k, fn i => swapAndRet i (Random.randRange (i, len) seed))
+      end
 
   fun sampleStates st k =
       let val cst = SST.compact st
-          val arr = Array.tabulate (Seq.length cst, fn i => Seq.nth cst i)
+          val arr = Array.tabulate (DelayedSeq.length cst, #1 o DelayedSeq.nth cst)
           val shuf = sampleArray arr k
       in
-        Seq.tabulate (fn i => Array.sub (shuf, i)) k
+        DelayedSeq.tabulate (fn i => Array.sub (shuf, i)) k
       end
-  *)
 
   fun push ((kern, amps): G.t * B.t DelayedSeq.t) =
     let val cap = G.maxBranchingFactor kern * DelayedSeq.length amps
@@ -76,6 +77,25 @@ struct
                                               end)
                                  end)
 
+  fun pushApply ((kern, state) : G.t * SST.t) =
+      let val pushF = G.pull kern (* TODO: implement push that stores amps too *)
+          val cap = G.maxBranchingFactor kern * SST.size state * 2
+          val state' = SST.make { capacity = cap, numQubits = #numQubits kern }
+          fun f i = case SST.sub state i of
+                        NONE => 0
+                      | SOME (b, c) =>
+                        let val ds = pushF b in
+                          DelayedSeq.applyIdx ds (fn (_, (b', c')) => SST.insertAndAdd state' (b', C.* (c, c')));
+                          DelayedSeq.length ds
+                        end
+          val numEdges = SeqBasis.reduce 1000 op+ 0 (0, SST.capacity state) f
+          val numVerts = SST.sizeInclZeroAmp state'
+      in
+        { state = state',
+          numVerts = numVerts,
+          numEdges = numEdges }
+      end
+
   fun pullCount ((kern, amps): G.t * SST.t) (tgts: SSS.t) =
       SST.fromKeysWith
         tgts
@@ -88,15 +108,15 @@ struct
                                   end),
                    DelayedSeq.length bs)
                  end)
+        op+ 0
 
   fun apply ((kern, state): G.t * SST.t) =
       let val nonzeros = SST.compact state
           val pushed = push (kern, DelayedSeq.map (fn (b, c) => b) nonzeros)
-          val (pulled, nums) = pullCount (kern, state) pushed
-          val numVerts = Seq.length nums
-          val numEdges = Seq.reduce op+ 0 nums
+          val (state', numEdges) = pullCount (kern, state) pushed
+          val numVerts = SST.sizeInclZeroAmp state'
       in
-        { state = pulled,
+        { state = state',
           numVerts = numVerts,
           numEdges = numEdges }
       end

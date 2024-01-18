@@ -13,6 +13,7 @@ sig
   val singleton: {numQubits: int} -> (B.t * C.t) -> table
 
   val size: table -> int
+  val sizeInclZeroAmp: table -> int
   val capacity: table -> int
 
   val insert: table -> (B.t * C.t) -> unit
@@ -21,8 +22,12 @@ sig
 
   val insertForceUnique: table -> (B.t * C.t) -> unit
 
+  val insertAndAdd: table -> (B.t * C.t) -> unit
+
   (* not safe for concurrency with insertions *)
   val lookup: table -> B.t -> C.t option
+
+  val sub: table -> int -> (B.t * C.t) option
 
   val compact: table -> (B.t * C.t) DelayedSeq.t
 
@@ -31,7 +36,7 @@ sig
   structure SSS: SPARSE_STATE_SET
   sharing SSS.B = B
   val fromKeys: SSS.t -> (B.t -> C.t) -> table
-  val fromKeysWith: SSS.t -> (B.t -> C.t * 'a) -> table * 'a Seq.t
+  val fromKeysWith: SSS.t -> (B.t -> C.t * 'a) -> ('a * 'a -> 'a) -> 'a -> table * 'a
 
   (* Unsafe because underlying array is shared. If the table is mutated,
    * then the Seq would not appear to be immutable.

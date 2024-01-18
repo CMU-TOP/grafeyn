@@ -66,6 +66,11 @@ struct
         10000 op+ 0 (0, capacity table)
         (fn i => if slotEmpty table i then 0 else 1)
 
+  fun sizeInclZeroAmp table =
+      SeqBasis.reduce
+        10000 op+ 0 (0, capacity table)
+        (fn i => if keyIdxIsEmpty table i then 0 else 1)
+
   fun unsafeViewContents table =
     DelayedSeq.tabulate
       (fn i => if slotEmpty table i then NONE else SOME (kvAt table i))
@@ -74,13 +79,25 @@ struct
   fun bcas (arr, i, old, new) =
     MLton.eq (old, Concurrency.casArray (arr, i) (old, new))
 
-  fun insert' {probes = tolerance, forceUnique} table (x, y) =
+  fun atomicAdd (arr: C.r array) i x =
+    let val old = Array.sub (arr, i)
+        val new = R.+ (old, x) in
+      if bcas (arr, i, old, new) then () else atomicAdd arr i x
+    end
+
+  fun insert' {probes = tolerance, forceUnique, add} table (x, y) =
     let val n = capacity table
+        val amps = #amps table
+        val keys = #keys table
 
         fun insertAmp i =
             let val (yre, yim) = C.view y in
-              Array.update (#amps table, 2 * i, yre);
-              Array.update (#amps table, 2 * i + 1, yim)
+              if add then
+                (atomicAdd amps (2 * i) yre;
+                 atomicAdd amps (2 * i + 1) yim)
+              else
+                (Array.update (amps, 2 * i, yre);
+                 Array.update (amps, 2 * i + 1, yim))
             end
         
         fun loop i probes =
@@ -91,7 +108,7 @@ struct
           else
             let val k = keyAt table i in
               if keyIsEmpty table k then
-                if bcas (#keys table, i, k, x) then insertAmp i else loop i probes
+                if bcas (keys, i, k, x) then insertAmp i else loop i probes
               else if B.equal (k, x) then
                 if forceUnique then raise DuplicateKey else insertAmp i
               else
@@ -103,17 +120,16 @@ struct
     end
 
   fun insert table x =
-    insert' {probes = capacity table, forceUnique = false} table x
+    insert' {probes = capacity table, forceUnique = false, add = false} table x
 
   fun insertForceUnique table x =
-    insert' {probes = capacity table, forceUnique = true} table x
+    insert' {probes = capacity table, forceUnique = true, add = false} table x
 
   fun insertLimitProbes {probes = tolerance} table x =
-    insert' {probes = tolerance, forceUnique = false} table x
+    insert' {probes = tolerance, forceUnique = false, add = false} table x
 
-  (*fun insertAndAdd {probes = tolerance} table x =
-    insert' {probes = tolerance, join = C.+} table x*)
-
+  fun insertAndAdd table x =
+    insert' {probes = capacity table, forceUnique = false, add = true} table x
 
   fun lookup table x =
     let val n = capacity table
@@ -131,6 +147,9 @@ struct
     in
       if n = 0 then NONE else loop start
     end
+
+  fun sub (table: t) (i: int) =
+      if slotEmpty table i then NONE else SOME (kvAt table i)
 
   fun compact table =
     let val keepers = SeqBasis.filter 5000 (0, capacity table)
@@ -184,39 +203,35 @@ struct
       table
     end
 
-  fun fromKeysWith (set: SSS.t) (amp: B.t -> C.t * 'a) =
+  fun fromKeysWith (set: SSS.t) (amp: B.t -> C.t * 'a) (join: 'a * 'a -> 'a) (base: 'a) =
     let val keys = #keys set
         val emptykey = #emptykey set
         val cap = SSS.capacity set
         val zero = R.fromLarge 0.0
-        val arr = SeqBasis.tabulate GRAIN (0, 2 * cap) (fn _ => zero)
-        val accs = ForkJoin.alloc cap
-        val touched = SeqBasis.tabulate GRAIN (0, cap) (fn _ => false)
-        fun put i a x y = (Array.update (accs, i, a);
-                           Array.update (touched, i, true);
-                           Array.update (arr, 2 * i, x);
-                           Array.update (arr, 2 * i + 1, y))
-        fun pararr i =
+        (* TODO: use ForkJoin.alloc for amps, then put zero zero below if emptykey *)
+        val amps = ForkJoin.alloc (2 * cap)
+        fun put i a x y = (Array.update (amps, 2 * i, x);
+                           Array.update (amps, 2 * i + 1, y);
+                           a)
+        fun f i =
             let val k = Array.sub (keys, i) in
               if B.equal (k, emptykey) then
-                ()
+                put i base zero zero
               else
                 let val (c, a) = amp k
                     val (re, im) = C.view c in
                   put i a re im
                 end
             end
-        val _ = ForkJoin.parfor GRAIN (0, cap) pararr
-
-        val seq = Seq.fromArray (SeqBasis.filter GRAIN (0, cap) (fn i => Array.sub (accs, i)) (fn i => Array.sub (touched, i)))
+        val a = SeqBasis.reduce GRAIN join base (0, cap) f
 
         val table = {
           keys = keys,
-          amps = arr,
+          amps = amps,
           emptykey = emptykey
         }
     in
-      (table, seq)
+      (table, a)
     end
 
   fun singleton {numQubits} x =

@@ -8,6 +8,7 @@ sig
 
   type data_flow_graph = DataFlowGraph.t
 
+  val copyState: state -> state
   val visit: data_flow_graph -> gate_idx -> state -> unit
   val frontier: state -> gate_idx Seq.t
   val initState: data_flow_graph -> state
@@ -23,6 +24,10 @@ sig
   val chooseSchedule: gate_idx Seq.t Seq.t Seq.t -> (gate_idx -> bool) -> gate_idx Seq.t Seq.t
 
   val gateIsBranching: data_flow_graph -> (gate_idx -> bool)
+
+  type sampler = { gen: Random.rand, max_branching: int, num_samples: int }
+
+  val samplePaths: sampler -> data_flow_graph -> (gate_idx -> int) -> state -> gate_idx Seq.t Seq.t
 end =
 struct
 
@@ -50,13 +55,24 @@ struct
 
   type state = { visited: bool array, indegree: int array }
 
+  fun copyState {visited = vis, indegree = deg} =
+      let fun copyArr a =
+              let val a' = ForkJoin.alloc (Array.length vis) in
+                Array.copy {src = a, dst = a', di = 0}; a'
+              end
+      in
+        { visited = copyArr vis,
+          indegree = copyArr deg }
+      end
+
   fun visit {succs = succs, ...} i {visited = vis, indegree = deg} =
       (
         (* Set visited[i] = true *)
         Array.update (vis, i, true);
-        (* Decrement indegree of each i dependency *)
-        Seq.map (fn j => Array.update (deg, j, Array.sub (deg, j) - 1)) (Seq.nth succs i);
-        ()
+        (* Decrement indegree of each i dependency
+         * Not safe for concurrency with a huge number of successors
+         * if there can be duplicates (but I don't think there are) *)
+        Seq.applyIdx (Seq.nth succs i) (fn (_, j) => Array.update (deg, j, Array.sub (deg, j) - 1))
       )
 
   fun frontier {visited = vis, indegree = deg} =
@@ -170,7 +186,70 @@ struct
   (*structure Gate_branching = Gate (structure B = BasisIdxUnlimited
                                    structure C = Complex64)*)
 
+  fun forRange (range: int * int) (f: int -> 'a) =
+      let val (s, e) = range
+          fun iter i = if i < e then (f i; iter (i + 1)) else () in
+        iter s
+      end
 
   fun gateIsBranching ({ gates = gates, ...} : data_flow_graph) i =
       GateDefn.maxBranchingFactor (Seq.nth gates i) > 1
+
+  type sampler = { gen: Random.rand, max_branching: int, num_samples: int }
+
+  fun samplePath (samp: sampler)
+                 (dfg: data_flow_graph)
+                 (gateBranchingFactor: gate_idx -> int)
+                 (st: state) =
+      let val seed = #gen samp
+          fun path (mbf: int) (cbf: int) (acc: gate_idx list) =
+              let val fr = Seq.filter (fn gi => gateBranchingFactor gi * cbf <= mbf) (frontier st)
+                  val fr1 = Seq.filter (fn gi => gateBranchingFactor gi = 1) fr
+              in
+                if Seq.length fr1 = 0 then
+                  if Seq.length fr = 0 then
+                    Seq.rev (Seq.fromList acc)
+                  else
+                    let val i = Random.randRange (0, Seq.length fr) (#gen samp)
+                        val gidx = Seq.nth fr i in
+                      visit dfg gidx st;
+                      path mbf (cbf * gateBranchingFactor gidx) (gidx :: acc)
+                    end
+                else
+                  (* Add branching-factor=1 gates first *)
+                  (forRange (0, Seq.length fr1) (fn i => visit dfg (Seq.nth fr1 i) st);
+                   path mbf cbf (Seq.toList (Seq.rev fr1) @ acc))
+              end
+      in
+        path (#max_branching samp) 1 nil
+      end
+
+  (* TODO: if we get to a high enough number of paths to sample,
+   * we will want to change this to some hashtable insertion to
+   * deduplicate paths *)
+  fun discardDuplicatePaths (paths: gate_idx Seq.t Seq.t) =
+      let val keep = Array.array (Seq.length paths, true)
+          val len = Seq.length paths
+      in
+        ForkJoin.parfor
+          100
+          (0, len * len)
+          (fn k => let val i = k mod len
+                       val j = k div len in
+                     if not (i = j) andalso
+                        Seq.equal op= (Seq.nth paths i, Seq.nth paths j) then
+                       Array.update (keep, Int.min (i, j), false)
+                     else
+                       ()
+                   end);
+        Seq.filterIdx (fn (i, _) => Array.sub (keep, i)) paths
+      end
+
+  fun samplePaths (samp: sampler)
+                  (dfg: data_flow_graph)
+                  (gateBranchingFactor: gate_idx -> int)
+                  (st: state) =
+      discardDuplicatePaths
+        (Seq.tabulate (fn _ => samplePath samp dfg gateBranchingFactor (copyState st))
+                      (#num_samples samp))
 end
