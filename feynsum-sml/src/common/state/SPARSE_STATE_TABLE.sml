@@ -30,6 +30,7 @@ sig
   val sub: table -> int -> (B.t * C.t) option
 
   val compact: table -> (B.t * C.t) DelayedSeq.t
+  val compactKeys: table -> B.t DelayedSeq.t
 
   val increaseCapacityByFactor: real -> table -> table
 

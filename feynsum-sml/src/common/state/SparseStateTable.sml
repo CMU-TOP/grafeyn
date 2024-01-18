@@ -159,6 +159,14 @@ struct
         (Array.length keepers)
     end
 
+  fun compactKeys table =
+    let val keepers = SeqBasis.filter 5000 (0, capacity table)
+                                      (fn i => i) (not o slotEmpty table) in
+      DelayedSeq.tabulate
+        (fn i => keyAt table (Array.sub (keepers, i)))
+        (Array.length keepers)
+    end
+
 
   fun increaseCapacityByFactor alpha table =
     let val newCap = Real.ceil (alpha * Real.fromInt (capacity table))

@@ -58,16 +58,16 @@ local
   (*state/HYBRID_STATE.sml
   state/HybridState.sml*)
 
-  state/PushPull.sml
-
-  Fingerprint.sml
-
   DataFlowGraph.sml
   DataFlowGraphUtil.sml
   GateScheduler.sml
   schedulers/GreedyBranching.sml
   schedulers/GreedyNonBranching.sml
   schedulers/FinishQubit.sml
+
+  state/PushPull.sml
+
+  Fingerprint.sml
 in
   structure Rat
 

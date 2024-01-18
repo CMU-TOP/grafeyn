@@ -242,7 +242,8 @@ struct
                      else
                        ()
                    end);
-        Seq.filterIdx (fn (i, _) => Array.sub (keep, i)) paths
+        Seq.filterIdx (fn (i, _) => Array.sub (keep, i) andalso
+                                    Seq.length (Seq.nth paths i) <> 0) paths
       end
 
   fun samplePaths (samp: sampler)
