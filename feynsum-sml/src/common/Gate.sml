@@ -2,23 +2,27 @@ signature GATE =
 sig
   structure B: BASIS_IDX
   structure C: COMPLEX
+  structure SSS: SPARSE_STATE_SET
+  sharing SSS.B = B
 
   type qubit_idx = int
 
-  type gate = { push: B.t -> B.t DelayedSeq.t,
+  type gate = { push: (B.t -> unit) -> (B.t -> unit),
                 pull: B.t -> (B.t * C.t) DelayedSeq.t,
                 maxBranchingFactor: int,
                 numQubits: int }
 
   type t = gate
 
+  val composeSeq: ('a -> 'a) Seq.t -> 'a -> 'a
+
   val fromGateDefn: {numQubits: int} -> GateDefn.t -> gate
   val maxBranchingFactor: gate -> int
   val numQubits: gate -> int
-  val push: gate -> B.t -> B.t DelayedSeq.t
+  val push: gate -> (B.t -> unit) -> (B.t -> unit)
   val pull: gate -> B.t -> (B.t * C.t) DelayedSeq.t
   val fuse: gate Seq.t -> gate
-  val control: gate -> qubit_idx -> gate
+  (*val control: gate -> qubit_idx -> gate*)
 end
 
 
@@ -28,13 +32,14 @@ functor Gate
 struct
   structure B = B
   structure C = C
+  structure SSS = SparseStateSet (structure B = B)
   
   structure R =
   struct open C.R val fromLarge = fromLarge IEEEReal.TO_NEAREST end
 
   type qubit_idx = int
 
-  type gate = { push: B.t -> B.t DelayedSeq.t,
+  type gate = { push: (B.t -> unit) -> (B.t -> unit),
                 pull: B.t -> (B.t * C.t) DelayedSeq.t,
                 maxBranchingFactor: int,
                 numQubits: int }
@@ -71,13 +76,29 @@ struct
           DelayedSeq.tabulate (fn i => Option.valOf (Array.sub (arr, i))) (!pos)
         end
 
+  fun composeSeq fs =
+      let val len = Seq.length fs
+          fun iter i f =
+              if i >= len then
+                f
+              else
+                iter (i + 1) (Seq.nth fs i o f)
+      in
+        iter 1 (Seq.nth fs 0)
+      end
+
   fun fuse (gs: gate Seq.t) =
       let val numQubits = #numQubits (Seq.nth gs 0)
+          val numGates = Seq.length gs
           val _ = Seq.applyIdx gs (fn (_, g) => if #numQubits g = numQubits then () else raise Fail "Cannot fuse gates for circuits with different numbers of qubits")
 
-          fun pushIter (f, f') b = DelayedSeq.flatten (DelayedSeq.map f' (f b))
+          (*fun pushIter (f, f') b = DelayedSeq.flatten (DelayedSeq.map f' (f b))
           val push = Seq.iterate (fn (f, g) => pushIter (f, #push g))
-                                 DelayedSeq.singleton gs
+                                 DelayedSeq.singleton gs*)
+          val push =
+              let fun iter i f = if i >= numGates then f else iter (i + 1) (#push (Seq.nth gs i) o f) in
+                iter 1 (#push (Seq.nth gs 0))
+              end
 
           fun pullIter (f, f') b =
               DelayedSeq.flatten
@@ -112,11 +133,11 @@ struct
 
   fun superpos ab = C.scale (half, C.+ ab)
 
-  fun control (g: gate) qi =
+  (*fun control (g: gate) qi =
       { push = fn b => if B.get b qi then #push g b else DelayedSeq.singleton b,
         pull = fn b => if B.get b qi then #pull g b else DelayedSeq.singleton (b, pos_1),
         maxBranchingFactor = #maxBranchingFactor g,
-        numQubits = #numQubits g }
+        numQubits = #numQubits g }*)
 
   (* Given a basis idx b, return a list of tuples (b', c'), where
    *   b' = basis idx to pull from
@@ -254,7 +275,8 @@ struct
   | GateDefn.Other {name = n, params = xs, args = is} => raise Fail "Gate.pullFromGateDefn Other unimplemented"
 
   fun fromGateDefn {numQubits = numQubits} gd =
-    { push = (DelayedSeq.fromList o pushFromGateDefn gd),
+    { (*push = (DelayedSeq.fromList o pushFromGateDefn gd),*)
+      push = (fn f => List.foldr (fn (b', u) => (f b'; u)) () o pushFromGateDefn gd),
       pull = (DelayedSeq.fromList o pullFromGateDefn gd),
       maxBranchingFactor = GateDefn.maxBranchingFactor gd,
       numQubits = numQubits
@@ -264,7 +286,7 @@ struct
 
   fun numQubits (g: gate) = #numQubits g
 
-  fun push (g: gate) (b: B.t) = #push g b
+  fun push (g: gate) = #push g
 
   fun pull (g: gate) (b: B.t) = #pull g b
 end

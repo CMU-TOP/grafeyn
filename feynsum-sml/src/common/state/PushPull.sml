@@ -69,7 +69,8 @@ struct
   fun push ((kern, amps): G.t * B.t DelayedSeq.t) =
     let val cap = G.maxBranchingFactor kern * DelayedSeq.length amps
         val sss = SSS.make { capacity = cap * 2, numQubits = #numQubits kern }
-        fun pushB b = DelayedSeq.applyIdx (G.push kern b) (fn (_, b) => SSS.insert sss b)
+        fun pushB b = G.push kern (SSS.insert sss) b
+        (*fun pushB b = DelayedSeq.applyIdx (G.push kern b) (fn (_, b) => SSS.insert sss b)*)
         val _ = DelayedSeq.applyIdx amps (fn (_, b) => pushB b)
     in
       sss
