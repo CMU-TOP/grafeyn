@@ -19,6 +19,7 @@ struct
   structure F = Fingerprint (structure B = B structure C = C)
 
   structure PP = PushPull (structure SST = SST
+                           val maxBranchingStride = maxBranchingStride
                            val blockSize = blockSize
                            val maxload = maxload
                            val denseThreshold = denseThreshold
@@ -41,6 +42,10 @@ struct
         val kernels = Seq.map (G.fuses o Seq.map (Seq.nth gates)) sched'*)
         val initState = SST.singleton {numQubits = numQubits} (B.zeros, C.one)
         val { state, numVerts, numEdges } = PP.applyAll (gates, initState) circuit
+(* Completed with vertices = 98166 and edges = 392664 *)
+(* fp0 000010010000001110000100100100100100100000000 -0.70706260-0.70707780i *)
+(* 3.447s *)
+        (* val { state, numVerts, numEdges } = PP.applyAllOld (gates, initState) *)
         val (fp, tm) = Util.getTime (fn _ => F.fingerprint (SST.unsafeViewContents state))
         val _ = print ("computed fingerprint in " ^ Time.fmt 4 tm ^ "s\n")
         val _ = Util.for (0, Seq.length fp)

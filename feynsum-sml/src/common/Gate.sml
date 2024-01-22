@@ -14,10 +14,10 @@ sig
 
   val fromGateDefn: {numQubits: int} -> GateDefn.t -> gate
   val maxBranchingFactor: gate -> int
+  val numQubits: gate -> int
   val push: gate -> B.t -> B.t DelayedSeq.t
   val pull: gate -> B.t -> (B.t * C.t) DelayedSeq.t
-  (* val fuse: gate * gate -> gate *)
-  val fuses: gate Seq.t -> gate
+  val fuse: gate Seq.t -> gate
   val control: gate -> qubit_idx -> gate
 end
 
@@ -71,7 +71,7 @@ struct
           DelayedSeq.tabulate (fn i => Option.valOf (Array.sub (arr, i))) (!pos)
         end
 
-  fun fuses (gs: gate Seq.t) =
+  fun fuse (gs: gate Seq.t) =
       let val numQubits = #numQubits (Seq.nth gs 0)
           val _ = Seq.applyIdx gs (fn (_, g) => if #numQubits g = numQubits then () else raise Fail "Cannot fuse gates for circuits with different numbers of qubits")
 
@@ -261,6 +261,8 @@ struct
     }
 
   fun maxBranchingFactor (g: gate) = #maxBranchingFactor g
+
+  fun numQubits (g: gate) = #numQubits g
 
   fun push (g: gate) (b: B.t) = #push g b
 

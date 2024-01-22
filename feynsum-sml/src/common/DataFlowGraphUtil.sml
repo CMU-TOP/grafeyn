@@ -25,7 +25,7 @@ sig
 
   val gateIsBranching: data_flow_graph -> (gate_idx -> bool)
 
-  type sampler = { gen: Random.rand, max_branching: int, num_samples: int }
+  type sampler = { gen: Random.rand, max_branching: int, num_samples: int, num_bases: int }
 
   val samplePaths: sampler -> data_flow_graph -> (gate_idx -> int) -> state -> gate_idx Seq.t Seq.t
 end =
@@ -53,6 +53,12 @@ struct
          numQubits = qs}
       end*)
 
+  fun forRange (range: int * int) (f: int -> 'a) =
+      let val (s, e) = range
+          fun iter i = if i < e then (f i; iter (i + 1)) else () in
+        iter s
+      end
+
   type state = { visited: bool array, indegree: int array }
 
   fun copyState {visited = vis, indegree = deg} =
@@ -65,14 +71,21 @@ struct
           indegree = copyArr deg }
       end
 
+  fun bcas (arr, i, old, new) =
+    MLton.eq (old, Concurrency.casArray (arr, i) (old, new))
+
+  fun atomicAdd (arr: int array) i x =
+    let val old = Array.sub (arr, i)
+        val new = old + x in
+      if bcas (arr, i, old, new) then () else atomicAdd arr i x
+    end
+
   fun visit {succs = succs, ...} i {visited = vis, indegree = deg} =
       (
         (* Set visited[i] = true *)
         Array.update (vis, i, true);
-        (* Decrement indegree of each i dependency
-         * Not safe for concurrency with a huge number of successors
-         * if there can be duplicates (but I don't think there are) *)
-        Seq.applyIdx (Seq.nth succs i) (fn (_, j) => Array.update (deg, j, Array.sub (deg, j) - 1))
+        (* Decrement indegree of each i dependency *)
+        Seq.applyIdx (Seq.nth succs i) (fn (_, j) => atomicAdd deg j ~1)
       )
 
   fun frontier {visited = vis, indegree = deg} =
@@ -186,16 +199,10 @@ struct
   (*structure Gate_branching = Gate (structure B = BasisIdxUnlimited
                                    structure C = Complex64)*)
 
-  fun forRange (range: int * int) (f: int -> 'a) =
-      let val (s, e) = range
-          fun iter i = if i < e then (f i; iter (i + 1)) else () in
-        iter s
-      end
-
   fun gateIsBranching ({ gates = gates, ...} : data_flow_graph) i =
       GateDefn.maxBranchingFactor (Seq.nth gates i) > 1
 
-  type sampler = { gen: Random.rand, max_branching: int, num_samples: int }
+  type sampler = { gen: Random.rand, max_branching: int, num_samples: int, num_bases: int }
 
   fun samplePath (samp: sampler)
                  (dfg: data_flow_graph)
@@ -210,7 +217,7 @@ struct
                   if Seq.length fr = 0 then
                     Seq.rev (Seq.fromList acc)
                   else
-                    let val i = Random.randRange (0, Seq.length fr) (#gen samp)
+                    let val i = Random.randRange (0, Seq.length fr - 1) (#gen samp)
                         val gidx = Seq.nth fr i in
                       visit dfg gidx st;
                       path mbf (cbf * gateBranchingFactor gidx) (gidx :: acc)
@@ -227,18 +234,32 @@ struct
   (* TODO: if we get to a high enough number of paths to sample,
    * we will want to change this to some hashtable insertion to
    * deduplicate paths *)
-  fun discardDuplicatePaths (paths: gate_idx Seq.t Seq.t) =
+  fun discardDuplicatePaths (paths: gate_idx Seq.t Seq.t) (numGates: int) =
       let val keep = Array.array (Seq.length paths, true)
           val len = Seq.length paths
+          fun samePath (a, b) =
+              Seq.length a = Seq.length b andalso
+              (let val a_arr = Array.array (numGates, false)
+                   val b_arr = Array.array (numGates, false)
+                   val _ = Seq.applyIdx a (fn (_, gidx) => Array.update (a_arr, gidx, true))
+                   val _ = Seq.applyIdx b (fn (_, gidx) => Array.update (b_arr, gidx, true))
+               in
+                 SeqBasis.reduce
+                   1000 (fn (a, b) => a andalso b) true (0, Seq.length a)
+                   (fn i => let val gidxa = Seq.nth a i
+                                val gidxb = Seq.nth b i in
+                              Array.sub (a_arr, gidxa) = Array.sub (b_arr, gidxa) andalso
+                              Array.sub (a_arr, gidxb) = Array.sub (b_arr, gidxb)
+                            end)
+               end)
       in
         ForkJoin.parfor
           100
           (0, len * len)
           (fn k => let val i = k mod len
                        val j = k div len in
-                     if not (i = j) andalso
-                        Seq.equal op= (Seq.nth paths i, Seq.nth paths j) then
-                       Array.update (keep, Int.min (i, j), false)
+                     if i > j andalso samePath (Seq.nth paths i, Seq.nth paths j) then
+                       Array.update (keep, i, false)
                      else
                        ()
                    end);
@@ -253,4 +274,5 @@ struct
       discardDuplicatePaths
         (Seq.tabulate (fn _ => samplePath samp dfg gateBranchingFactor (copyState st))
                       (#num_samples samp))
+        (Seq.length (#gates dfg))
 end

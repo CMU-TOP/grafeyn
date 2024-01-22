@@ -183,7 +183,7 @@ struct
 
   structure SSS = SparseStateSet (structure B = B)
 
-  fun fromKeys (set: SSS.t) (amp: B.t -> C.t) =
+  fun fromSet (set: SSS.t) (amp: B.t -> C.t) =
     let val keys = #keys set
         val emptykey = #emptykey set
         val cap = SSS.capacity set
@@ -211,7 +211,7 @@ struct
       table
     end
 
-  fun fromKeysWith (set: SSS.t) (amp: B.t -> C.t * 'a) (join: 'a * 'a -> 'a) (base: 'a) =
+  fun fromSetWith (set: SSS.t) (amp: B.t -> C.t * 'a) (join: 'a * 'a -> 'a) (base: 'a) =
     let val keys = #keys set
         val emptykey = #emptykey set
         val cap = SSS.capacity set
@@ -241,6 +241,8 @@ struct
     in
       (table, a)
     end
+
+  fun toSet {keys, amps, emptykey} = { keys = keys, emptykey = emptykey }
 
   fun singleton {numQubits} x =
     let val table = make {capacity = 1, numQubits = numQubits} in
