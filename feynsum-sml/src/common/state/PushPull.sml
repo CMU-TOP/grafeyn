@@ -9,7 +9,7 @@ sig
   val push: G.t * B.t DelayedSeq.t -> SST.SSS.t
   val pull: G.t * SST.t -> SST.SSS.t -> SST.t
   val apply: G.t * SST.t -> {state: SST.t, numVerts: int, numEdges: int}
-  val pushApply: G.t * SST.t -> {state: SST.t, numVerts: int, numEdges: int}
+  (*val pushApply: G.t * SST.t -> {state: SST.t, numVerts: int, numEdges: int}*)
   val pullCount: G.t * SST.t -> SST.SSS.t -> SST.t * int
   val applyAll: G.t Seq.t * SST.t -> DataFlowGraph.t -> {state: SST.t, numVerts: int, numEdges: int}
   val applyAllOld: G.t Seq.t * SST.t -> {state: SST.t, numVerts: int, numEdges: int}
@@ -77,20 +77,9 @@ struct
     end
 
   fun pull ((kern, amps): G.t * SST.t) (tgts: SSS.t) =
-      SST.fromSet tgts (fn b => let val bs = G.pull kern b in
-                                  SeqBasis.reduce
-                                    1000
-                                    C.+
-                                    C.zero
-                                    (0, DelayedSeq.length bs)
-                                    (fn i => let val (b, c) = DelayedSeq.nth bs i in
-                                               case SST.lookup amps b of
-                                                   NONE => C.zero
-                                                 | SOME c' => C.* (c, c')
-                                             end)
-                                end)
+      SST.fromSet tgts (G.pull kern (fn b => Option.getOpt (SST.lookup amps b, C.zero)))
 
-  fun pushApply ((kern, state) : G.t * SST.t) =
+(*  fun pushApply ((kern, state) : G.t * SST.t) =
       let val pushF = G.pull kern (* TODO: implement push that stores amps too *)
           val cap = G.maxBranchingFactor kern * SST.size state * 2
           val state' = SST.make { capacity = cap, numQubits = #numQubits kern }
@@ -107,12 +96,19 @@ struct
         { state = state',
           numVerts = numVerts,
           numEdges = numEdges }
-      end
+      end*)
 
   fun pullCount ((kern, amps): G.t * SST.t) (tgts: SSS.t) =
       SST.fromSetWith
         tgts
-        (fn b => let val bs = G.pull kern b in
+        (fn b =>
+            let val count = ref 0
+                fun get b = (count := !count + 1; Option.getOpt (SST.lookup amps b, C.zero))
+                val amp = G.pull kern get b
+            in
+              (amp, !count)
+            end)
+        (*(fn b => let val bs = G.pull kern b in
                    (SeqBasis.reduce 1000 C.+ C.zero (0, DelayedSeq.length bs)
                          (fn i => let val (b, c) = DelayedSeq.nth bs i in
                                     case SST.lookup amps b of
@@ -120,7 +116,7 @@ struct
                                       | SOME c' => C.* (c, c')
                                   end),
                    DelayedSeq.length bs)
-                 end)
+                 end)*)
         op+ 0
 
   fun apply ((kern, state): G.t * SST.t) =
@@ -150,20 +146,18 @@ struct
           numEdges = numEdges }
       end
 
-  val NUM_SAMPLES = 10
-  val MAX_BRANCHING = 32
-  val NUM_BASES = 1000
+  val NUM_SAMPLES = 40
+  val MAX_BRANCHING = 8
+  val NUM_BASES = 100
 
   fun kernelizeThese (allGates: G.t Seq.t) (theseGates: gate_idx Seq.t) =
-      let val gateCount = Seq.length theseGates
+      let (*val _ = print ("Kernelize " ^ Seq.toString Int.toString theseGates ^ "\n")*)
+          val gateCount = Seq.length theseGates
           fun mbf gidx = G.maxBranchingFactor (Seq.nth allGates gidx)
           fun iter (kerns: (gate_idx Seq.t) list) (acc: gate_idx list) (cbf: int) (i: int) =
+              (*(print ("iter (kerns = " ^ Seq.toString (Seq.toString Int.toString) (Seq.fromList kerns) ^ ") (acc = " ^ Seq.toString Int.toString (Seq.fromList acc) ^ ") (cbf = " ^ Int.toString cbf ^ ") (i = " ^ Int.toString i ^ ")\n");*)
               if i >= gateCount then
-                List.rev
-                  (if List.null acc then
-                     kerns
-                   else
-                     Seq.rev (Seq.fromList acc) :: kerns)
+                List.rev (Seq.rev (Seq.fromList acc) :: kerns)
               else
                 let val next = Seq.nth theseGates i
                     val nextBF = mbf next
@@ -177,7 +171,7 @@ struct
                 end
           val g0 = Seq.nth theseGates 0
       in
-        List.rev (iter nil (g0 :: nil) (mbf g0) 1)
+        iter nil (g0 :: nil) (mbf g0) 1
       end
 
   fun applyAll ((gates, state): G.t Seq.t * SST.t) (dfg: DataFlowGraph.t) =
@@ -208,7 +202,8 @@ struct
               case kerns of
                   nil => old
                 | kern :: remKerns =>
-                  let val _ = Seq.map (fn gidx => DataFlowGraphUtil.visit dfg gidx visited) kern
+                  let (*val _ = print ("Apply kernel " ^ Seq.toString Int.toString kern ^ "\n")*)
+                      val _ = Seq.map (fn gidx => DataFlowGraphUtil.visit dfg gidx visited) kern
                       val fusedKern = G.fuse (Seq.map (Seq.nth gates) kern)
                       val {state = state',
                            numVerts = numVerts',

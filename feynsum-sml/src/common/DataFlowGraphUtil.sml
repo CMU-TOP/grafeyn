@@ -53,12 +53,6 @@ struct
          numQubits = qs}
       end*)
 
-  fun forRange (range: int * int) (f: int -> 'a) =
-      let val (s, e) = range
-          fun iter i = if i < e then (f i; iter (i + 1)) else () in
-        iter s
-      end
-
   type state = { visited: bool array, indegree: int array }
 
   fun copyState {visited = vis, indegree = deg} =
@@ -224,7 +218,8 @@ struct
                     end
                 else
                   (* Add branching-factor=1 gates first *)
-                  (forRange (0, Seq.length fr1) (fn i => visit dfg (Seq.nth fr1 i) st);
+                  (MathHelpers.forRange (0, Seq.length fr1)
+                                        (fn i => visit dfg (Seq.nth fr1 i) st);
                    path mbf cbf (Seq.toList (Seq.rev fr1) @ acc))
               end
       in

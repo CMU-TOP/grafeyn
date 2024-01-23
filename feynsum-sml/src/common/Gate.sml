@@ -8,7 +8,8 @@ sig
   type qubit_idx = int
 
   type gate = { push: (B.t -> unit) -> (B.t -> unit),
-                pull: B.t -> (B.t * C.t) DelayedSeq.t,
+                (*pull: B.t -> (B.t * C.t) DelayedSeq.t,*)
+                pull: (B.t -> C.t) -> (B.t -> C.t),
                 maxBranchingFactor: int,
                 numQubits: int }
 
@@ -20,7 +21,7 @@ sig
   val maxBranchingFactor: gate -> int
   val numQubits: gate -> int
   val push: gate -> (B.t -> unit) -> (B.t -> unit)
-  val pull: gate -> B.t -> (B.t * C.t) DelayedSeq.t
+  val pull: gate -> (B.t -> C.t) -> (B.t -> C.t)
   val fuse: gate Seq.t -> gate
   (*val control: gate -> qubit_idx -> gate*)
 end
@@ -40,7 +41,7 @@ struct
   type qubit_idx = int
 
   type gate = { push: (B.t -> unit) -> (B.t -> unit),
-                pull: B.t -> (B.t * C.t) DelayedSeq.t,
+                pull: (B.t -> C.t) -> (B.t -> C.t),
                 maxBranchingFactor: int,
                 numQubits: int }
 
@@ -76,16 +77,37 @@ struct
           DelayedSeq.tabulate (fn i => Option.valOf (Array.sub (arr, i))) (!pos)
         end
 
+  (* composeSeq [f, g, h] = h o (g o f) *)
   fun composeSeq fs =
       let val len = Seq.length fs
-          fun iter i f =
-              if i >= len then
-                f
-              else
-                iter (i + 1) (Seq.nth fs i o f)
-      in
+          fun iter i f = if i >= len then f else iter (i + 1) (Seq.nth fs i o f) in
         iter 1 (Seq.nth fs 0)
       end
+
+  (* composeSeq' [f, g, h] = (f o g) o h *)
+  fun composeSeq' fs =
+      let val len = Seq.length fs
+          fun iter i f = if i >= len then f else iter (i + 1) (f o Seq.nth fs i) in
+        iter 1 (Seq.nth fs 0)
+      end
+
+  (*fun fuse' ((g1, g2): gate) =
+      let val {numQubits = numQubits1,
+               push = push1,
+               pull = pull1,
+               maxBranchingFactor = mbf1} = g1
+          val {numQubits = numQubits2,
+               push = push2,
+               pull = pull2,
+               maxBranchingFactor = mbf2} = g2
+          val push = push1 o push2
+          val pull = pull2 o pull1
+      in
+        { push = push,
+          pull = pull,
+          maxBranchingFactor = mbf1 * mbf2,
+          numQubits = numQubits1 }
+      end*)
 
   fun fuse (gs: gate Seq.t) =
       let val numQubits = #numQubits (Seq.nth gs 0)
@@ -95,12 +117,10 @@ struct
           (*fun pushIter (f, f') b = DelayedSeq.flatten (DelayedSeq.map f' (f b))
           val push = Seq.iterate (fn (f, g) => pushIter (f, #push g))
                                  DelayedSeq.singleton gs*)
-          val push =
-              let fun iter i f = if i >= numGates then f else iter (i + 1) (#push (Seq.nth gs i) o f) in
-                iter 1 (#push (Seq.nth gs 0))
-              end
+          val push = composeSeq' (Seq.map #push gs)
+          val pull = composeSeq (Seq.map #pull gs)
 
-          fun pullIter (f, f') b =
+          (*fun pullIter (f, f') b =
               DelayedSeq.flatten
                 (DelayedSeq.map (fn (b', c') =>
                              DelayedSeq.map (fn (b'', c'') =>
@@ -108,12 +128,13 @@ struct
                                      (f b'))
                          (f' b))
           val pull = Seq.iterate (fn (f, g) => pullIter (f, #pull g))
-                                 (fn b => DelayedSeq.singleton (b, C.one)) gs
+                                 (fn b => DelayedSeq.singleton (b, C.one)) gs*)
 
           val maxBranchingFactor = Seq.reduce op* 1 (Seq.map #maxBranchingFactor gs)
       in
         { push = push,
-          pull = (fn b => flattenAndJoin (DelayedSeq.singleton (pull b))),
+          (*pull = (fn b => flattenAndJoin (DelayedSeq.singleton (pull b))),*)
+          pull = pull,
           maxBranchingFactor = maxBranchingFactor,
           numQubits = numQubits }
       end
@@ -276,8 +297,9 @@ struct
 
   fun fromGateDefn {numQubits = numQubits} gd =
     { (*push = (DelayedSeq.fromList o pushFromGateDefn gd),*)
-      push = (fn f => List.foldr (fn (b', u) => (f b'; u)) () o pushFromGateDefn gd),
-      pull = (DelayedSeq.fromList o pullFromGateDefn gd),
+      (*pull = (DelayedSeq.fromList o pullFromGateDefn gd),*)
+      push = (fn set => List.foldr (fn (b, u) => (set b; u)) () o pushFromGateDefn gd),
+      pull = (fn get => List.foldr (fn ((b, c), a) => C.+ (a, C.* (c, get b))) C.zero o pullFromGateDefn gd),
       maxBranchingFactor = GateDefn.maxBranchingFactor gd,
       numQubits = numQubits
     }
@@ -288,5 +310,5 @@ struct
 
   fun push (g: gate) = #push g
 
-  fun pull (g: gate) (b: B.t) = #pull g b
+  fun pull (g: gate) = #pull g
 end

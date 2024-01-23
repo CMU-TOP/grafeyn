@@ -2,6 +2,7 @@ structure MathHelpers:
 sig
   val riMult: real -> IntInf.int -> IntInf.int
   val log2: real -> real
+  val forRange: int * int -> (int -> 'a) -> unit
 end =
 struct
 
@@ -43,4 +44,10 @@ struct
 
 
   fun log2 x = Math.log10 x / Math.log10 2.0
+
+  fun forRange (range: int * int) (f: int -> 'a) =
+      let val (s, e) = range
+          fun iter i = if i < e then (f i; iter (i + 1)) else () in
+        iter s
+      end
 end

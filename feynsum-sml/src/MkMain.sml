@@ -37,6 +37,7 @@ struct
 
   fun main ((inputName, circuit): string * DataFlowGraph.t) =
     let val numQubits = #numQubits circuit
+        val _ = print ("max branching stride = " ^ Int.toString maxBranchingStride ^ "\n")
         val gates = Seq.map (G.fromGateDefn {numQubits = numQubits}) (#gates circuit)
         (*val sched' = DataFlowGraphUtil.scheduleWithOracle circuit (fn i => #maxBranchingFactor (Seq.nth gates i) > 1) (sched circuit) disableFusion maxBranchingStride
         val kernels = Seq.map (G.fuses o Seq.map (Seq.nth gates)) sched'*)
