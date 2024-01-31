@@ -14,6 +14,7 @@ val _ = print ("expand-max-load " ^ Real.toString maxload ^ "\n")
 val _ = print ("dense-thresh " ^ Real.toString denseThreshold ^ "\n")
 val _ = print ("pull-thresh " ^ Real.toString pullThreshold ^ "\n")
 
+
 (* should the simulator print out info about how many zeros were eliminated
  * on each frontier? (default: no)
  *)
@@ -92,11 +93,13 @@ val _ =
  * gate scheduling
  *)
 
-
 val disableFusion = CLA.parseFlag "scheduler-disable-fusion"
 val maxBranchingStride = CLA.parseInt "scheduler-max-branching-stride" 2
+val schedSamplePathDepth = CLA.parseInt "scheduler-sample-path-depth" 6
+val schedSamplePaths = CLA.parseInt "scheduler-sample-paths" 10
+val schedSampleStates = CLA.parseInt "scheduler-sample-states" 1000
 
-structure DGNB =
+(*structure DGNB =
   GreedyNonBranchingScheduler
     (val maxBranchingStride = maxBranchingStride
      val disableFusion = disableFusion)
@@ -104,7 +107,7 @@ structure DGNB =
 structure DGFQ =
   FinishQubitScheduler
     (val maxBranchingStride = maxBranchingStride
-     val disableFusion = disableFusion)
+     val disableFusion = disableFusion)*)
 
 fun print_sched_info () =
   let
@@ -136,8 +139,12 @@ structure M_64_32 =
   MkMain
     (structure B = BasisIdx64
      structure C = Complex32
+     val numQubits = #numQubits dfg
      val maxBranchingStride = maxBranchingStride
      val disableFusion = disableFusion
+     val schedSamplePathDepth = schedSamplePathDepth
+     val schedSamplePaths = schedSamplePaths
+     val schedSampleStates = schedSampleStates
      val blockSize = blockSize
      val maxload = maxload
      val gateScheduler = schedulerName
@@ -149,8 +156,12 @@ structure M_64_64 =
   MkMain
     (structure B = BasisIdx64
      structure C = Complex64
+     val numQubits = #numQubits dfg
      val maxBranchingStride = maxBranchingStride
      val disableFusion = disableFusion
+     val schedSamplePathDepth = schedSamplePathDepth
+     val schedSamplePaths = schedSamplePaths
+     val schedSampleStates = schedSampleStates
      val blockSize = blockSize
      val maxload = maxload
      val gateScheduler = schedulerName
@@ -162,8 +173,12 @@ structure M_U_32 =
   MkMain
     (structure B = BasisIdxUnlimited
      structure C = Complex32
+     val numQubits = #numQubits dfg
      val maxBranchingStride = maxBranchingStride
      val disableFusion = disableFusion
+     val schedSamplePathDepth = schedSamplePathDepth
+     val schedSamplePaths = schedSamplePaths
+     val schedSampleStates = schedSampleStates
      val blockSize = blockSize
      val maxload = maxload
      val gateScheduler = schedulerName
@@ -175,8 +190,12 @@ structure M_U_64 =
   MkMain
     (structure B = BasisIdxUnlimited
      structure C = Complex64
+     val numQubits = #numQubits dfg
      val maxBranchingStride = maxBranchingStride
      val disableFusion = disableFusion
+     val schedSamplePathDepth = schedSamplePathDepth
+     val schedSamplePaths = schedSamplePaths
+     val schedSampleStates = schedSampleStates
      val blockSize = blockSize
      val maxload = maxload
      val gateScheduler = schedulerName

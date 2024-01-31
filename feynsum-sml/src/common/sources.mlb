@@ -24,7 +24,7 @@ local
   $(SML_LIB)/smlnj-lib/Util/smlnj-lib.mlb
 
   Rat.sml
-
+  Helpers.sml
   QubitIdx.sml
 
   Constants.sml
@@ -33,18 +33,17 @@ local
   complex/Complex64.sml
   complex/Complex.sml
 
-  MathHelpers.sml
-
   basis/BASIS_IDX.sml
   ann "allowExtendedTextConsts true" in
     basis/BasisIdx64.sml
     basis/BasisIdxUnlimited.sml
   end
 
-  state/SPARSE_STATE_SET.sml
+  (*state/SPARSE_STATE_SET.sml
   state/SparseStateSet.sml
   state/SPARSE_STATE_TABLE.sml
-  state/SparseStateTable.sml
+  state/SparseStateTable.sml*)
+  state/HashTable.sml
 
   ann "allowExtendedTextConsts true" in
     GateDefn.sml
@@ -78,6 +77,7 @@ in
   structure Complex
 
   structure QubitIdx
+  structure Helpers
 
   signature BASIS_IDX
   structure BasisIdx64
@@ -102,19 +102,15 @@ in
   (*signature HYBRID_STATE
   functor HybridState*)
 
-  signature SPARSE_STATE_TABLE
+  signature HASH_TABLE
   functor SparseStateTable
-  signature SPARSE_STATE_SET
   functor SparseStateSet
+  functor SparseStateCounter
 
   functor PushPull
 
-  (*functor ExpandState*)
-
-  functor RedBlackMapFn
-  functor RedBlackSetFn
-
-  structure MathHelpers
+  (*functor RedBlackMapFn
+  functor RedBlackSetFn*)
 
   functor Fingerprint
 

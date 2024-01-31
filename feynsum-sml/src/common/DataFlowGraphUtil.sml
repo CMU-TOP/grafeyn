@@ -25,7 +25,7 @@ sig
 
   val gateIsBranching: data_flow_graph -> (gate_idx -> bool)
 
-  type sampler = { gen: Random.rand, max_branching: int, num_samples: int, num_bases: int }
+  type sampler = { gen: Random.rand, max_branching: int, num_samples: int }
 
   val samplePaths: sampler -> data_flow_graph -> (gate_idx -> int) -> state -> gate_idx Seq.t Seq.t
 end =
@@ -196,7 +196,7 @@ struct
   fun gateIsBranching ({ gates = gates, ...} : data_flow_graph) i =
       GateDefn.maxBranchingFactor (Seq.nth gates i) > 1
 
-  type sampler = { gen: Random.rand, max_branching: int, num_samples: int, num_bases: int }
+  type sampler = { gen: Random.rand, max_branching: int, num_samples: int }
 
   fun samplePath (samp: sampler)
                  (dfg: data_flow_graph)
@@ -218,8 +218,8 @@ struct
                     end
                 else
                   (* Add branching-factor=1 gates first *)
-                  (MathHelpers.forRange (0, Seq.length fr1)
-                                        (fn i => visit dfg (Seq.nth fr1 i) st);
+                  (Helpers.forRange (0, Seq.length fr1)
+                                    (fn i => visit dfg (Seq.nth fr1 i) st);
                    path mbf cbf (Seq.toList (Seq.rev fr1) @ acc))
               end
       in

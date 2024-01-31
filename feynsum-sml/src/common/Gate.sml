@@ -2,8 +2,6 @@ signature GATE =
 sig
   structure B: BASIS_IDX
   structure C: COMPLEX
-  structure SSS: SPARSE_STATE_SET
-  sharing SSS.B = B
 
   type qubit_idx = int
 
@@ -33,7 +31,6 @@ functor Gate
 struct
   structure B = B
   structure C = C
-  structure SSS = SparseStateSet (structure B = B)
   
   structure R =
   struct open C.R val fromLarge = fromLarge IEEEReal.TO_NEAREST end

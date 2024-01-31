@@ -1,36 +1,40 @@
-signature PUSH_PULL =
-sig
-  structure SST: SPARSE_STATE_TABLE
-  structure G: GATE
-  structure B: BASIS_IDX
-  structure C: COMPLEX
-  sharing SST.B = G.B = B
-  sharing SST.C = G.C = C
-  val push: G.t * B.t DelayedSeq.t -> SST.SSS.t
-  val pull: G.t * SST.t -> SST.SSS.t -> SST.t
-  val apply: G.t * SST.t -> {state: SST.t, numVerts: int, numEdges: int}
-  (*val pushApply: G.t * SST.t -> {state: SST.t, numVerts: int, numEdges: int}*)
-  val pullCount: G.t * SST.t -> SST.SSS.t -> SST.t * int
-  val applyAll: G.t Seq.t * SST.t -> DataFlowGraph.t -> {state: SST.t, numVerts: int, numEdges: int}
-  val applyAllOld: G.t Seq.t * SST.t -> {state: SST.t, numVerts: int, numEdges: int}
-  val sampleStates: SST.SSS.t -> int -> B.t DelayedSeq.t
-end
-
 functor PushPull
-  (structure SST: SPARSE_STATE_TABLE
+  (structure B: BASIS_IDX
+   structure C: COMPLEX
+   val numQubits: int
    val maxBranchingStride: int
+   val schedSamplePathDepth: int
+   val schedSamplePaths: int
+   val schedSampleStates: int
    val blockSize: int
    val maxload: real
    val denseThreshold: real
-   val pullThreshold: real): PUSH_PULL =
-struct
+   val pullThreshold: real):
+sig
+  structure G: GATE
+  structure B: BASIS_IDX
+  structure C: COMPLEX
+  sharing G.B = B
+  sharing G.C = C
 
-  structure SST = SST
-  structure B = SST.B
-  structure C = SST.C
+  structure SSS: HASH_TABLE
+  structure SST: HASH_TABLE
+  structure SSC: HASH_TABLE
+
+  val push: G.t * B.t DelayedSeq.t -> SSS.t
+  val pull: G.t * SST.t -> SSS.t -> SST.t
+  val apply: G.t * SST.t -> {state: SST.t, numVerts: int, numEdges: int}
+  (*val pushApply: G.t * SST.t -> {state: SST.t, numVerts: int, numEdges: int}*)
+  val pullCount: G.t * SST.t -> SSS.t -> SST.t * int
+  val applyAll: G.t Seq.t * SST.t -> DataFlowGraph.t -> {state: SST.t, numVerts: int, numEdges: int}
+  val applyAllOld: G.t Seq.t * SST.t -> {state: SST.t, numVerts: int, numEdges: int}
+  (*val sampleStates: SSS.t -> int -> B.t DelayedSeq.t*)
+end =
+struct
+  structure B = B
+  structure C = C
   structure G = Gate (structure B = B
                       structure C = C)
-  structure SSS = SST.SSS
 
   type gate_idx = int
 
@@ -58,9 +62,19 @@ struct
           Array.tabulate (k, fn i => swapAndRet i (Random.randRange (i, len - 1) seed))
         end*)
 
-  fun sampleStates st k =
-      let val cst = SSS.compact st
-          val arr = SeqBasis.tabulate 5000 (0, DelayedSeq.length cst) (DelayedSeq.nth cst)
+  structure SSS = SparseStateSet
+                    (structure B = B
+                     val numQubits = numQubits)
+  structure SST = SparseStateTable
+                    (structure B = B
+                     structure C = C
+                     val numQubits = numQubits)
+  structure SSC = SparseStateCounter
+                    (structure B = B
+                     val numQubits = numQubits)
+
+  fun sampleStates cst k =
+      let val arr = SeqBasis.tabulate 5000 (0, DelayedSeq.length cst) (DelayedSeq.nth cst)
           val shuf = sampleArray arr k
       in
         DelayedSeq.tabulate (fn i => Array.sub (shuf, i)) (Array.length shuf)
@@ -68,8 +82,8 @@ struct
 
   fun push ((kern, amps): G.t * B.t DelayedSeq.t) =
     let val cap = G.maxBranchingFactor kern * DelayedSeq.length amps
-        val sss = SSS.make { capacity = cap * 2, numQubits = #numQubits kern }
-        fun pushB b = G.push kern (SSS.insert sss) b
+        val sss = SSS.make { capacity = ((cap * 5) div 4) }
+        fun pushB b = G.push kern (fn x => SSS.insert sss (x, ())) b
         (*fun pushB b = DelayedSeq.applyIdx (G.push kern b) (fn (_, b) => SSS.insert sss b)*)
         val _ = DelayedSeq.applyIdx amps (fn (_, b) => pushB b)
     in
@@ -77,7 +91,7 @@ struct
     end
 
   fun pull ((kern, amps): G.t * SST.t) (tgts: SSS.t) =
-      SST.fromSet tgts (G.pull kern (fn b => Option.getOpt (SST.lookup amps b, C.zero)))
+      SST.fromKeys (SSS.toKeys tgts, G.pull kern (fn b => Option.getOpt (SST.lookup (amps, b), C.zero)))
 
 (*  fun pushApply ((kern, state) : G.t * SST.t) =
       let val pushF = G.pull kern (* TODO: implement push that stores amps too *)
@@ -99,15 +113,15 @@ struct
       end*)
 
   fun pullCount ((kern, amps): G.t * SST.t) (tgts: SSS.t) =
-      SST.fromSetWith
-        tgts
-        (fn b =>
-            let val count = ref 0
-                fun get b = (count := !count + 1; Option.getOpt (SST.lookup amps b, C.zero))
-                val amp = G.pull kern get b
-            in
-              (amp, !count)
-            end)
+      SST.fromKeysWith
+        (SSS.toKeys tgts,
+         (fn b =>
+             let val count = ref 0
+                 fun get b = (count := !count + 1; Option.getOpt (SST.lookup (amps, b), C.zero))
+                 val amp = G.pull kern get b
+             in
+               (amp, !count)
+             end))
         (*(fn b => let val bs = G.pull kern b in
                    (SeqBasis.reduce 1000 C.+ C.zero (0, DelayedSeq.length bs)
                          (fn i => let val (b, c) = DelayedSeq.nth bs i in
@@ -117,13 +131,13 @@ struct
                                   end),
                    DelayedSeq.length bs)
                  end)*)
-        op+ 0
+        (0, op+)
 
   fun apply ((kern, state): G.t * SST.t) =
       let val pushFrom = SST.compactKeys state
           val pushed = push (kern, pushFrom)
           val (state', numEdges) = pullCount (kern, state) pushed
-          val numVerts = SST.sizeInclZeroAmp state'
+          val numVerts = SST.nonEmptyKeys state'
       in
         { state = state',
           numVerts = numVerts,
@@ -135,27 +149,23 @@ struct
           val pushed_size = SSS.size pushed
           val kbf = G.maxBranchingFactor kern
           val num_samples = Int.max (1, pushed_size div kbf)
-          val subpushed = sampleStates pushed num_samples
-          val substate' = SSS.make { capacity = DelayedSeq.length subpushed * 2, numQubits = G.numQubits kern }
-          val _ = DelayedSeq.applyIdx subpushed (fn (_, b) => SSS.insert substate' b)
+          val subpushed = sampleStates (SSS.compactKeys pushed) num_samples
+          val substate' = SSS.make { capacity = DelayedSeq.length subpushed * 2 }
+          val _ = DelayedSeq.applyIdx subpushed (fn (_, b) => SSS.insert substate' (b, ()))
           val (substate'', numEdges) = pullCount (kern, state) substate'
-          val numVerts = SST.sizeInclZeroAmp substate''
+          val numVerts = SST.nonEmptyKeys substate''
       in
         { state = substate'',
           numVerts = numVerts,
           numEdges = numEdges }
       end
 
-  val NUM_SAMPLES = 40
-  val MAX_BRANCHING = 8
-  val NUM_BASES = 100
+  
 
   fun kernelizeThese (allGates: G.t Seq.t) (theseGates: gate_idx Seq.t) =
-      let (*val _ = print ("Kernelize " ^ Seq.toString Int.toString theseGates ^ "\n")*)
-          val gateCount = Seq.length theseGates
+      let val gateCount = Seq.length theseGates
           fun mbf gidx = G.maxBranchingFactor (Seq.nth allGates gidx)
           fun iter (kerns: (gate_idx Seq.t) list) (acc: gate_idx list) (cbf: int) (i: int) =
-              (*(print ("iter (kerns = " ^ Seq.toString (Seq.toString Int.toString) (Seq.fromList kerns) ^ ") (acc = " ^ Seq.toString Int.toString (Seq.fromList acc) ^ ") (cbf = " ^ Int.toString cbf ^ ") (i = " ^ Int.toString i ^ ")\n");*)
               if i >= gateCount then
                 List.rev (Seq.rev (Seq.fromList acc) :: kerns)
               else
@@ -175,11 +185,11 @@ struct
       end
 
   fun applyAll ((gates, state): G.t Seq.t * SST.t) (dfg: DataFlowGraph.t) =
-      let val visited = DataFlowGraphUtil.initState dfg
+      let fun lshift (x, n) = if n <= 0 then x else lshift (2 * x, n - 1)
+          val visited = DataFlowGraphUtil.initState dfg
           val sampler = { gen = Random.rand (123, 456),
-                          max_branching = MAX_BRANCHING,
-                          num_samples = NUM_SAMPLES,
-                          num_bases = NUM_BASES }
+                          max_branching = lshift (1, schedSamplePathDepth),
+                          num_samples = schedSamplePaths }
           val gateCount = Seq.length gates
           val numQubits = #numQubits dfg
 
@@ -202,8 +212,7 @@ struct
               case kerns of
                   nil => old
                 | kern :: remKerns =>
-                  let (*val _ = print ("Apply kernel " ^ Seq.toString Int.toString kern ^ "\n")*)
-                      val _ = Seq.map (fn gidx => DataFlowGraphUtil.visit dfg gidx visited) kern
+                  let val _ = Seq.map (fn gidx => DataFlowGraphUtil.visit dfg gidx visited) kern
                       val fusedKern = G.fuse (Seq.map (Seq.nth gates) kern)
                       val {state = state',
                            numVerts = numVerts',
@@ -217,52 +226,52 @@ struct
                     applyKernels remKerns new
                   end
 
+          fun bestPath (old as {state, numVerts, numEdges, numGates})
+                       (paths: gate_idx Seq.t Seq.t) =
+              if Seq.length paths = 1 then
+                Seq.nth paths 0
+              else
+                let val substate = sampleStates (SST.compactKeys state) schedSampleStates
+                    val stateEsts =
+                        SeqBasis.tabulate
+                          1 (0, Seq.length paths)
+                          (fn i =>
+                              (* TODO: maybe we shouldn't PURELY optimize for state size,
+                               * but also consider the number of verts/edges inside? *)
+                              (* TODO: also, need to make this a weighted expectation *)
+                              let val kern = G.fuse (Seq.map (Seq.nth gates)
+                                                             (Seq.nth paths i))
+                                  val { state = state',
+                                        numVerts = numVerts',
+                                        numEdges = numEdges' } =
+                                      apply' (kern, state, substate) in
+                                (SST.size state', numVerts', numEdges')
+                              end)
+                    fun better (p1 as (i1, (state1, verts1, edges1))) (p2 as (i2, (state2, verts2, edges2))) =
+                        if state1 < state2 orelse
+                           (state1 = state2 andalso verts1 + edges1 < verts2 + edges2) then
+                          p1
+                        else
+                          p2
+                            
+                    val (best, _) = Array.foldri
+                                      (fn (i, sve, bestsve) => better (i, sve) bestsve)
+                                      (0, Array.sub (stateEsts, 0)) stateEsts
+                in
+                  Seq.nth paths best
+                end
+
           fun iter (old as {state, numVerts, numEdges, numGates}) =
               (* Note: length of paths might be less than
-               * NUM_SAMPLES because we remove duplicate paths *)
+               * schedSamplePaths because we remove duplicate paths *)
               let val paths = DataFlowGraphUtil.samplePaths sampler dfg mbf visited in
                 if Seq.length paths = 0 then
+                  (* Nothing left to do; we're finished *)
                   { state = state, numVerts = numVerts, numEdges = numEdges }
-                else if Seq.length paths = 1 then
-                  let val onlyPath = Seq.nth paths 0
-                      val nextKernels = kernelizeThese gates onlyPath
-                      val new = applyKernels nextKernels old
-                  in
-                    iter new
-                  end
                 else
-                  let val substate = sampleStates (SST.toSet state) (#num_bases sampler)
-                      val stateEsts =
-                          SeqBasis.tabulate
-                            1 (0, Seq.length paths)
-                            (fn i =>
-                                (* TODO: maybe we shouldn't PURELY optimize for state size,
-                                 * but also consider the number of verts/edges inside? *)
-                                (* TODO: also, need to make this a weighted expectation *)
-                                let val kern = G.fuse (Seq.map (Seq.nth gates)
-                                                               (Seq.nth paths i))
-                                    val { state = state',
-                                          numVerts = numVerts',
-                                          numEdges = numEdges' } =
-                                        apply' (kern, state, substate) in
-                                  (SST.size state', numVerts', numEdges')
-                                end)
-                      fun better (p1 as (i1, (state1, verts1, edges1))) (p2 as (i2, (state2, verts2, edges2))) =
-                          if state1 < state2 orelse
-                             (state1 = state2 andalso verts1 + edges1 < verts2 + edges2) then
-                            p1
-                          else
-                            p2
-                                    
-                      val (best, _) = Array.foldri
-                                        (fn (i, sve, bestsve) => better (i, sve) bestsve)
-                                        (0, Array.sub (stateEsts, 0)) stateEsts
-                      val bestPath = Seq.nth paths best
-                      val nextKernels = kernelizeThese gates bestPath
-                      val new = applyKernels nextKernels old
-                  in
-                    iter new
-                  end
+                  (* Kernelize gates on best path, apply them,
+                   * then continue on with rest of circuit *)
+                  iter (applyKernels (kernelizeThese gates (bestPath old paths)) old)
               end
       in
         iter { state = state,

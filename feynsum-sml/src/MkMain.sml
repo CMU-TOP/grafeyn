@@ -1,8 +1,12 @@
 functor MkMain
   (structure C: COMPLEX
    structure B: BASIS_IDX
+   val numQubits: int
    val disableFusion: bool
    val maxBranchingStride: int
+   val schedSamplePathDepth: int
+   val schedSamplePaths: int
+   val schedSampleStates: int
    val blockSize: int
    val maxload: real
    val gateScheduler: string
@@ -14,39 +18,34 @@ struct
   structure CLA = CommandLineArgs
 
   structure G = Gate (structure B = B structure C = C)
-  structure SST = SparseStateTable (structure B = B structure C = C)
+  structure SST = SparseStateTable (structure B = B
+                                    val numQubits = numQubits
+                                    structure C = C)
 
   structure F = Fingerprint (structure B = B structure C = C)
 
-  structure PP = PushPull (structure SST = SST
-                           val maxBranchingStride = maxBranchingStride
-                           val blockSize = blockSize
-                           val maxload = maxload
-                           val denseThreshold = denseThreshold
-                           val pullThreshold = pullThreshold)
-
+  structure PP = PushPull (structure B = B
+                         structure C = C
+                         val numQubits = numQubits
+                         val maxBranchingStride = maxBranchingStride
+                         val schedSamplePathDepth = schedSamplePathDepth
+                         val schedSamplePaths = schedSamplePaths
+                         val schedSampleStates = schedSampleStates
+                         val blockSize = blockSize
+                         val maxload = maxload
+                         val denseThreshold = denseThreshold
+                         val pullThreshold = pullThreshold)
 
   (* =======================================================================
    * main
    *)
 
 
-  structure FQ = FinishQubitScheduler (val maxBranchingStride = maxBranchingStride
-                                       val disableFusion = disableFusion)
-  val sched = FQ.scheduler5
-
   fun main ((inputName, circuit): string * DataFlowGraph.t) =
     let val numQubits = #numQubits circuit
-        val _ = print ("max branching stride = " ^ Int.toString maxBranchingStride ^ "\n")
         val gates = Seq.map (G.fromGateDefn {numQubits = numQubits}) (#gates circuit)
-        (*val sched' = DataFlowGraphUtil.scheduleWithOracle circuit (fn i => #maxBranchingFactor (Seq.nth gates i) > 1) (sched circuit) disableFusion maxBranchingStride
-        val kernels = Seq.map (G.fuses o Seq.map (Seq.nth gates)) sched'*)
-        val initState = SST.singleton {numQubits = numQubits} (B.zeros, C.one)
+        val initState = SST.singleton (B.zeros, C.one)
         val { state, numVerts, numEdges } = PP.applyAll (gates, initState) circuit
-(* Completed with vertices = 98166 and edges = 392664 *)
-(* fp0 000010010000001110000100100100100100100000000 -0.70706260-0.70707780i *)
-(* 3.447s *)
-        (* val { state, numVerts, numEdges } = PP.applyAllOld (gates, initState) *)
         val (fp, tm) = Util.getTime (fn _ => F.fingerprint (SST.unsafeViewContents state))
         val _ = print ("computed fingerprint in " ^ Time.fmt 4 tm ^ "s\n")
         val _ = Util.for (0, Seq.length fp)
@@ -60,6 +59,34 @@ struct
     in
       print ("Completed with vertices = " ^ Int.toString numVerts ^ " and edges = " ^ Int.toString numEdges ^ "\n")
     end
+
+
+  (*structure FQ = FinishQubitScheduler (val maxBranchingStride = maxBranchingStride
+                                       val disableFusion = disableFusion)
+  val sched = FQ.scheduler5
+
+  fun main ((inputName, circuit): string * DataFlowGraph.t) =
+    let val numQubits = #numQubits circuit
+        val _ = print ("max branching stride = " ^ Int.toString maxBranchingStride ^ "\n")
+        val gates = Seq.map (G.fromGateDefn {numQubits = numQubits}) (#gates circuit)
+        val sched' = DataFlowGraphUtil.scheduleWithOracle circuit (fn i => #maxBranchingFactor (Seq.nth gates i) > 1) (sched circuit) disableFusion maxBranchingStride
+        val kernels = Seq.map (G.fuse o Seq.map (Seq.nth gates)) sched'
+        val initState = SST.singleton {numQubits = numQubits} (B.zeros, C.one)
+        val { state, numVerts, numEdges } = PP.applyAllOld (gates, initState)
+        val (fp, tm) = Util.getTime (fn _ => F.fingerprint (SST.unsafeViewContents state))
+        val _ = print ("computed fingerprint in " ^ Time.fmt 4 tm ^ "s\n")
+        val _ = Util.for (0, Seq.length fp)
+                         (fn i =>
+                             let val (b, c) = Seq.nth fp i in
+                               print
+                                 ("fp" ^ Int.toString i ^ " "
+                                  ^ B.toString {numQubits = numQubits, pretty = false} b ^ " "
+                                  ^ C.toString c ^ "\n")
+                             end)
+    in
+      print ("Completed with vertices = " ^ Int.toString numVerts ^ " and edges = " ^ Int.toString numEdges ^ "\n")
+    end
+   *)
 
   (*fun main (inputName, circuit) =
     let
