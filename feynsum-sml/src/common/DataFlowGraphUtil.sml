@@ -232,7 +232,8 @@ struct
   fun discardDuplicatePaths (paths: gate_idx Seq.t Seq.t) (numGates: int) =
       let val keep = Array.array (Seq.length paths, true)
           val len = Seq.length paths
-          fun samePath (a, b) =
+          val samePath = Seq.equal (op=)
+          fun samePath' (a, b) =
               Seq.length a = Seq.length b andalso
               (let val a_arr = Array.array (numGates, false)
                    val b_arr = Array.array (numGates, false)

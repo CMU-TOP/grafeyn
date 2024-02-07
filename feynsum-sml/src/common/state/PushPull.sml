@@ -22,12 +22,17 @@ sig
   structure SSC: HASH_TABLE
 
   val push: G.t * B.t DelayedSeq.t -> SSS.t
+  val pushCount: G.t * B.t DelayedSeq.t -> SSC.t
+  val pullCount: G.t * SSS.t * SSC.t -> SSC.t
   val pull: G.t * SST.t -> SSS.t -> SST.t
   val apply: G.t * SST.t -> {state: SST.t, numVerts: int, numEdges: int}
+  val applySub: G.t * SST.t * B.t DelayedSeq.t -> real * int
   (*val pushApply: G.t * SST.t -> {state: SST.t, numVerts: int, numEdges: int}*)
-  val pullCount: G.t * SST.t -> SSS.t -> SST.t * int
-  val applyAll: G.t Seq.t * SST.t -> DataFlowGraph.t -> {state: SST.t, numVerts: int, numEdges: int}
+  val pullInfo: G.t * SST.t -> SSS.t -> SST.t * int
+  val applyAll: G.t Seq.t * SST.t -> DataFlowGraph.t
+                -> {state: SST.t, numVerts: int, numEdges: int}
   val applyAllOld: G.t Seq.t * SST.t -> {state: SST.t, numVerts: int, numEdges: int}
+  val dumbFusion: G.t Seq.t -> G.t Seq.t
   (*val sampleStates: SSS.t -> int -> B.t DelayedSeq.t*)
 end =
 struct
@@ -40,27 +45,6 @@ struct
 
   val seed = Random.rand (50, 14125)
 
-  fun sampleArray (xs: 'a array) (k: int) =
-      let val len = Array.length xs in
-        SeqBasis.tabulate 1000 (0, k) (fn i => Array.sub (xs, Random.randRange (0, len - 1) seed))
-      end  
-
-  (* Randomly selects k distinct elements from array xs *)
-  (*fun sampleArray (xs: 'a array) (k: int) =
-      if k >= Array.length xs then
-        xs
-      else
-        let val len = Array.length xs
-            fun swapAndRet i j =
-                let val xi = Array.sub (xs, i)
-                    val xj = Array.sub (xs, j) in
-                  Array.update (xs, i, xj);
-                  Array.update (xs, j, xi);
-                  xj
-                end
-        in
-          Array.tabulate (k, fn i => swapAndRet i (Random.randRange (i, len - 1) seed))
-        end*)
 
   structure SSS = SparseStateSet
                     (structure B = B
@@ -75,23 +59,44 @@ struct
 
   fun sampleStates cst k =
       let val arr = SeqBasis.tabulate 5000 (0, DelayedSeq.length cst) (DelayedSeq.nth cst)
-          val shuf = sampleArray arr k
+          val shuf = Helpers.sampleArray seed arr k
       in
         DelayedSeq.tabulate (fn i => Array.sub (shuf, i)) (Array.length shuf)
       end
 
   fun push ((kern, amps): G.t * B.t DelayedSeq.t) =
     let val cap = G.maxBranchingFactor kern * DelayedSeq.length amps
-        val sss = SSS.make { capacity = ((cap * 5) div 4) }
+        val sss = SSS.make { capacity = SSS.defaultPadding cap }
         fun pushB b = G.push kern (fn x => SSS.insert sss (x, ())) b
-        (*fun pushB b = DelayedSeq.applyIdx (G.push kern b) (fn (_, b) => SSS.insert sss b)*)
         val _ = DelayedSeq.applyIdx amps (fn (_, b) => pushB b)
     in
       sss
     end
 
+  fun pushCount ((kern, amps): G.t * B.t DelayedSeq.t) =
+    let val cap = G.maxBranchingFactor kern * DelayedSeq.length amps
+        val ssc = SSC.make { capacity = SSC.defaultPadding cap }
+        val _ = DelayedSeq.applyIdx amps (G.push kern (fn x => SSC.update ssc (x, 1)) o #2)
+    in
+      ssc
+    end
+
+  fun pullCount ((kern, substate, amps): G.t * SSS.t * SSC.t) =
+    let val amps' = SSC.compactKeys amps
+        val ssc = SSC.make { capacity = SSC.defaultPadding (DelayedSeq.length amps') }
+        fun doB (b: B.t) = G.pull kern
+                                  (fn b' =>
+                                      ((if SSS.contains (substate, b') then
+                                         SSC.update ssc (b, 1) else ()); C.zero)) b
+        val _ = DelayedSeq.applyIdx amps' (fn (_, b) => (doB b; ()))
+    in
+      ssc
+    end
+
   fun pull ((kern, amps): G.t * SST.t) (tgts: SSS.t) =
-      SST.fromKeys (SSS.toKeys tgts, G.pull kern (fn b => Option.getOpt (SST.lookup (amps, b), C.zero)))
+      SST.fromKeys
+        (SSS.toKeys tgts,
+         G.pull kern (fn b => Option.getOpt (SST.lookup (amps, b), C.zero)))
 
 (*  fun pushApply ((kern, state) : G.t * SST.t) =
       let val pushF = G.pull kern (* TODO: implement push that stores amps too *)
@@ -112,31 +117,23 @@ struct
           numEdges = numEdges }
       end*)
 
-  fun pullCount ((kern, amps): G.t * SST.t) (tgts: SSS.t) =
+  fun pullInfo ((kern, amps): G.t * SST.t) (tgts: SSS.t) =
       SST.fromKeysWith
         (SSS.toKeys tgts,
          (fn b =>
              let val count = ref 0
-                 fun get b = (count := !count + 1; Option.getOpt (SST.lookup (amps, b), C.zero))
+                 fun get b = (count := !count + 1;
+                              Option.getOpt (SST.lookup (amps, b), C.zero))
                  val amp = G.pull kern get b
              in
                (amp, !count)
              end))
-        (*(fn b => let val bs = G.pull kern b in
-                   (SeqBasis.reduce 1000 C.+ C.zero (0, DelayedSeq.length bs)
-                         (fn i => let val (b, c) = DelayedSeq.nth bs i in
-                                    case SST.lookup amps b of
-                                        NONE => C.zero
-                                      | SOME c' => C.* (c, c')
-                                  end),
-                   DelayedSeq.length bs)
-                 end)*)
         (0, op+)
 
   fun apply ((kern, state): G.t * SST.t) =
       let val pushFrom = SST.compactKeys state
           val pushed = push (kern, pushFrom)
-          val (state', numEdges) = pullCount (kern, state) pushed
+          val (state', numEdges) = pullInfo (kern, state) pushed
           val numVerts = SST.nonEmptyKeys state'
       in
         { state = state',
@@ -144,23 +141,41 @@ struct
           numEdges = numEdges }
       end
 
-  fun apply' ((kern, state, substate): G.t * SST.t * B.t DelayedSeq.t) =
-      let val pushed = push (kern, substate)
-          val pushed_size = SSS.size pushed
-          val kbf = G.maxBranchingFactor kern
+  fun applySub ((kern, state, substate): G.t * SST.t * B.t DelayedSeq.t) =
+      let val k = DelayedSeq.length substate
+          (*val kbf = G.maxBranchingFactor kern*)
+
+          val substate' = SSS.make { capacity = SSS.defaultPadding k }
+          val _ = DelayedSeq.applyIdx substate (fn (_, b) => SSS.insert substate' (b, ()))
+
+          val pushCounts = pushCount (kern, substate)
+          val pullCounts = pullCount (kern, substate', pushCounts)
+          val (pullAmps, edges) = pullInfo (kern, state) (SSS.fromKeys (SSC.toKeys pushCounts, fn _ => ()))
+      in
+        (DelayedSeq.reduce
+           op+ 0.0
+           (DelayedSeq.map
+              (fn b => Real.fromInt (SSC.lookupElse (pushCounts, b, 0)) /
+                       Real.fromInt (SSC.lookupElse (pullCounts, b, 0)))
+              (SST.compactKeys pullAmps)) / Real.fromInt k,
+         edges)
+      end
+        (*
+          val pushed_size = SSC.size pushCounts
+
           val num_samples = Int.max (1, pushed_size div kbf)
-          val subpushed = sampleStates (SSS.compactKeys pushed) num_samples
-          val substate' = SSS.make { capacity = DelayedSeq.length subpushed * 2 }
-          val _ = DelayedSeq.applyIdx subpushed (fn (_, b) => SSS.insert substate' (b, ()))
-          val (substate'', numEdges) = pullCount (kern, state) substate'
+
+
+          val subpushed = sampleStates (SSC.compactKeys pushed) num_samples
+          val substate' = SSC.make { capacity = (DelayedSeq.length subpushed * 3) div 2 }
+          val _ = DelayedSeq.applyIdx subpushed (fn (_, b) => SSC.insert substate' (b, 1))
+          val (substate'', numEdges) = pullInfo (kern, state) substate'
           val numVerts = SST.nonEmptyKeys substate''
       in
         { state = substate'',
           numVerts = numVerts,
           numEdges = numEdges }
-      end
-
-  
+      end*)
 
   fun kernelizeThese (allGates: G.t Seq.t) (theseGates: gate_idx Seq.t) =
       let val gateCount = Seq.length theseGates
@@ -184,6 +199,47 @@ struct
         iter nil (g0 :: nil) (mbf g0) 1
       end
 
+  fun dumbFusion (gs: G.t Seq.t) =
+      let val ks = Seq.fromList (kernelizeThese gs (Seq.tabulate (fn i => i) (Seq.length gs))) in
+        Seq.map (G.fuse o Seq.map (Seq.nth gs)) ks
+      end
+
+
+  fun statusUpdate {size, numVerts, numEdges, numGates, gateCount} =
+      print ("gate " ^ Int.toString numGates ^ "/" ^ Int.toString gateCount ^ ", "
+             ^ Int.toString numVerts ^ " vertices, "
+             ^ Int.toString numEdges ^ " edges, "
+             ^ Int.toString size ^ " states, "
+             ^ Real.fmt (StringCvt.FIX (SOME 8))
+                        (Helpers.divPow2 (Real.fromInt size) numQubits) ^ " density\n")
+
+  fun applyKernels (kerns: (gate_idx Seq.t) list)
+                   (old as {state, numVerts, numEdges, numGates})
+                   (info as {dfg = dfg, gateCount = gateCount,
+                             visited = visited, gates = gates}) =
+      case kerns of
+          nil => old
+        | kern :: remKerns =>
+          let val _ = Helpers.forRange
+                        (0, Seq.length kern)
+                        (fn i => DataFlowGraphUtil.visit dfg (Seq.nth kern i) visited)
+              val fusedKern = G.fuse (Seq.map (Seq.nth gates) kern)
+              val {state = state',
+                   numVerts = numVerts',
+                   numEdges = numEdges'} = apply (fusedKern, state)
+              val new = { state = state',
+                          numVerts = numVerts + numVerts',
+                          numEdges = numEdges + numEdges',
+                          numGates = numGates + Seq.length kern }
+          in
+            statusUpdate { size = SST.size state',
+                           numVerts = numVerts',
+                           numEdges = numEdges',
+                           numGates = numGates + Seq.length kern,
+                           gateCount = gateCount };
+            applyKernels remKerns new info
+          end
+
   fun applyAll ((gates, state): G.t Seq.t * SST.t) (dfg: DataFlowGraph.t) =
       let fun lshift (x, n) = if n <= 0 then x else lshift (2 * x, n - 1)
           val visited = DataFlowGraphUtil.initState dfg
@@ -193,38 +249,8 @@ struct
           val gateCount = Seq.length gates
           val numQubits = #numQubits dfg
 
-          fun divPow2 r n = if n <= 0 then r else divPow2 (r / 2.0) (n - 1)
-
-          fun statusUpdate {state, numVerts, numEdges, numGates} =
-              let val size = SST.size state in
-                print ("gate " ^ Int.toString numGates ^ "/" ^ Int.toString gateCount ^ ", "
-                       ^ Int.toString numVerts ^ " vertices, "
-                       ^ Int.toString numEdges ^ " edges, "
-                       ^ Int.toString size ^ " states, "
-                       ^ Real.fmt (StringCvt.FIX (SOME 8))
-                                  (divPow2 (Real.fromInt size) numQubits) ^ " density\n")
-              end
-
           val mbf = G.maxBranchingFactor o Seq.nth gates
 
-          fun applyKernels (kerns: (gate_idx Seq.t) list)
-                           (old as {state, numVerts, numEdges, numGates}) =
-              case kerns of
-                  nil => old
-                | kern :: remKerns =>
-                  let val _ = Seq.map (fn gidx => DataFlowGraphUtil.visit dfg gidx visited) kern
-                      val fusedKern = G.fuse (Seq.map (Seq.nth gates) kern)
-                      val {state = state',
-                           numVerts = numVerts',
-                           numEdges = numEdges'} = apply (fusedKern, state)
-                      val new = { state = state',
-                                  numVerts = numVerts + numVerts',
-                                  numEdges = numEdges + numEdges',
-                                  numGates = numGates + Seq.length kern }
-                  in
-                    statusUpdate { state = state', numVerts = numVerts', numEdges = numEdges', numGates = numGates + Seq.length kern };
-                    applyKernels remKerns new
-                  end
 
           fun bestPath (old as {state, numVerts, numEdges, numGates})
                        (paths: gate_idx Seq.t Seq.t) =
@@ -239,25 +265,24 @@ struct
                               (* TODO: maybe we shouldn't PURELY optimize for state size,
                                * but also consider the number of verts/edges inside? *)
                               (* TODO: also, need to make this a weighted expectation *)
-                              let val kern = G.fuse (Seq.map (Seq.nth gates)
-                                                             (Seq.nth paths i))
-                                  val { state = state',
-                                        numVerts = numVerts',
-                                        numEdges = numEdges' } =
-                                      apply' (kern, state, substate) in
-                                (SST.size state', numVerts', numEdges')
-                              end)
-                    fun better (p1 as (i1, (state1, verts1, edges1))) (p2 as (i2, (state2, verts2, edges2))) =
-                        if state1 < state2 orelse
-                           (state1 = state2 andalso verts1 + edges1 < verts2 + edges2) then
+                              applySub (G.fuse (Seq.map (Seq.nth gates) (Seq.nth paths i)),
+                                        state, substate))
+                    fun better (p1 as (i1, (relDensity1, edges1)))
+                               (p2 as (i2, (relDensity2, edges2))) =
+                        (*if relDensity1 < relDensity2 orelse
+                           (Real.== (relDensity1, relDensity2) andalso edges1 < edges2) then*)
+                        (*if edges1 < edges2 orelse (edges1 = edges2 andalso relDensity1 < relDensity2) then*)
+                        if Real.fromInt edges1 * relDensity1 < Real.fromInt edges2 * relDensity2 then
                           p1
                         else
                           p2
                             
-                    val (best, _) = Array.foldri
-                                      (fn (i, sve, bestsve) => better (i, sve) bestsve)
-                                      (0, Array.sub (stateEsts, 0)) stateEsts
+                    val (best, (relDensity, edges)) =
+                        Array.foldri
+                          (fn (i, sve, bestsve) => better (i, sve) bestsve)
+                          (0, Array.sub (stateEsts, 0)) stateEsts
                 in
+                  print ("Best path has relative density = " ^ Real.fmt (StringCvt.FIX (SOME 8)) relDensity ^ "\n");
                   Seq.nth paths best
                 end
 
@@ -271,7 +296,9 @@ struct
                 else
                   (* Kernelize gates on best path, apply them,
                    * then continue on with rest of circuit *)
-                  iter (applyKernels (kernelizeThese gates (bestPath old paths)) old)
+                  iter (applyKernels (kernelizeThese gates (bestPath old paths)) old
+                                     {dfg = dfg, gateCount = gateCount,
+                                      visited = visited, gates = gates})
               end
       in
         iter { state = state,
@@ -293,9 +320,15 @@ struct
                     val new = { state = state',
                                 numVerts = numVerts + numVerts',
                                 numEdges = numEdges + numEdges' }
-                    fun divPow2 r n = if n <= 0 then r else divPow2 (r / 2.0) (n - 1)
                 in
-                  print ("kernel " ^ Int.toString (i + 1) ^ "/" ^ Int.toString numkerns ^ ", " ^ Int.toString numVerts' ^ " vertices, " ^ Int.toString numEdges' ^ " edges, " ^ Int.toString (SST.size state') ^ " states, " ^ Real.fmt (StringCvt.FIX (SOME 8)) (divPow2 (Real.fromInt (SST.size state')) (#numQubits kern)) ^ " density\n");
+                  print
+                    ("kernel " ^ Int.toString (i + 1) ^ "/" ^ Int.toString numkerns ^ ", " ^
+                     Int.toString numVerts' ^ " vertices, " ^
+                     Int.toString numEdges' ^ " edges, " ^
+                     Int.toString (SST.size state') ^ " states, " ^
+                     Real.fmt (StringCvt.FIX (SOME 8))
+                              (Helpers.divPow2 (Real.fromInt (SST.size state'))
+                                               (#numQubits kern)) ^ " density\n");
                   iter (i + 1) new
                 end
       in
