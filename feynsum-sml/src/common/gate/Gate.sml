@@ -302,7 +302,7 @@ struct
       case pushFromGateDefn gd of
           [f0] => (fn (set, b) => set (f0 b))
         | [f0, f1] => (fn (set, b) => (set (f0 b); set (f1 b)))
-        | [f0, f1, f2, f3] => (fn (set, b) => (set (f0 b); set (f1 b); set (f1 b); set (f2 b)))
+        (* | [f0, f1] => (fn (set, b) => let val b0 = f0 b val b1 = f1 b in if B.equal (b0, b1) then set b0 else (set b0; set b1) end) *)
         | fs => (fn (set, b) => List.foldr (fn (f, u) => (set (f b); u)) () fs)
 
   fun pullFromGateDefn' gd =
@@ -311,20 +311,14 @@ struct
         | [f0, f1] => (fn (get, b) => let val (b0, c0) = f0 b
                                           val (b1, c1) = f1 b
                                       in C.+ (C.* (c0, get b0), C.* (c1, get b1)) end)
-        | [f0, f1, f2, f3] => (fn (get, b) => let val (b0, c0) = f0 b
-                                                  val (b1, c1) = f1 b
-                                                  val (b2, c2) = f2 b
-                                                  val (b3, c3) = f3 b
-                                              in C.+ (C.* (c0, get b0),
-                                                      C.+ (C.* (c1, get b1),
-                                                          C.+ (C.* (c2, get b2),
-                                                               C.* (c3, get b3)))) end)
+        (* | [f0, f1] => (fn (get, b) => let val (b0, c0) = f0 b *)
+        (*                                   val (b1, c1) = f1 b *)
+        (*                               in if B.equal (b0, b1) then C.* (C.+ (c0, c1), get b0) else C.+ (C.* (c0, get b0), C.* (c1, get b1)) end) *)
         | fs => (fn (get, b) => List.foldr (fn (f, a) => let val (b', c) = f b in C.+ (a, C.* (c, get b')) end) C.zero fs)
 
   fun fromGateDefn {numQubits = numQubits} gd =
     { (*push = (DelayedSeq.fromList o pushFromGateDefn gd),*)
       (*pull = (DelayedSeq.fromList o pullFromGateDefn gd),*)
-      (* TODO: might not get inlined properly... fix *)
       push = let val p = pushFromGateDefn' gd in (fn set => fn b => p (set, b)) end,
       (*pull = (fn get => List.foldr (fn ((b, c), a) => C.+ (a, C.* (c, get b))) C.zero o pullFromGateDefn gd),*)
       pull = let val p = pullFromGateDefn' gd in (fn get => fn b => p (get, b)) end,

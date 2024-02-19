@@ -46,8 +46,9 @@ local
   state/HashTable.sml
 
   ann "allowExtendedTextConsts true" in
-    GateDefn.sml
-    Gate.sml
+    gate/GateDefn.sml
+    gate/Gate.sml
+    (*gate/Unitary.sml*)
     Circuit.sml
   end
 

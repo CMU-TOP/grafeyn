@@ -3,8 +3,8 @@ sig
 
   type gate_idx = int
 
-  (* Traversal Automaton State *)
-  type state = { visited: bool array, indegree: int array }
+  (* Traversal State Automaton *)
+  type state = { visited: bool array, indegree: int array, frontier: gate_idx Seq.t ref }
 
   type data_flow_graph = DataFlowGraph.t
 
@@ -53,36 +53,30 @@ struct
          numQubits = qs}
       end*)
 
-  type state = { visited: bool array, indegree: int array }
+  type state = { visited: bool array, indegree: int array, frontier: gate_idx Seq.t ref }
 
-  fun copyState {visited = vis, indegree = deg} =
-      let fun copyArr a =
-              let val a' = ForkJoin.alloc (Array.length vis) in
-                Array.copy {src = a, dst = a', di = 0}; a'
-              end
-      in
-        { visited = copyArr vis,
-          indegree = copyArr deg }
+  fun copyState {visited = vis, indegree = deg, frontier = fr} =
+      let val dfr = !fr in
+        { visited = Helpers.copyArray vis,
+          indegree = Helpers.copyArray deg,
+          frontier = ref (Seq.tabulate (Seq.nth dfr) (Seq.length dfr))}
       end
 
-  fun bcas (arr, i, old, new) =
-    MLton.eq (old, Concurrency.casArray (arr, i) (old, new))
-
-  fun atomicAdd (arr: int array) i x =
-    let val old = Array.sub (arr, i)
-        val new = old + x in
-      if bcas (arr, i, old, new) then () else atomicAdd arr i x
-    end
-
-  fun visit {succs = succs, ...} i {visited = vis, indegree = deg} =
+  fun visit {succs = succs, ...} i {visited = vis, indegree = deg, frontier = fr} =
       (
         (* Set visited[i] = true *)
         Array.update (vis, i, true);
         (* Decrement indegree of each i dependency *)
-        Seq.applyIdx (Seq.nth succs i) (fn (_, j) => atomicAdd deg j ~1)
+        let val dfr = !fr
+            val ss = (Seq.nth succs i)
+            val ssdeg = SeqBasis.tabulate 5000 (0, Seq.length ss) (fn j => Helpers.fetchAndAdd (deg, Seq.nth ss j, ~1) = 0)
+            val addToFr = Seq.filterIdx (fn (idx, j) => Array.sub (ssdeg, idx) andalso not (Array.sub (vis, j))) ss
+        in
+          fr := Seq.append (Seq.filter (fn j => i <> j) dfr, addToFr)
+        end
       )
 
-  fun frontier {visited = vis, indegree = deg} =
+  (*fun frontier {visited = vis, indegree = deg} =
       let val N = Array.length vis
           fun iter i acc =
               if i < 0 then
@@ -93,14 +87,19 @@ struct
                               then i :: acc else acc)
       in
         Seq.fromList (iter (N - 1) nil)
-      end
+      end*)
+
+  fun frontier (st: state) = !(#frontier st)
 
   fun initState (graph: data_flow_graph) =
       let val N = Seq.length (#gates graph)
-          val vis = Array.array (N, false)
-          val deg = Array.tabulate (N, Seq.length o Seq.nth (#preds graph))
+          val vis = SeqBasis.tabulate 5000 (0, N) (fn _ => false)
+          val deg = SeqBasis.tabulate 5000 (0, N) (Seq.length o Seq.nth (#preds graph))
+          val fr = Seq.filter (fn i => Array.sub (deg, i) = 0) (Seq.tabulate (fn i => i) N)
       in
-        { visited = vis, indegree = deg }
+        { visited = vis,
+          indegree = deg,
+          frontier = ref fr }
       end
 
   fun scheduleWithOracle' (graph: data_flow_graph) (branching: gate_idx -> bool) (choose: 'state * gate_idx Seq.t -> gate_idx) (disableFusion: bool) (maxBranchingStride: int) (apply: 'state * gate_idx Seq.t -> 'state) state =
@@ -203,9 +202,11 @@ struct
                  (gateBranchingFactor: gate_idx -> int)
                  (st: state) =
       let val seed = #gen samp
+          val greedyInclNonBranching = true
+          val fr1bf = if greedyInclNonBranching then 1 else 0
           fun path (mbf: int) (cbf: int) (acc: gate_idx list) =
               let val fr = Seq.filter (fn gi => gateBranchingFactor gi * cbf <= mbf) (frontier st)
-                  val fr1 = Seq.filter (fn gi => gateBranchingFactor gi = 1) fr
+                  val fr1 = Seq.filter (fn gi => gateBranchingFactor gi = fr1bf) fr
               in
                 if Seq.length fr1 = 0 then
                   if Seq.length fr = 0 then
@@ -217,10 +218,14 @@ struct
                       path mbf (cbf * gateBranchingFactor gidx) (gidx :: acc)
                     end
                 else
-                  (* Add branching-factor=1 gates first *)
-                  (Helpers.forRange (0, Seq.length fr1)
-                                    (fn i => visit dfg (Seq.nth fr1 i) st);
-                   path mbf cbf (Seq.toList (Seq.rev fr1) @ acc))
+                  let fun visitFr1 i =
+                          if i >= Seq.length fr1 then ()
+                          else (visit dfg (Seq.nth fr1 i) st; visitFr1 (i + 1))
+                  in
+                    visitFr1 0;
+                    (* Add branching-factor=1 gates first *)
+                    path mbf cbf (Seq.toList (Seq.rev fr1) @ acc)
+                  end
               end
       in
         path (#max_branching samp) 1 nil

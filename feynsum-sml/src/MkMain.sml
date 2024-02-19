@@ -6,7 +6,8 @@ functor MkMain
    val maxBranchingStride: int
    val schedSamplePathDepth: int
    val schedSamplePaths: int
-   val schedSampleStates: int
+   val schedSampleMinStates: int
+   val schedSampleStates: real
    val blockSize: int
    val maxload: real
    val gateScheduler: string
@@ -30,6 +31,7 @@ struct
                          val maxBranchingStride = maxBranchingStride
                          val schedSamplePathDepth = schedSamplePathDepth
                          val schedSamplePaths = schedSamplePaths
+                         val schedSampleMinStates = schedSampleMinStates
                          val schedSampleStates = schedSampleStates
                          val blockSize = blockSize
                          val maxload = maxload
@@ -41,7 +43,7 @@ struct
    *)
 
 
-  fun main' ((inputName, circuit): string * DataFlowGraph.t) =
+  fun main ((inputName, circuit): string * DataFlowGraph.t) =
     let val numQubits = #numQubits circuit
         val gates = Seq.map (G.fromGateDefn {numQubits = numQubits}) (#gates circuit)
         val initState = SST.singleton (B.zeros, C.one)
@@ -61,11 +63,11 @@ struct
     end
 
 
-  structure FQ = FinishQubitScheduler (val maxBranchingStride = maxBranchingStride
+  (*structure FQ = FinishQubitScheduler (val maxBranchingStride = maxBranchingStride
                                        val disableFusion = disableFusion)
-  val sched = FQ.scheduler5
+  val sched = FQ.scheduler5*)
 
-  fun main ((inputName, circuit): string * DataFlowGraph.t) =
+  fun main' ((inputName, circuit): string * DataFlowGraph.t) =
     let val numQubits = #numQubits circuit
         val _ = print ("max branching stride = " ^ Int.toString maxBranchingStride ^ "\n")
         val gates = Seq.map (G.fromGateDefn {numQubits = numQubits}) (#gates circuit)

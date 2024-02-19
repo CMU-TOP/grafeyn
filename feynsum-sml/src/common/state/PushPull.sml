@@ -5,7 +5,8 @@ functor PushPull
    val maxBranchingStride: int
    val schedSamplePathDepth: int
    val schedSamplePaths: int
-   val schedSampleStates: int
+   val schedSampleMinStates: int
+   val schedSampleStates: real
    val blockSize: int
    val maxload: real
    val denseThreshold: real
@@ -26,7 +27,7 @@ sig
   val pullCount: G.t * SSS.t * SSC.t -> SSC.t
   val pull: G.t * SST.t -> SSS.t -> SST.t
   val apply: G.t * SST.t -> {state: SST.t, numVerts: int, numEdges: int}
-  val applySub: G.t * SST.t * B.t DelayedSeq.t -> real * int
+  val applySub: G.t * SST.t * B.t DelayedSeq.t -> real
   (*val pushApply: G.t * SST.t -> {state: SST.t, numVerts: int, numEdges: int}*)
   val pullInfo: G.t * SST.t -> SSS.t -> SST.t * int
   val applyAll: G.t Seq.t * SST.t -> DataFlowGraph.t
@@ -66,7 +67,8 @@ struct
 
   fun push ((kern, amps): G.t * B.t DelayedSeq.t) =
     let val cap = G.maxBranchingFactor kern * DelayedSeq.length amps
-        val sss = SSS.make { capacity = SSS.defaultPadding cap }
+        val cap' = Int.min (Helpers.exp2 numQubits, cap)
+        val sss = SSS.make { capacity = SSS.defaultPadding cap' }
         fun pushB b = G.push kern (fn x => SSS.insert sss (x, ())) b
         val _ = DelayedSeq.applyIdx amps (fn (_, b) => pushB b)
     in
@@ -76,7 +78,9 @@ struct
   fun pushCount ((kern, amps): G.t * B.t DelayedSeq.t) =
     let val cap = G.maxBranchingFactor kern * DelayedSeq.length amps
         val ssc = SSC.make { capacity = SSC.defaultPadding cap }
-        val _ = DelayedSeq.applyIdx amps (G.push kern (fn x => SSC.update ssc (x, 1)) o #2)
+        (* fun doB' (b: B.t) = G.push kern (fn b' => SSC.update ssc (b', 1)) b *)
+        fun doB (b: B.t) = let val cache = SSS.make { capacity = G.maxBranchingFactor kern } in G.push kern (fn b' => if not (SSS.contains (cache, b')) then (SSS.insert cache (b', ()); SSC.update ssc (b', 1)) else ()) b end
+        val _ = DelayedSeq.applyIdx amps (doB o #2)
     in
       ssc
     end
@@ -84,19 +88,28 @@ struct
   fun pullCount ((kern, substate, amps): G.t * SSS.t * SSC.t) =
     let val amps' = SSC.compactKeys amps
         val ssc = SSC.make { capacity = SSC.defaultPadding (DelayedSeq.length amps') }
-        fun doB (b: B.t) = G.pull kern
-                                  (fn b' =>
-                                      ((if SSS.contains (substate, b') then
-                                         SSC.update ssc (b, 1) else ()); C.zero)) b
+        fun doB (b: B.t) =
+            let val cache = SSS.make { capacity = G.maxBranchingFactor kern } in
+              G.pull kern
+                     (fn b' => if not (SSS.contains (cache, b')) then
+                                 (SSS.insert cache (b', ());
+                                  (if SSS.contains (substate, b') then
+                                     SSC.update ssc (b, 1) else ());
+                                  C.zero)
+                               else
+                                 C.zero) b
+            end
+        (* fun doB (b: B.t) = G.pull kern *)
+        (*                           (fn b' => *)
+        (*                               ((if SSS.contains (substate, b') then *)
+        (*                                  SSC.update ssc (b, 1) else ()); C.zero)) b *)
         val _ = DelayedSeq.applyIdx amps' (fn (_, b) => (doB b; ()))
     in
       ssc
     end
 
   fun pull ((kern, amps): G.t * SST.t) (tgts: SSS.t) =
-      SST.fromKeys
-        (SSS.toKeys tgts,
-         G.pull kern (fn b => Option.getOpt (SST.lookup (amps, b), C.zero)))
+      SST.fromKeys (SSS.toKeys tgts, G.pull kern (fn b => SST.lookupElse (amps, b, C.zero)))
 
 (*  fun pushApply ((kern, state) : G.t * SST.t) =
       let val pushF = G.pull kern (* TODO: implement push that stores amps too *)
@@ -130,6 +143,8 @@ struct
              end))
         (0, op+)
 
+  (* TODO: don't construct intermediate DelayedSeq with SST.compact,
+   * instead just pass the whole SST to push *)
   fun apply ((kern, state): G.t * SST.t) =
       let val pushFrom = SST.compactKeys state
           val pushed = push (kern, pushFrom)
@@ -141,9 +156,8 @@ struct
           numEdges = numEdges }
       end
 
-  fun applySub ((kern, state, substate): G.t * SST.t * B.t DelayedSeq.t) =
+  fun applySub' ((kern, state, substate): G.t * SST.t * B.t DelayedSeq.t) =
       let val k = DelayedSeq.length substate
-          (*val kbf = G.maxBranchingFactor kern*)
 
           val substate' = SSS.make { capacity = SSS.defaultPadding k }
           val _ = DelayedSeq.applyIdx substate (fn (_, b) => SSS.insert substate' (b, ()))
@@ -156,26 +170,30 @@ struct
            op+ 0.0
            (DelayedSeq.map
               (fn b => Real.fromInt (SSC.lookupElse (pushCounts, b, 0)) /
-                       Real.fromInt (SSC.lookupElse (pullCounts, b, 0)))
+                       Real.fromInt (SSC.lookupElse (pullCounts, b, 1)))
               (SST.compactKeys pullAmps)) / Real.fromInt k,
          edges)
       end
-        (*
-          val pushed_size = SSC.size pushCounts
 
-          val num_samples = Int.max (1, pushed_size div kbf)
+  fun applySub ((kern, state, substate): G.t * SST.t * B.t DelayedSeq.t) =
+      let val k = DelayedSeq.length substate
+          val kbf = G.maxBranchingFactor kern
+          val pushed = push (kern, substate)
 
+          val subpushed = sampleStates (SSS.compactKeys pushed) k
+          val substate' = SSS.make { capacity = SSS.defaultPadding k }
+          val _ = DelayedSeq.applyIdx subpushed (fn (_, b) => SSS.insert substate' (b, ()))
 
-          val subpushed = sampleStates (SSC.compactKeys pushed) num_samples
-          val substate' = SSC.make { capacity = (DelayedSeq.length subpushed * 3) div 2 }
-          val _ = DelayedSeq.applyIdx subpushed (fn (_, b) => SSC.insert substate' (b, 1))
-          val (substate'', numEdges) = pullInfo (kern, state) substate'
-          val numVerts = SST.nonEmptyKeys substate''
+          val pulled = pull (kern, state) pushed
+
+          val numPushed = SSS.size pushed
+          val numPulled = SST.size pulled
+          val numPushedR = Real.fromInt numPushed
+          val numPulledR = Real.fromInt numPulled
+          val kR = Real.fromInt k
       in
-        { state = substate'',
-          numVerts = numVerts,
-          numEdges = numEdges }
-      end*)
+        numPulledR * numPushedR / Real.min (numPushedR, kR)
+      end
 
   fun kernelizeThese (allGates: G.t Seq.t) (theseGates: gate_idx Seq.t) =
       let val gateCount = Seq.length theseGates
@@ -240,6 +258,58 @@ struct
             applyKernels remKerns new info
           end
 
+
+  fun bestPath (gates: G.t Seq.t)
+               (old as {state, numVerts, numEdges, numGates})
+               (paths: gate_idx Seq.t Seq.t) =
+      if Seq.length paths = 1 then
+        Seq.nth paths 0
+      else
+        let val numkeys = SST.estimateSize {subsection = schedSampleMinStates} state in
+          if numkeys <= schedSampleMinStates * schedSamplePaths then
+            (print ("Skipping sampling, estimated " ^ Int.toString numkeys ^ " states\n");
+             Seq.nth paths 0)
+          else
+            let val keys = SST.compactKeys state
+                val numkeys = DelayedSeq.length keys
+                val k' = Real.floor (Real.fromInt numkeys * schedSampleStates)
+                (* Clamp k within [schedSampleMinStates, size of SST] *)
+                val k = Int.min (Int.max (k', schedSampleMinStates), numkeys)
+                val substate = sampleStates keys k
+                val stateEsts =
+                    SeqBasis.tabulate
+                      1 (0, Seq.length paths)
+                      (fn i =>
+                          (* TODO: maybe we shouldn't PURELY optimize for state size,
+                           * but also consider the number of verts/edges inside? *)
+                          applySub (G.fuse (Seq.map (Seq.nth gates) (Seq.nth paths i)),
+                                    state, substate))
+                (*fun better (p1 as (i1, (relDensity1, edges1)))
+                       (p2 as (i2, (relDensity2, edges2))) =
+                let val densityRatio = relDensity1 / relDensity2 in
+                  if densityRatio <= 0.9 then
+                    p1
+                  else if 0.9 < densityRatio andalso densityRatio < 1.11111
+                          andalso 10 * edges1 < 9 * edges2 then
+                    p1
+                  else
+                    p2
+                end*)
+                fun better (p1 as (i1, r1)) (p2 as (i2, r2)) =
+                    if r1 < r2 then p1 else p2
+
+                (*val _ = print ("Average path out of " ^ Int.toString (Array.length stateEsts) ^ " paths has relative density = " ^ Real.fmt (StringCvt.FIX (SOME 8)) (Array.foldri (fn (i, (d, _), d') => d + d') 0.0 stateEsts / Real.fromInt (Array.length stateEsts)) ^ "\n")*)
+                                              
+                val (best, _) =
+                    Array.foldri
+                      (fn (i, sve, bestsve) => better (i, sve) bestsve)
+                      (0, Array.sub (stateEsts, 0)) stateEsts
+            in
+              (*print ("Best path has relative density = " ^ Real.fmt (StringCvt.FIX (SOME 8)) relDensity ^ "\n");*)
+              Seq.nth paths best
+            end
+        end
+
   fun applyAll ((gates, state): G.t Seq.t * SST.t) (dfg: DataFlowGraph.t) =
       let fun lshift (x, n) = if n <= 0 then x else lshift (2 * x, n - 1)
           val visited = DataFlowGraphUtil.initState dfg
@@ -251,41 +321,6 @@ struct
 
           val mbf = G.maxBranchingFactor o Seq.nth gates
 
-
-          fun bestPath (old as {state, numVerts, numEdges, numGates})
-                       (paths: gate_idx Seq.t Seq.t) =
-              if Seq.length paths = 1 then
-                Seq.nth paths 0
-              else
-                let val substate = sampleStates (SST.compactKeys state) schedSampleStates
-                    val stateEsts =
-                        SeqBasis.tabulate
-                          1 (0, Seq.length paths)
-                          (fn i =>
-                              (* TODO: maybe we shouldn't PURELY optimize for state size,
-                               * but also consider the number of verts/edges inside? *)
-                              (* TODO: also, need to make this a weighted expectation *)
-                              applySub (G.fuse (Seq.map (Seq.nth gates) (Seq.nth paths i)),
-                                        state, substate))
-                    fun better (p1 as (i1, (relDensity1, edges1)))
-                               (p2 as (i2, (relDensity2, edges2))) =
-                        (*if relDensity1 < relDensity2 orelse
-                           (Real.== (relDensity1, relDensity2) andalso edges1 < edges2) then*)
-                        (*if edges1 < edges2 orelse (edges1 = edges2 andalso relDensity1 < relDensity2) then*)
-                        if Real.fromInt edges1 * relDensity1 < Real.fromInt edges2 * relDensity2 then
-                          p1
-                        else
-                          p2
-                            
-                    val (best, (relDensity, edges)) =
-                        Array.foldri
-                          (fn (i, sve, bestsve) => better (i, sve) bestsve)
-                          (0, Array.sub (stateEsts, 0)) stateEsts
-                in
-                  print ("Best path has relative density = " ^ Real.fmt (StringCvt.FIX (SOME 8)) relDensity ^ "\n");
-                  Seq.nth paths best
-                end
-
           fun iter (old as {state, numVerts, numEdges, numGates}) =
               (* Note: length of paths might be less than
                * schedSamplePaths because we remove duplicate paths *)
@@ -296,7 +331,7 @@ struct
                 else
                   (* Kernelize gates on best path, apply them,
                    * then continue on with rest of circuit *)
-                  iter (applyKernels (kernelizeThese gates (bestPath old paths)) old
+                  iter (applyKernels (kernelizeThese gates (bestPath gates old paths)) old
                                      {dfg = dfg, gateCount = gateCount,
                                       visited = visited, gates = gates})
               end
