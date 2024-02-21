@@ -75,8 +75,8 @@ struct
         val kernels = Seq.map (G.fuse o Seq.map (Seq.nth gates)) sched'*)
         val kernels = PP.dumbFusion gates
         val initState = SST.singleton (B.zeros, C.one)
-        val { state, numVerts, numEdges } = PP.applyAllOld (gates, initState)
-        val (fp, tm) = Util.getTime (fn _ => F.fingerprint (SST.unsafeViewContents state))
+        val { state, numEdges } = PP.applyAllOld (gates, initState)
+        val (fp, tm) = Util.getTime (fn _ => F.fingerprint (PP.unsafeViewContents state))
         val _ = print ("computed fingerprint in " ^ Time.fmt 4 tm ^ "s\n")
         val _ = Util.for (0, Seq.length fp)
                          (fn i =>
@@ -87,7 +87,7 @@ struct
                                   ^ C.toString c ^ "\n")
                              end)
     in
-      print ("Completed with vertices = " ^ Int.toString numVerts ^ " and edges = " ^ Int.toString numEdges ^ "\n")
+      print ("Completed with edges = " ^ Int.toString numEdges ^ "\n")
     end
    
 

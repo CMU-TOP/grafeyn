@@ -3,6 +3,7 @@ sig
   val riMult: real -> IntInf.int -> IntInf.int
   val log2: real -> real
   val exp2: int -> int
+  val exp2inf: int -> IntInf.int
   val divPow2: real -> int -> real
   val forRange: int * int -> (int -> 'a) -> unit
   val bcas: ('a array * int * 'a * 'a) -> bool
@@ -18,7 +19,9 @@ struct
 
   (* r / 2^n *)
   fun divPow2 r n = if n <= 0 then r else divPow2 (r / 2.0) (n - 1)
-  fun exp2 n = let fun h x n = if n <= 0 then x else h (x + x) (n - 1) in h 1 n end
+  (* fun exp2 n = let fun h x n = if n <= 0 then x else h (x + x) (n - 1) in h 1 n end *)
+  fun exp2 n = Word64.toInt (Word64.<< (0w1, Word64.fromInt n))
+  fun exp2inf n = IntInf.pow (2, n)
 
   fun bcas (arr, i, old, new) =
     MLton.eq (old, Concurrency.casArray (arr, i) (old, new))

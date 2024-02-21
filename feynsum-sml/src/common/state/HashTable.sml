@@ -43,7 +43,8 @@ sig
   val compact: table -> (K * V) DelayedSeq.t
   val compactKeys: table -> K DelayedSeq.t
 
-  val increaseCapacityByFactor: (table * real) -> table
+  val increaseCapacityByFactor: table -> real -> table
+  val resize: table -> int -> table
 
   val fromKeys: (K array * (K -> V)) -> table
   val fromKeysWith: (K array * (K -> V * 'a)) -> ('a * ('a * 'a -> 'a)) -> table * 'a
@@ -60,7 +61,8 @@ sig
 
   val reset: table -> unit
   
-  val estimateSize: {subsection: int} -> table -> int
+  val estimateSize : {subsection: int } -> table -> int
+  val estimateSize': {subsection: real, minsection: int} -> table -> int
 end
 
 functor HashTable (type K
@@ -221,16 +223,16 @@ struct
         (Array.length keepers)
     end
 
+  fun resize table newCap =
+      let val newTable = make {capacity = newCap} in
+        ForkJoin.parfor 1000 (0, capacity table)
+                        (fn i => if slotEmpty table i then ()
+                                 else insertForceUnique newTable (kvsub table i));
+        newTable
+      end
 
-  fun increaseCapacityByFactor (table, alpha) =
-    let val newCap = Real.ceil (alpha * Real.fromInt (capacity table))
-        val newTable = make {capacity = newCap}
-    in
-      ForkJoin.parfor 1000 (0, capacity table)
-                      (fn i => if slotEmpty table i then ()
-                               else insertForceUnique newTable (kvsub table i));
-      newTable
-    end
+  fun increaseCapacityByFactor table alpha =
+      resize table (Real.ceil (alpha * Real.fromInt (capacity table)))
 
   fun fromKeys (keys, f) =
     let val cap = Array.length keys
@@ -268,17 +270,22 @@ struct
 
   fun reset {keys, vals} = Helpers.resetArray (keys, emptykey)
 
-  fun estimateSize {subsection = subs} table =
-      let val cap = capacity table in
-        if subs < capacity table then
+  fun estimateSize' {subsection, minsection} table =
+      let val cap = capacity table
+          val rcap = Real.fromInt cap
+          val subs = Int.max (minsection, Real.round (subsection * rcap)) in
+        if subs < cap then
           Real.round
             (Real.fromInt (SeqBasis.reduce
                              5000 op+ 0 (0, subs)
                              (fn i => if slotEmpty table i then 0 else 1))
-             * Real.fromInt cap / Real.fromInt subs)
+             * rcap / Real.fromInt subs)
         else
           size table
       end
+
+  fun estimateSize {subsection} table =
+      estimateSize' {subsection = 0.0, minsection = subsection} table
 end
 
 functor SparseStateSet (structure B: BASIS_IDX
