@@ -43,7 +43,7 @@ struct
    *)
 
 
-  fun main ((inputName, circuit): string * DataFlowGraph.t) =
+  (*fun main' ((inputName, circuit): string * DataFlowGraph.t) =
     let val numQubits = #numQubits circuit
         val gates = Seq.map (G.fromGateDefn {numQubits = numQubits}) (#gates circuit)
         val initState = SST.singleton (B.zeros, C.one)
@@ -60,14 +60,14 @@ struct
                              end)
     in
       print ("Completed with vertices = " ^ Int.toString numVerts ^ " and edges = " ^ Int.toString numEdges ^ "\n")
-    end
+    end*)
 
 
   (*structure FQ = FinishQubitScheduler (val maxBranchingStride = maxBranchingStride
                                        val disableFusion = disableFusion)
   val sched = FQ.scheduler5*)
 
-  fun main' ((inputName, circuit): string * DataFlowGraph.t) =
+  fun main ((inputName, circuit): string * DataFlowGraph.t) =
     let val numQubits = #numQubits circuit
         val _ = print ("max branching stride = " ^ Int.toString maxBranchingStride ^ "\n")
         val gates = Seq.map (G.fromGateDefn {numQubits = numQubits}) (#gates circuit)
@@ -75,7 +75,7 @@ struct
         val kernels = Seq.map (G.fuse o Seq.map (Seq.nth gates)) sched'*)
         val kernels = PP.dumbFusion gates
         val initState = SST.singleton (B.zeros, C.one)
-        val { state, numEdges } = PP.applyAllOld (gates, initState)
+        val { state, numEdges } = PP.applyAllOld (kernels, initState)
         val (fp, tm) = Util.getTime (fn _ => F.fingerprint (PP.unsafeViewContents state))
         val _ = print ("computed fingerprint in " ^ Time.fmt 4 tm ^ "s\n")
         val _ = Util.for (0, Seq.length fp)

@@ -65,7 +65,7 @@ local
   schedulers/GreedyNonBranching.sml
   schedulers/FinishQubit.sml
 
-  state/PushPull.sml
+  state/PushPull2.sml
 
   Fingerprint.sml
 in
