@@ -9,7 +9,8 @@ sig
                 (*pull: B.t -> (B.t * C.t) DelayedSeq.t,*)
                 pull: (B.t -> C.t) -> (B.t -> C.t),
                 maxBranchingFactor: int,
-                numQubits: int }
+                numQubits: int,
+                defn: GateDefn.t Seq.t}
 
   type t = gate
 
@@ -40,7 +41,8 @@ struct
   type gate = { push: (B.t -> unit) -> (B.t -> unit),
                 pull: (B.t -> C.t) -> (B.t -> C.t),
                 maxBranchingFactor: int,
-                numQubits: int }
+                numQubits: int,
+                defn: GateDefn.t Seq.t}
 
   type t = gate
 
@@ -133,7 +135,9 @@ struct
           (*pull = (fn b => flattenAndJoin (DelayedSeq.singleton (pull b))),*)
           pull = pull,
           maxBranchingFactor = maxBranchingFactor,
-          numQubits = numQubits }
+          numQubits = numQubits,
+          defn = Seq.flatten (Seq.map #defn gs)
+        }
       end
 
   val one = R.fromLarge 1.0
@@ -323,7 +327,8 @@ struct
       (*pull = (fn get => List.foldr (fn ((b, c), a) => C.+ (a, C.* (c, get b))) C.zero o pullFromGateDefn gd),*)
       pull = let val p = pullFromGateDefn' gd in (fn get => fn b => p (get, b)) end,
       maxBranchingFactor = GateDefn.maxBranchingFactor gd,
-      numQubits = numQubits
+      numQubits = numQubits,
+      defn = Seq.singleton gd
     }
 
   fun maxBranchingFactor (g: gate) = #maxBranchingFactor g

@@ -68,6 +68,7 @@ local
   state/PushPull2.sml
 
   Fingerprint.sml
+  Kernelize.sml
 in
   structure Rat
 
@@ -121,4 +122,5 @@ in
   structure GreedyBranchingScheduler
   functor GreedyNonBranchingScheduler
   functor FinishQubitScheduler
+  functor Kernelize
 end
