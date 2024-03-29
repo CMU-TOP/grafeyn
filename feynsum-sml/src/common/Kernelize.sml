@@ -109,6 +109,10 @@ struct
                 if i < (Seq.length gates)
                 then
                     let
+                        (* val qstr = Seq.toString (Int.toString) (G.getGateArgs (Seq.nth gates i)) *)
+                        val qstr = String.concatWith ", " (List.map (Int.toString) (G.getGateArgs (Seq.nth gates i)) )
+                        val _ = print("Qubits touched: " ^ qstr ^ "\n")
+                        val _ = print("Num qubits touched: " ^ Int.toString(G.numUniqueQubitsTouched (Seq.nth gates i)) ^ "\n")
                         fun innerloop defns j =
                             if j < (Seq.length defns)
                             then

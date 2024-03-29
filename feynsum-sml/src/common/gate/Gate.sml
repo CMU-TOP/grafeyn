@@ -22,7 +22,9 @@ sig
   val push: gate -> (B.t -> unit) -> (B.t -> unit)
   val pull: gate -> (B.t -> C.t) -> (B.t -> C.t)
   val fuse: gate Seq.t -> gate
-  (*val control: gate -> qubit_idx -> gate*)
+  val getGateArgs: gate -> (qubit_idx list)
+  val numUniqueQubitsTouched: gate -> int
+    (*val control: gate -> qubit_idx -> gate*)
 end
 
 
@@ -108,6 +110,45 @@ struct
           numQubits = numQubits1 }
       end*)
 
+  fun getGateArgsHelper (gatedefs: GateDefn.t Seq.t) =
+      (* GateDefn.getGateArgs (Seq.nth (#defn g) 0) *)
+      let
+        (* TODO: Surely there's a more idiomatic way to compute this *)
+        fun loop i list =
+            if i < Seq.length gatedefs
+            then
+              let
+                val defn = Seq.nth gatedefs i
+                val gateArgs = GateDefn.getGateArgs defn
+                fun innerloop j noDupesList =
+                    if j < List.length gateArgs
+                    then
+                      let
+                        fun filterFun x =
+                            List.all (fn y => x <> y) noDupesList
+                        val toAppend = List.filter (filterFun) gateArgs
+                        val newNoDupesList = noDupesList @ toAppend
+                      in
+                        innerloop (j+1) newNoDupesList
+                      end
+                    else
+                      noDupesList
+                val newlist = innerloop 0 list
+              in
+                loop (i+1) newlist
+              end
+            else
+              list
+      in
+        loop 0 []
+      end
+
+  fun getGateArgs (g: gate) =
+      getGateArgsHelper(#defn g)
+
+  fun numUniqueQubitsTouched (g: gate) =
+      List.length (getGateArgs g)
+
   fun fuse (gs: gate Seq.t) =
       let val numQubits = #numQubits (Seq.nth gs 0)
           val numGates = Seq.length gs
@@ -129,7 +170,12 @@ struct
           val pull = Seq.iterate (fn (f, g) => pullIter (f, #pull g))
                                  (fn b => DelayedSeq.singleton (b, C.one)) gs*)
 
-          val maxBranchingFactor = Seq.reduce op* 1 (Seq.map #maxBranchingFactor gs)
+          val allDefns = Seq.flatten(Seq.map (fn g => (#defn g)) gs)
+          val numUnique = List.length (getGateArgsHelper allDefns)
+          val cap = Helpers.exp2(numUnique)
+
+          val maxBranchingFactor = Int.min(cap,
+                                           Seq.reduce op* 1 (Seq.map #maxBranchingFactor gs))
       in
         { push = push,
           (*pull = (fn b => flattenAndJoin (DelayedSeq.singleton (pull b))),*)
