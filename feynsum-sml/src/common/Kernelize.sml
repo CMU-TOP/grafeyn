@@ -44,11 +44,11 @@ struct
             let
                 val other = minIndex seq (start+1)
             in
-                if Seq.nth seq start = Int.min((Seq.nth seq start), (Seq.nth seq other))
+                if Seq.nth seq other = Int.min((Seq.nth seq start), (Seq.nth seq other))
                 then
-                    start
-                else
                     other
+                else
+                    start
             end
 
     (* Assume costArray is pairs of (index, cost) *)
@@ -89,7 +89,6 @@ struct
                                        Seq.singleton (G.fuse (Seq.subseq gateList (priorIndex, i-priorIndex))))
                         else
                             gateList
-                    val _ = print("done\n")
                 in
                     fused
                 end

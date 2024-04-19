@@ -170,12 +170,27 @@ struct
           val pull = Seq.iterate (fn (f, g) => pullIter (f, #pull g))
                                  (fn b => DelayedSeq.singleton (b, C.one)) gs*)
 
+          (* TODO: Come up with a more rigorously justified cap, or make this a variable *)
+          val maxHandlableQubits = 31
+          val maxIntVal = Helpers.exp2(maxHandlableQubits)
+
           val allDefns = Seq.flatten(Seq.map (fn g => (#defn g)) gs)
           val numUnique = List.length (getGateArgsHelper allDefns)
-          val cap = Helpers.exp2(numUnique)
+          val cap = if numUnique >= maxHandlableQubits
+                    then
+                      maxIntVal
+                    else
+                      Helpers.exp2(numUnique)
+
+          fun cappedMult (a: int, b: int): int =
+              if a > 0 andalso ((maxIntVal div a) <= b)
+              then
+                maxIntVal
+              else
+                a*b
 
           val maxBranchingFactor = Int.min(cap,
-                                           Seq.reduce op* 1 (Seq.map #maxBranchingFactor gs))
+                                           Seq.reduce cappedMult 1 (Seq.map #maxBranchingFactor gs))
       in
         { push = push,
           (*pull = (fn b => flattenAndJoin (DelayedSeq.singleton (pull b))),*)
