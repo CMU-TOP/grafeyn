@@ -132,6 +132,20 @@ def most_recent_row(data, simulator, threads, inp):
     return None
 
 
+def most_recent_rows(data, simulator, threads, inp):
+  try:
+    rows = [
+      row for row in data
+      if check_value(row, 'simulator', simulator) and
+        check_value(row, 'threads', threads) and
+        check_value(row, 'input', inp)
+    ]
+    return rows[-10:]
+  except:
+    print(f"[WARN] couldn't find rows for: simulator={simulator} threads={threads} input={inp}")
+    return None
+
+
 def get_total_nonzero_count(data, inp):
   try:
     cs = parse_nonzero_counts(most_recent_row(data, 'feynsum-sml', None, inp))
@@ -164,8 +178,20 @@ def get_num_gates(data, inp):
   return parse_num_gates(most_recent_row(data, "feynsum-sml", None, inp))
 def get_time(data, simulator, threads, inp):
   return parse_time(most_recent_row(data, simulator, threads, inp))
+def get_avg_time(data, simulator, threads, inp):
+  try:
+    tms = [parse_time(x) for x in most_recent_rows(data, simulator, threads, inp)]
+    return sum(tms) / len(tms)
+  except:
+    return None
 def get_maxrss(data, simulator, threads, inp):
   return parse_maxrss(most_recent_row(data, simulator, threads, inp))
+def get_avg_maxrss(data, simulator, threads, inp):
+  try:
+    rs = [parse_maxrss(x) for x in most_recent_rows(data, simulator, threads, inp)]
+    return sum(rs) / len(rs)
+  except:
+    return None
 def get_returncode(data, simulator, threads, inp):
   return parse_returncode(most_recent_row(data, simulator, threads, inp))
   
@@ -401,16 +427,15 @@ def improvement_table():
     stats = {
       s: {
         'ret': get_returncode(data, s, max_threads, inp),
-        'time': get_time(data, s, max_threads, inp),
-        'mem': get_maxrss(data, s, max_threads, inp)
+        'time': get_avg_time(data, s, max_threads, inp),
+        'mem': get_avg_maxrss(data, s, max_threads, inp)
       }
       for s in simulator_names
     }
     def ok(s, k):
       return stats[s]['ret'] == 0 and stats[s][k] is not None
     keep = \
-      (ok('feynsum-sml', 'time') or ok('feynsum-sml', 'mem')) and \
-      any(ok(s,k) for s in simulator_cols for k in ['time','mem'])
+      all(ok('feynsum-sml', k) for k in ['time','mem'])
     if not keep:
       continue
 

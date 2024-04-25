@@ -5,6 +5,7 @@ GEN=scripts/gencmds
 RUN=scripts/runcmds
 
 NOW=$(date '+%y%m%d-%H%M%S')
+#NOW="231017-035001"
 mkdir -p $ROOT/results
 RESULTS=$ROOT/results/$NOW
 
@@ -14,7 +15,10 @@ RESULTS=$ROOT/results/$NOW
 ## For example:
 ##   $GEN | jq -c 'select(.input == "bv_n30.qasm") | $RUN ...'
 
-$GEN $@ \
-| $RUN --output $RESULTS
+(cd feynsum-sml && make)
+
+$GEN -m r6i.32xlarge --trials 10 $@ \
+| jq -c 'select(.simulator != "feynsum-rust")' \
+| $RUN --timeout 1800 --output $RESULTS
 
 echo "[INFO] wrote results to $RESULTS"
