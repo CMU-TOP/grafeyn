@@ -9,14 +9,15 @@ sig
     sharing G.C = C
 
     val cost: G.t -> int (* TODO: Delete this, just wanted to check types *)
-    val computeCosts: G.t Seq.t -> (int * int) Seq.t -> int -> (int * int) Seq.t (* TODO: Delete this, just wanted to check types *)
-    val mediocreFusion: G.t Seq.t -> G.t Seq.t
+    val computeCosts: DataFlowGraph.t -> DataFlowGraphUtil.state -> (int * int) Seq.t -> int -> (G.t Seq.t * (int * int) Seq.t) (* TODO: Delete this, just wanted to check types *)
+    val performGateFusion: DataFlowGraph.t -> G.t Seq.t
 end =
 struct
     structure B = B
     structure C = C
     structure G = Gate(structure B = B
                        structure C = C)
+    structure U = DataFlowGraphUtil
 
     fun cost (g: G.t) =
         #maxBranchingFactor g
@@ -52,37 +53,45 @@ struct
             end
 
     (* Assume costArray is pairs of (index, cost) *)
-    fun computeCosts (gates: G.t Seq.t) (costArray: (int * int) Seq.t) (num_gates: int) =
-        if num_gates <= Seq.length gates
-        then
-            let
-                (* val costs = Seq.tabulate (fn i => (Seq.nth costArray i) + (cost (Seq.nth gates i))) i *)
-                val _ = print("computeCosts, num_gates=" ^ Int.toString(num_gates) ^ "\n")
-                val costs = Seq.tabulate (fn j =>
-                                             let
-                                                 val fused_gate = G.fuse(Seq.subseq gates (j, num_gates-j))
-                                                 val tuple as (prior_index, prior_cost) = Seq.nth costArray j
-                                             in
-                                                 prior_cost + (cost fused_gate)
-                                             end
-                                         ) num_gates
-                val bestIndex = minIndex costs 0
-                val _ = print(" cost array: \n  ")
-                val _ = printSeq (Seq.tabulate (fn j => (j, Seq.nth costs j)) (Seq.length costs))
-                val _ = print(" Min index: " ^ Int.toString(bestIndex) ^ "\n")
-                val newCostArray = Seq.append(costArray, (Seq.singleton (bestIndex, (Seq.nth costs bestIndex))))
-            in
-                computeCosts gates newCostArray (num_gates+1)
-            end
-        else
-            costArray
+    fun computeCosts (circuit: DataFlowGraph.t) (state: U.state) (costArray: (int * int) Seq.t) (num_gates: int) =
+        let
+            val numQubits = #numQubits circuit
+            val gates = Seq.map (G.fromGateDefn {numQubits = numQubits}) (#gates circuit)
 
+            val frontier = U.frontier state
+        in
+            (* Exit once frontier is empty *)
+            if Seq.length (frontier) > 0 andalso num_gates <= Seq.length gates
+            then
+                let
+                    (* val costs = Seq.tabulate (fn i => (Seq.nth costArray i) + (cost (Seq.nth gates i))) i *)
+                    val _ = print("computeCosts, num_gates=" ^ Int.toString(num_gates) ^ "\n")
+                    val costs = Seq.tabulate (fn j =>
+                                                 let
+                                                     val fused_gate = G.fuse(Seq.subseq gates (j, num_gates-j))
+                                                     val tuple as (prior_index, prior_cost) = Seq.nth costArray j
+                                                 in
+                                                     prior_cost + (cost fused_gate)
+                                                 end
+                                             ) num_gates
+                    val bestIndex = minIndex costs 0
+                    val _ = print(" cost array: \n  ")
+                    val _ = printSeq (Seq.tabulate (fn j => (j, Seq.nth costs j)) (Seq.length costs))
+                    val _ = print(" Min index: " ^ Int.toString(bestIndex) ^ "\n")
+                    val newCostArray = Seq.append(costArray, (Seq.singleton (bestIndex, (Seq.nth costs bestIndex))))
+                in
+                    computeCosts circuit state newCostArray (num_gates+1)
+                end
+            else
+                (gates, costArray)
+          end
+
+    (* Given the costs of each kernel, return the best possible kernelization *)
     fun fuseGates gates costArray =
         let
             fun fuseGatesHelper gateList costArray i =
                 let
                     val priorIndex = #1 (Seq.nth costArray i)
-                    val _ = print("Fusing gates: " ^ Int.toString(priorIndex) ^ "-" ^ Int.toString(i) ^ "\n")
                     val fused = if i > 0
                         then
                             Seq.append((fuseGatesHelper (Seq.subseq gateList (0, priorIndex)) costArray priorIndex),
@@ -97,21 +106,30 @@ struct
             fuseGatesHelper gates costArray (Seq.length gates)
         end
 
-    fun mediocreFusion gates = (* raise Fail "not yet implemented" *)
+    fun performGateFusion circuit =
         let
             (* Create empty cost array *)
-            val costArray = computeCosts gates (Seq.singleton((0,0))) 1
+            val (gates, costArray) = computeCosts circuit (U.initState circuit) (Seq.singleton((0,0))) 1
+
+            val dag = U.initState circuit
+
+            val frontier = U.frontier dag
+
+            val _ = print("Frontier:\n ")
+            val _ = print(Seq.toString(Int.toString) frontier)
 
             val _ = print("Cost array:\n ")
             val _ = printSeq costArray
+            (* Print each kernel *)
             fun loop gates i =
                 if i < (Seq.length gates)
                 then
                     let
-                        (* val qstr = Seq.toString (Int.toString) (G.getGateArgs (Seq.nth gates i)) *)
+                        val _ = print("Kernel " ^ Int.toString(i) ^ ":\n")
                         val qstr = String.concatWith ", " (List.map (Int.toString) (G.getGateArgs (Seq.nth gates i)) )
                         val _ = print("Qubits touched: " ^ qstr ^ "\n")
-                        val _ = print("Num qubits touched: " ^ Int.toString(G.numUniqueQubitsTouched (Seq.nth gates i)) ^ "\n")
+                        val _ = print("Unique qubits touched: " ^ Int.toString(G.numUniqueQubitsTouched (Seq.nth gates i)) ^ "\n")
+                        (* Print gates within each kernel *)
                         fun innerloop defns j =
                             if j < (Seq.length defns)
                             then
@@ -127,7 +145,7 @@ struct
                         val _ = print("(")
                         val _ = innerloop (#defn (Seq.nth gates i)) 0
                         val _ = print(" maxBranchFactor: " ^ Int.toString(#maxBranchingFactor (Seq.nth gates i)))
-                        val _ = print(")\n")
+                        val _ = print(")\n\n")
                     in
                         loop gates (i + 1)
                     end
@@ -137,4 +155,46 @@ struct
         in
             fuseGates gates costArray
         end
-end
+
+  (* Old formulation for fusing, which does not reorder gates *)
+  (*     fun mediocreFusion gates = *)
+  (*         let *)
+  (*             (* Create empty cost array *) *)
+  (*             val costArray = computeCosts gates (Seq.singleton((0,0))) 1 *)
+
+  (*             val _ = print("Cost array:\n ") *)
+  (*             val _ = printSeq costArray *)
+  (*             fun loop gates i = *)
+  (*                 if i < (Seq.length gates) *)
+  (*                 then *)
+  (*                     let *)
+  (*                         (* val qstr = Seq.toString (Int.toString) (G.getGateArgs (Seq.nth gates i)) *) *)
+  (*                         val qstr = String.concatWith ", " (List.map (Int.toString) (G.getGateArgs (Seq.nth gates i)) ) *)
+  (*                         val _ = print("Qubits touched: " ^ qstr ^ "\n") *)
+  (*                         val _ = print("Num qubits touched: " ^ Int.toString(G.numUniqueQubitsTouched (Seq.nth gates i)) ^ "\n") *)
+  (*                         fun innerloop defns j = *)
+  (*                             if j < (Seq.length defns) *)
+  (*                             then *)
+  (*                                 let *)
+  (*                                     val defn = Seq.nth defns j *)
+  (*                                     val stringified: string = GateDefn.toString defn (fn j => Int.toString(j)) *)
+  (*                                     val _ = print(stringified ^ " | ") *)
+  (*                                 in *)
+  (*                                     innerloop defns (j+1) *)
+  (*                                 end *)
+  (*                             else *)
+  (*                                 () *)
+  (*                         val _ = print("(") *)
+  (*                         val _ = innerloop (#defn (Seq.nth gates i)) 0 *)
+  (*                         val _ = print(" maxBranchFactor: " ^ Int.toString(#maxBranchingFactor (Seq.nth gates i))) *)
+  (*                         val _ = print(")\n") *)
+  (*                     in *)
+  (*                         loop gates (i + 1) *)
+  (*                     end *)
+  (*                 else *)
+  (*                     () *)
+  (*             val _ = loop (fuseGates gates costArray) 0 *)
+  (*         in *)
+  (*             fuseGates gates costArray *)
+  (*         end *)
+  end

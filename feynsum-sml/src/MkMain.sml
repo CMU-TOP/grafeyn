@@ -73,13 +73,11 @@ structure K = Kernelize (structure B = B
   Make a new file for this (PP struct shouldnt contain fxn for fusion)
   *)
   fun main ((inputName, circuit): string * DataFlowGraph.t) =
-    let val numQubits = #numQubits circuit
-        val _ = print ("max branching stride = " ^ Int.toString maxBranchingStride ^ "\n")
-        val gates = Seq.map (G.fromGateDefn {numQubits = numQubits}) (#gates circuit)
+    let val _ = print ("max branching stride = " ^ Int.toString maxBranchingStride ^ "\n")
         (*val sched' = DataFlowGraphUtil.scheduleWithOracle circuit (fn i => #maxBranchingFactor (Seq.nth gates i) > 1) (sched circuit) disableFusion maxBranchingStride
         val kernels = Seq.map (G.fuse o Seq.map (Seq.nth gates)) sched'*)
         (* val kernels = PP.dumbFusion gates *)
-        val kernels = K.mediocreFusion gates
+        val kernels = K.performGateFusion circuit
         val initState = SST.singleton (B.zeros, C.one)
         val { state, numEdges } = PP.applyAllOld (kernels, initState)
         val (fp, tm) = Util.getTime (fn _ => F.fingerprint (PP.unsafeViewContents state))
