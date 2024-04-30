@@ -21,7 +21,8 @@ struct
 
     fun cost (g: G.t) =
         #maxBranchingFactor g
-        (* + Helpers.exp2(G.numUniqueQubitsTouched g) *)
+        + 2 * G.numUniqueQubitsTouched g
+        (* + Seq.length (#defn g) *)
 
     fun printHelper seq i =
         if i >= Seq.length seq
@@ -38,19 +39,34 @@ struct
     fun printSeq (seq: (int*int) Seq.t) =
         printHelper seq 0
 
-    fun minIndex (seq: int Seq.t) (start: int) =
+    fun minIndexR (seq: int Seq.t) (start: int) =
         if start >= (Seq.length seq)-1
         then
             start
         else
             let
-                val other = minIndex seq (start+1)
+                val other = minIndexR seq (start+1)
             in
                 if Seq.nth seq other = Int.min((Seq.nth seq start), (Seq.nth seq other))
                 then
                     other
                 else
                     start
+            end
+
+    fun minIndexL (seq: int Seq.t) (start: int) =
+        if start >= (Seq.length seq)-1
+        then
+            start
+        else
+            let
+                val other = minIndexL seq (start+1)
+            in
+                if Seq.nth seq start = Int.min((Seq.nth seq start), (Seq.nth seq other))
+                then
+                    start
+                else
+                    other
             end
 
     (* Assume costArray is pairs of (index, cost) *)
@@ -83,7 +99,7 @@ struct
                                                              prior_cost + (cost fused_gate)
                                                          end
                                                      ) num_gates
-                            val bestIndex = minIndex costs 0
+                            val bestIndex = minIndexR costs 0
                             (* val _ = print(" cost array: \n  ") *)
                             (* val _ = printSeq (Seq.tabulate (fn j => (j, Seq.nth costs j)) (Seq.length costs)) *)
                             (* val _ = print(" Min index: " ^ Int.toString(bestIndex) ^ "\n") *)
@@ -95,7 +111,7 @@ struct
                                                          computeCostsFixed (Seq.append (gates, Seq.singleton(Seq.nth globalGateOrdering (Seq.nth frontier i))))
                                                      )
                                                      (Seq.length frontier)
-                    val frontierChoiceIndex = minIndex (Seq.map (fn pair => #2 pair) orderingCosts) 0
+                    val frontierChoiceIndex = minIndexL (Seq.map (fn pair => #2 pair) orderingCosts) 0
                     val bestGateIndex = Seq.nth frontier frontierChoiceIndex
 
                     val _ = print("Iter " ^ Int.toString(num_gates) ^ ": Best gate=" ^ Int.toString(bestGateIndex) ^ "\n  costs:")
@@ -143,6 +159,8 @@ struct
 
             val _ = print("Cost array:\n ")
             val _ = printSeq costArray
+            val _ = print("\n\n")
+
             (* Print each kernel *)
             fun loop gates i =
                 if i < (Seq.length gates)
@@ -150,8 +168,8 @@ struct
                     let
                         val _ = print("Kernel " ^ Int.toString(i) ^ ":\n")
                         val qstr = String.concatWith ", " (List.map (Int.toString) (G.getGateArgs (Seq.nth gates i)) )
-                        val _ = print("Qubits touched: " ^ qstr ^ "\n")
-                        val _ = print("Unique qubits touched: " ^ Int.toString(G.numUniqueQubitsTouched (Seq.nth gates i)) ^ "\n")
+                        val _ = print("  Qubits touched: " ^ qstr ^ "\n")
+                        val _ = print("  Unique qubits touched: " ^ Int.toString(G.numUniqueQubitsTouched (Seq.nth gates i)) ^ "\n")
                         (* Print gates within each kernel *)
                         fun innerloop defns j =
                             if j < (Seq.length defns)
@@ -159,16 +177,17 @@ struct
                                 let
                                     val defn = Seq.nth defns j
                                     val stringified: string = GateDefn.toString defn (fn j => Int.toString(j))
-                                    val _ = print(stringified ^ " | ")
+                                    val _ = print(" " ^ stringified ^ " |")
                                 in
                                     innerloop defns (j+1)
                                 end
                             else
                                 ()
-                        val _ = print("(")
+                        val _ = print("  (")
                         val _ = innerloop (#defn (Seq.nth gates i)) 0
-                        val _ = print(" maxBranchFactor: " ^ Int.toString(#maxBranchingFactor (Seq.nth gates i)))
-                        val _ = print(")\n\n")
+                        val _ = print("| maxBranchFactor: " ^ Int.toString(#maxBranchingFactor (Seq.nth gates i)))
+                        val _ = print(" | cost: " ^ Int.toString(cost (Seq.nth gates i)))
+                        val _ = print(" )\n\n")
                     in
                         loop gates (i + 1)
                     end
