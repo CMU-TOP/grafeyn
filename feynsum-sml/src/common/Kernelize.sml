@@ -9,7 +9,7 @@ sig
     sharing G.C = C
 
     val cost: G.t -> int (* TODO: Delete this, just wanted to check types *)
-    val computeCosts: DataFlowGraph.t -> DataFlowGraphUtil.state -> (int * int) Seq.t -> int -> (G.t Seq.t * (int * int) Seq.t) (* TODO: Delete this, just wanted to check types *)
+    val computeCosts: DataFlowGraph.t -> DataFlowGraphUtil.state -> (int * int) Seq.t -> G.t Seq.t -> (G.t Seq.t * (int * int) Seq.t) (* TODO: Delete this, just wanted to check types *)
     val performGateFusion: DataFlowGraph.t -> G.t Seq.t
 end =
 struct
@@ -21,6 +21,7 @@ struct
 
     fun cost (g: G.t) =
         #maxBranchingFactor g
+        (* + Helpers.exp2(G.numUniqueQubitsTouched g) *)
 
     fun printHelper seq i =
         if i >= Seq.length seq
@@ -53,34 +54,61 @@ struct
             end
 
     (* Assume costArray is pairs of (index, cost) *)
-    fun computeCosts (circuit: DataFlowGraph.t) (state: U.state) (costArray: (int * int) Seq.t) (num_gates: int) =
+    fun computeCosts (circuit: DataFlowGraph.t) (state: U.state) (costArray: (int * int) Seq.t) (gates: G.t Seq.t) =
         let
+            val num_gates = Seq.length(costArray)
+
+            (* TODO: Reorganize this *)
             val numQubits = #numQubits circuit
-            val gates = Seq.map (G.fromGateDefn {numQubits = numQubits}) (#gates circuit)
+            val globalGateOrdering = Seq.map (G.fromGateDefn {numQubits = numQubits}) (#gates circuit)
 
             val frontier = U.frontier state
+            val _ = print("Frontier:\n ")
+            val _ = print(Seq.toString (Int.toString) frontier)
+            val _ = print("\n")
         in
             (* Exit once frontier is empty *)
-            if Seq.length (frontier) > 0 andalso num_gates <= Seq.length gates
+            if Seq.length (frontier) > 0
             then
                 let
-                    (* val costs = Seq.tabulate (fn i => (Seq.nth costArray i) + (cost (Seq.nth gates i))) i *)
-                    val _ = print("computeCosts, num_gates=" ^ Int.toString(num_gates) ^ "\n")
-                    val costs = Seq.tabulate (fn j =>
-                                                 let
-                                                     val fused_gate = G.fuse(Seq.subseq gates (j, num_gates-j))
-                                                     val tuple as (prior_index, prior_cost) = Seq.nth costArray j
-                                                 in
-                                                     prior_cost + (cost fused_gate)
-                                                 end
-                                             ) num_gates
-                    val bestIndex = minIndex costs 0
-                    val _ = print(" cost array: \n  ")
-                    val _ = printSeq (Seq.tabulate (fn j => (j, Seq.nth costs j)) (Seq.length costs))
-                    val _ = print(" Min index: " ^ Int.toString(bestIndex) ^ "\n")
-                    val newCostArray = Seq.append(costArray, (Seq.singleton (bestIndex, (Seq.nth costs bestIndex))))
+                    (* Calculate ideal costs given static gate order, and return a pair for the best new addition *)
+                    fun computeCostsFixed (gateOrder: G.t Seq.t) =
+                        let
+                            (* val _ = print("computeCosts, num_gates=" ^ Int.toString(num_gates) ^ "\n") *)
+                            val costs = Seq.tabulate (fn j =>
+                                                         let
+                                                             val fused_gate = G.fuse(Seq.subseq gateOrder (j, num_gates-j))
+                                                             val tuple as (prior_index, prior_cost) = Seq.nth costArray j
+                                                         in
+                                                             prior_cost + (cost fused_gate)
+                                                         end
+                                                     ) num_gates
+                            val bestIndex = minIndex costs 0
+                            (* val _ = print(" cost array: \n  ") *)
+                            (* val _ = printSeq (Seq.tabulate (fn j => (j, Seq.nth costs j)) (Seq.length costs)) *)
+                            (* val _ = print(" Min index: " ^ Int.toString(bestIndex) ^ "\n") *)
+                        in
+                            (bestIndex, (Seq.nth costs bestIndex))
+                        end
+
+                    val orderingCosts = Seq.tabulate (fn i =>
+                                                         computeCostsFixed (Seq.append (gates, Seq.singleton(Seq.nth globalGateOrdering (Seq.nth frontier i))))
+                                                     )
+                                                     (Seq.length frontier)
+                    val frontierChoiceIndex = minIndex (Seq.map (fn pair => #2 pair) orderingCosts) 0
+                    val bestGateIndex = Seq.nth frontier frontierChoiceIndex
+
+                    val _ = print("Iter " ^ Int.toString(num_gates) ^ ": Best gate=" ^ Int.toString(bestGateIndex) ^ "\n  costs:")
+                    val _ = print(Seq.toString (Int.toString) (Seq.map (fn pair => #2 pair) orderingCosts))
+                    val _ = print("\n\n")
+
+                    (* Lock in choice of gate *)
+                    val _ = U.visit circuit bestGateIndex state
+                    val newGates = Seq.append (gates, Seq.singleton(Seq.nth globalGateOrdering (Seq.nth frontier frontierChoiceIndex)))
+
+                    val newCostArray = Seq.append(costArray, Seq.singleton(computeCostsFixed newGates))
                 in
-                    computeCosts circuit state newCostArray (num_gates+1)
+                    computeCosts circuit state newCostArray newGates
                 end
             else
                 (gates, costArray)
@@ -108,15 +136,10 @@ struct
 
     fun performGateFusion circuit =
         let
-            (* Create empty cost array *)
-            val (gates, costArray) = computeCosts circuit (U.initState circuit) (Seq.singleton((0,0))) 1
+            (* Settle on ideal gate ordering, and find optimal costs for this ordering *)
+            val (gates, costArray) = computeCosts circuit (U.initState circuit) (Seq.singleton((0,0))) (Seq.empty())
 
-            val dag = U.initState circuit
-
-            val frontier = U.frontier dag
-
-            val _ = print("Frontier:\n ")
-            val _ = print(Seq.toString(Int.toString) frontier)
+            (* NOTE: Everything below this point is just printing *)
 
             val _ = print("Cost array:\n ")
             val _ = printSeq costArray
@@ -153,6 +176,7 @@ struct
                     ()
             val _ = loop (fuseGates gates costArray) 0
         in
+            (* Obtain optimal kernelization by backtracking through cost array *)
             fuseGates gates costArray
         end
 
