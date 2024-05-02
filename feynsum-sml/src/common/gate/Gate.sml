@@ -40,6 +40,14 @@ struct
 
   type qubit_idx = int
 
+  (* structure QubitInt :> ORD_KEY = struct *)
+  (*   type ord_key = qubit_idx *)
+  (*   val compare = Int.compare *)
+  (*   (* fun compare (x, y) = Int.compare (x, y) *) *)
+  (* end *)
+
+  (* structure QubitSet = BinarySetFn(QubitInt) *)
+
   type gate = { push: (B.t -> unit) -> (B.t -> unit),
                 pull: (B.t -> C.t) -> (B.t -> C.t),
                 maxBranchingFactor: int,
@@ -110,41 +118,99 @@ struct
           numQubits = numQubits1 }
       end*)
 
-  fun getGateArgsHelper (gatedefs: GateDefn.t Seq.t) =
+  (* fun getGateArgsHelper (gatedefs: GateDefn.t Seq.t) = *)
+  (*     let *)
+  (*       fun convertToInt (x: QubitSet.item): qubit_idx = *)
+  (*           x *)
+
+  (*       fun loop i set = *)
+  (*           if i < Seq.length gatedefs *)
+  (*           then *)
+  (*             let *)
+  (*               val defn = Seq.nth gatedefs i *)
+  (*               val gateArgs = QubitSet.fromList (GateDefn.getGateArgs defn) *)
+  (*             in *)
+  (*               QubitSet.union set gateArgs *)
+  (*             end *)
+  (*           else *)
+  (*             set *)
+  (*     in *)
+  (*       QubitSet.toList (loop 0 QubitSet.empty) *)
+  (*     end *)
+
+  fun getGateArgsHelper (gatedefs: GateDefn.t Seq.t) (numQubits: int) =
       (* GateDefn.getGateArgs (Seq.nth (#defn g) 0) *)
       let
-        (* TODO: Surely there's a more idiomatic way to compute this *)
-        fun loop i list =
+        val touched = Array.array (numQubits, false)
+        fun loop i =
             if i < Seq.length gatedefs
             then
               let
                 val defn = Seq.nth gatedefs i
-                val gateArgs = GateDefn.getGateArgs defn
-                fun innerloop j noDupesList =
-                    if j < List.length gateArgs
-                    then
-                      let
-                        fun filterFun x =
-                            List.all (fn y => x <> y) noDupesList
-                        val toAppend = List.filter (filterFun) gateArgs
-                        val newNoDupesList = noDupesList @ toAppend
-                      in
-                        innerloop (j+1) newNoDupesList
-                      end
-                    else
-                      noDupesList
-                val newlist = innerloop 0 list
+                fun innerloop [] = ()
+                  | innerloop (q::qs) =
+                    let
+                      val _ = Array.update(touched, q, true)
+                    in
+                      innerloop qs
+                    end
+                val _ = innerloop (GateDefn.getGateArgs defn)
               in
-                loop (i+1) newlist
+                loop (i+1)
               end
             else
-              list
+              ()
+        val _ = loop 0
+
+        fun getTrue i =
+            if i < Array.length touched
+            then
+              if Array.sub (touched, i)
+              then
+                i :: (getTrue (i+1))
+              else
+                getTrue (i+1)
+            else
+              []
       in
-        loop 0 []
+        getTrue 0
       end
 
+  (* fun getGateArgsHelper (gatedefs: GateDefn.t Seq.t) = *)
+  (*     (* GateDefn.getGateArgs (Seq.nth (#defn g) 0) *) *)
+  (*     let *)
+  (*       (* TODO: Surely there's a more idiomatic way to compute this *) *)
+  (*       fun loop i list = *)
+  (*           if i < Seq.length gatedefs *)
+  (*           then *)
+  (*             let *)
+  (*               val defn = Seq.nth gatedefs i *)
+  (*               val gateArgs = GateDefn.getGateArgs defn *)
+  (*               fun innerloop j noDupesList = *)
+  (*                   if j < List.length gateArgs *)
+  (*                   then *)
+  (*                     let *)
+  (*                       fun filterFun x = *)
+  (*                           List.all (fn y => x <> y) noDupesList *)
+  (*                       val toAppend = List.filter (filterFun) gateArgs *)
+  (*                       val newNoDupesList = noDupesList @ toAppend *)
+  (*                     in *)
+  (*                       innerloop (j+1) newNoDupesList *)
+  (*                     end *)
+  (*                   else *)
+  (*                     noDupesList *)
+  (*               val newlist = innerloop 0 list *)
+  (*             in *)
+  (*               loop (i+1) newlist *)
+  (*             end *)
+  (*           else *)
+  (*             list *)
+  (*     in *)
+  (*       loop 0 [] *)
+  (*     end *)
+
   fun getGateArgs (g: gate) =
-      getGateArgsHelper(#defn g)
+      getGateArgsHelper(#defn g) (#numQubits g)
 
   fun numUniqueQubitsTouched (g: gate) =
       List.length (getGateArgs g)
@@ -175,7 +241,7 @@ struct
           val maxIntVal = Helpers.exp2(maxHandlableQubits)
 
           val allDefns = Seq.flatten(Seq.map (fn g => (#defn g)) gs)
-          val numUnique = List.length (getGateArgsHelper allDefns)
+          val numUnique = List.length (getGateArgsHelper allDefns numQubits)
           val cap = if numUnique >= maxHandlableQubits
                     then
                       maxIntVal

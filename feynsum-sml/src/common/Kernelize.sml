@@ -19,10 +19,34 @@ struct
                        structure C = C)
     structure U = DataFlowGraphUtil
 
+    (* fun cost (g: G.t) = *)
+    (*     let *)
+    (*         val defns = #defn g *)
+    (*         val mbfs = Seq.map (GateDefn.maxBranchingFactor) defns *)
+
+    (*         val partials = Seq.tabulate *)
+    (*                 (fn i => *)
+    (*                     (Seq.reduce op* 1 *)
+    (*                                 (Seq.subseq mbfs (0, i+1))) *)
+    (*                 ) *)
+    (*                 (Seq.length defns) *)
+
+    (*         val _ = print(Seq.toString (Int.toString) partials) *)
+    (*         val _ = print("\n") *)
+    (*     in *)
+    (*         Seq.reduce op+ 0 ( *)
+    (*             partials *)
+    (*         ) *)
+    (*     end *)
+
     fun cost (g: G.t) =
         #maxBranchingFactor g
-        + 2 * G.numUniqueQubitsTouched g
+        + 2*G.numUniqueQubitsTouched g
         (* + Seq.length (#defn g) *)
+
+    (* fun cost (g: G.t) = *)
+    (*     #maxBranchingFactor g *)
+    (*     * Seq.length (#defn g) *)
 
     fun printHelper seq i =
         if i >= Seq.length seq
@@ -72,7 +96,10 @@ struct
     (* Assume costArray is pairs of (index, cost) *)
     fun computeCosts (circuit: DataFlowGraph.t) (state: U.state) (costArray: (int * int) Seq.t) (gates: G.t Seq.t) =
         let
-            val num_gates = Seq.length(costArray)
+            val numGates = Seq.length(costArray)
+
+            (* TODO: Move this somewhere better *)
+            val maxKernelSize = 15
 
             (* TODO: Reorganize this *)
             val numQubits = #numQubits circuit
@@ -90,21 +117,26 @@ struct
                     (* Calculate ideal costs given static gate order, and return a pair for the best new addition *)
                     fun computeCostsFixed (gateOrder: G.t Seq.t) =
                         let
-                            (* val _ = print("computeCosts, num_gates=" ^ Int.toString(num_gates) ^ "\n") *)
-                            val costs = Seq.tabulate (fn j =>
+                            (* val _ = print("computeCosts, numGates=" ^ Int.toString(numGates) ^ "\n") *)
+                            val iters = Int.min(numGates, maxKernelSize)
+                            val costs = Seq.tabulate (fn j => (* j represents lookbehind *)
                                                          let
-                                                             val fused_gate = G.fuse(Seq.subseq gateOrder (j, num_gates-j))
-                                                             val tuple as (prior_index, prior_cost) = Seq.nth costArray j
+                                                             val fused_gate = G.fuse(
+                                                                     Seq.subseq
+                                                                     gateOrder
+                                                                     ((numGates-j-1), j+1))
+                                                             val tuple as (prior_index, prior_cost) = Seq.nth costArray (numGates-j-1)
                                                          in
                                                              prior_cost + (cost fused_gate)
                                                          end
-                                                     ) num_gates
-                            val bestIndex = minIndexR costs 0
+                                                     ) iters
+                            val bestFuseCostIndex = minIndexL costs 0
+                            val bestCutIndex = numGates-bestFuseCostIndex-1
                             (* val _ = print(" cost array: \n  ") *)
                             (* val _ = printSeq (Seq.tabulate (fn j => (j, Seq.nth costs j)) (Seq.length costs)) *)
-                            (* val _ = print(" Min index: " ^ Int.toString(bestIndex) ^ "\n") *)
+                            (* val _ = print(" Best cut index: " ^ Int.toString(bestCutIndex) ^ "\n") *)
                         in
-                            (bestIndex, (Seq.nth costs bestIndex))
+                            (bestCutIndex, (Seq.nth costs bestFuseCostIndex))
                         end
 
                     val orderingCosts = Seq.tabulate (fn i =>
@@ -114,7 +146,7 @@ struct
                     val frontierChoiceIndex = minIndexL (Seq.map (fn pair => #2 pair) orderingCosts) 0
                     val bestGateIndex = Seq.nth frontier frontierChoiceIndex
 
-                    val _ = print("Iter " ^ Int.toString(num_gates) ^ ": Best gate=" ^ Int.toString(bestGateIndex) ^ "\n  costs:")
+                    val _ = print("Iter " ^ Int.toString(numGates) ^ ": Best gate=" ^ Int.toString(bestGateIndex) ^ "\n  costs:")
                     val _ = print(Seq.toString (Int.toString) (Seq.map (fn pair => #2 pair) orderingCosts))
                     val _ = print("\n\n")
 
