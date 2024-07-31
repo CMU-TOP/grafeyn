@@ -1,2 +1,2 @@
-# Feynman Path Based Quantum Simulator
+# GraFeyn: Efficient Parallel Sparse Simulation of Quantum Circuits
 
