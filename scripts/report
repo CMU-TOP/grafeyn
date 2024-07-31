@@ -146,16 +146,44 @@ def most_recent_rows(data, simulator, threads, inp):
     return None
 
 
+def most_recent_successful_rows(data, simulator, threads, inp):
+  try:
+    rows = [
+      row for row in data
+      if check_value(row, 'simulator', simulator) and
+        check_value(row, 'threads', threads) and
+        check_value(row, 'input', inp) and
+        check_value(row, 'returncode', 0)
+    ]
+    return rows[-10:]
+  except:
+    print(f"[WARN] couldn't find successful rows for: simulator={simulator} threads={threads} input={inp}")
+    return None
+
+def most_recent_successful_row(data, simulator, threads, inp):
+  try:
+    rows = [
+      row for row in data
+      if check_value(row, 'simulator', simulator) and
+        check_value(row, 'threads', threads) and
+        check_value(row, 'input', inp) and
+        check_value(row, 'returncode', 0)
+    ]
+    return rows[-1]
+  except:
+    print(f"[WARN] couldn't find a successful row for: simulator={simulator} threads={threads} input={inp}")
+    return None
+
 def get_total_nonzero_count(data, inp):
   try:
-    cs = parse_nonzero_counts(most_recent_row(data, 'feynsum-sml', None, inp))
+    cs = parse_nonzero_counts(most_recent_successful_row(data, 'feynsum-sml', None, inp))
     return int(sum(cs))
   except:
     return None
 
 def get_avg_density(data, inp):
   try:
-    row = most_recent_row(data, 'feynsum-sml', None, inp)
+    row = most_recent_successful_row(data, 'feynsum-sml', None, inp)
     cs = parse_nonzero_counts(row)
     gs = parse_num_gates(row)
     n = parse_num_qubits(row)
@@ -165,30 +193,46 @@ def get_avg_density(data, inp):
 
 def get_max_density(data, inp):
   try:
-    row = most_recent_row(data, 'feynsum-sml', None, inp)
+    row = most_recent_successful_row(data, 'feynsum-sml', None, inp)
     cs = parse_nonzero_counts(row)
     n = parse_num_qubits(row)
     return max(cs) / (2.0**n)
   except Exception as e:
     return None
 
+def get_max_nonzero_count(data, inp):
+  try:
+    row = most_recent_successful_row(data, 'feynsum-sml', None, inp)
+    cs = parse_nonzero_counts(row)
+    return max(cs)
+  except:
+    return None
+
+def get_avg_nonzero_count(data, inp):
+  try:
+    row = most_recent_successful_row(data, 'feynsum-sml', None, inp)
+    cs = parse_nonzero_counts(row)
+    return sum(cs) / len(cs)
+  except:
+    return None
+
 def get_num_qubits(data, inp):
-  return parse_num_qubits(most_recent_row(data, "feynsum-sml", None, inp))
+  return parse_num_qubits(most_recent_successful_row(data, "feynsum-sml", None, inp))
 def get_num_gates(data, inp):
-  return parse_num_gates(most_recent_row(data, "feynsum-sml", None, inp))
+  return parse_num_gates(most_recent_successful_row(data, "feynsum-sml", None, inp))
 def get_time(data, simulator, threads, inp):
-  return parse_time(most_recent_row(data, simulator, threads, inp))
+  return parse_time(most_recent_successful_row(data, simulator, threads, inp))
 def get_avg_time(data, simulator, threads, inp):
   try:
-    tms = [parse_time(x) for x in most_recent_rows(data, simulator, threads, inp)]
+    tms = [parse_time(x) for x in most_recent_successful_rows(data, simulator, threads, inp)]
     return sum(tms) / len(tms)
   except:
     return None
 def get_maxrss(data, simulator, threads, inp):
-  return parse_maxrss(most_recent_row(data, simulator, threads, inp))
+  return parse_maxrss(most_recent_successful_row(data, simulator, threads, inp))
 def get_avg_maxrss(data, simulator, threads, inp):
   try:
-    rs = [parse_maxrss(x) for x in most_recent_rows(data, simulator, threads, inp)]
+    rs = [parse_maxrss(x) for x in most_recent_successful_rows(data, simulator, threads, inp)]
     return sum(rs) / len(rs)
   except:
     return None
@@ -256,7 +300,8 @@ def makeline(row, widths, align):
       ln = w[:len(w)/2] + s + w[len(w)/2:]
     else:
       raise ValueError("invalid formatter: {}".format(aa))
-    bits.append(ln)
+    # bits.append(ln)
+    bits.append(ln + "&")
     i = j
   return (" " * delimWidth).join(bits)
 
@@ -418,24 +463,91 @@ main_table()
 # ===========================================================================
 
 
+ordering = [
+  "adder_n28.qasm",
+  "adder_n433.qasm",
+  "multiplier_n45.qasm",
+  "multiplier_n400.qasm",
+  "bv_n30.qasm",
+  "bv_n70.qasm",
+  "bv_n280.qasm",
+  "cat_n35.qasm",
+  "cat_n260.qasm",
+  "ghz_n40.qasm",
+  "ghz_n255.qasm",
+  "dj_indep_qiskit_30.qasm",
+  "dj_indep_qiskit_62.qasm",
+  "dj_indep_qiskit_130.qasm",
+  "qram_n20.qasm",
+  "knn_n31.qasm",
+  "qft_n29.qasm",
+  "ising_n26.qasm",
+  "ising_n34.qasm",
+  "dnn_n33_transpiled.qasm"
+]
+
+
+def rounded(x):
+  if x is None:
+    return None
+  if x <= 0.01:
+    return round(x, 4)
+  if x <= 0.1:
+    return round(x, 4)
+  if x <= 1.0:
+    return round(x, 3)
+  if x <= 10.0:
+    return round(x, 2)
+  if x <= 100.0:
+    return round(x, 1)
+  else:
+    return round(x)
+
+
+
+def fmt_float(x):
+  if x <= 0.01:
+    return "{:.4f}".format(x)
+  if x <= 0.1:
+    return "{:.4f}".format(x)
+  if x <= 1.0:
+    return "{:.3f}".format(x)
+  if x <= 10.0:
+    return "{:.2f}".format(x)
+  if x <= 100.0:
+    return "{:.1f}".format(x)
+  else:
+    return "{}".format(round(x))
+
+
+def fmt(x):
+  if x is None:
+    return '--'
+  if type(x) == str:
+    return x
+  elif type(x) == float:
+    return fmt_float(x)
+  else:
+    return str(x)
+
+
 def improvement_table():
   simulator_cols = [s for s in simulator_names if s != "feynsum-sml"]
-  h1 = ['', '', '', '--- density ---', None] + [x for s in simulator_cols for x in [f'- vs {s} -'.center(17, '-'), None]]
-  h2 = ['input', 'qubits', 'gates', 'avg', 'max'] + [x for s in simulator_cols for x in ['time', 'mem']]
+  h1 = ['', '', '', '--- density ---', None] + ['--- nonzeros ---'] + ['--- GraFeyn ---', None] + ['--- Qiskit absolute ---', None] + ['--- Qiskit relative ---', None] + ['--- QSim absolute ---', None] + ['--- QSim relative ---', None]
+  h2 = ['input', 'qubits', 'gates', 'avg', 'max', 'max'] + ['time','mem'] + ['time','mem'] + ['time','mem'] + ['time','mem'] + ['time','mem']
   tt = [h1, h2, "="]
-  for inp in inputs_sorted_by_avg_density:
+  for inp in ordering:
     stats = {
       s: {
-        'ret': get_returncode(data, s, max_threads, inp),
+        'successes': most_recent_successful_rows(data, s, max_threads, inp),
         'time': get_avg_time(data, s, max_threads, inp),
         'mem': get_avg_maxrss(data, s, max_threads, inp)
       }
       for s in simulator_names
     }
     def ok(s, k):
-      return stats[s]['ret'] == 0 and stats[s][k] is not None
-    keep = \
-      all(ok('feynsum-sml', k) for k in ['time','mem'])
+      return len(stats[s]['successes']) >= 10 and stats[s][k] is not None
+    keep = all(ok('feynsum-sml', k) for k in ['time','mem'])
     if not keep:
       continue
 
@@ -444,15 +556,21 @@ def improvement_table():
       get_num_qubits(data, inp),
       get_num_gates(data, inp),
       pct(get_avg_density(data, inp)),
-      pct(get_max_density(data, inp))
+      pct(get_max_density(data, inp)),
+      # get_avg_nonzero_count(data, inp),
+      get_max_nonzero_count(data, inp)
     ]
+
+    row += [ x for s in ['feynsum-sml'] for x in [stats[s]['time'], stats[s]['mem']] ]
 
     row += [
       x
       for s in simulator_cols
       for x in [
-        safediv(stats[s]['time'], stats['feynsum-sml']['time']),
-        safediv(stats[s]['mem'], stats['feynsum-sml']['mem'])
+        stats[s]['time'],
+        stats[s]['mem'],
+        safediv(rounded(stats[s]['time']), rounded(stats['feynsum-sml']['time'])),
+        safediv(rounded(stats[s]['mem']), rounded(stats['feynsum-sml']['mem']))
       ]
     ]
     

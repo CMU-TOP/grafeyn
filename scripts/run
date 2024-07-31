@@ -5,7 +5,6 @@ GEN=scripts/gencmds
 RUN=scripts/runcmds
 
 NOW=$(date '+%y%m%d-%H%M%S')
-#NOW="231017-035001"
 mkdir -p $ROOT/results
 RESULTS=$ROOT/results/$NOW
 

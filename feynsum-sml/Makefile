@@ -1,10 +1,5 @@
 MPL_COMPILER=mpl
-# MPL_COMPILER=/home/ec2-user/proj/mpl/em/build/bin/mpl
-# MPL_COMPILER?=/usr0/home/swestric/proj/mpl/em/build/bin/mpl
-# MPL_COMPILER=/usr0/home/swestric/proj/mpl/sam-heartbeat/build/bin/mpl -mlb-path-var 'PICK_FJ greedy-work-amortized'
-
-MPL=$(MPL_COMPILER) # -disable-pass splitTypes1 -disable-pass splitTypes2
-
+MPL=$(MPL_COMPILER)
 FLAGS=-verbose 1 -default-type int64 -default-type word64 -cc-opt "-O3 -march=native"
 
 main.mpl: phony
