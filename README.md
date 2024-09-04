@@ -86,7 +86,7 @@ Here's an example on a large sparse circuit. This circuit in particular is
 a 280-qubit instance of the
 [Bernstein-Vazirani algorithm](https://en.wikipedia.org/wiki/Bernstein%E2%80%93Vazirani_algorithm).
 
-First, we download `bv_n280.qasm` from [QASMBench](https://github.com/pnnl/QASMBench):
+First, we download [`bv_n280.qasm`](https://raw.githubusercontent.com/pnnl/QASMBench/master/large/bv_n280/bv_n280.qasm) from [QASMBench](https://github.com/pnnl/QASMBench):
 ```
 $ wget https://raw.githubusercontent.com/pnnl/QASMBench/master/large/bv_n280/bv_n280.qasm
 ```
