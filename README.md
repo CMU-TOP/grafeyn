@@ -22,10 +22,10 @@ given to GraFeyn should have the following form:
 ```openqasm
 OPENQASM 2.0;
 include "qelib1.inc";
-// sequence of qreg declarations
+// sequence of qreg declarations (example with 2 qubits shown here)
 qreg q[2];
 ...
-// sequence of gate applications
+// sequence of gate applications (a few example gates shown here)
 h q[0];
 cx q[0], q[1];
 ...
@@ -58,7 +58,7 @@ be **big**.)
       - If you have trouble with MPL, you can instead use
       [MLton](https://github.com/mlton/mlton). The performance with MLton will
       be slower due to lack of parallelism. (MLton is a robust, mature compiler,
-      with excellent sequential performance but no support for parallelism.)
+      with excellent sequential performance but no support for multi-core execution.)
   - [`smlpkg`](https://github.com/diku-dk/smlpkg)
   - For our benchmarking scripts, you will need Python 3 and [`jq`](https://jqlang.github.io/jq/)
 
@@ -67,13 +67,15 @@ be **big**.)
 To build and run using MPL (with parallel multi-core execution):
 ```bash
 $ cd feynsum-sml
-$ make main.mpl  # this will take a minute
+$ (cd src && smlpkg sync) # only have to do this once
+$ make main.mpl           # this will take a minute
 $ ./main.mpl @mpl procs <NUMBER_OF_PROCESSORS> -- -input FILE.qasm
 ```
 
 Alternatively, you can use MLton. (Sequential execution only; no multi-core speedup.)
 ```bash
 $ cd feynsum-sml
+$ (cd src && smlpkg sync) # only have to do this once
 $ make main.mlton
 $ ./main.mlton -input FILE.qasm
 ```
