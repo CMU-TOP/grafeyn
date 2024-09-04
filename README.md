@@ -80,7 +80,7 @@ $ make main.mlton
 $ ./main.mlton -input FILE.qasm
 ```
 
-## Sample Execution
+## Example
 
 Here's an example on a large sparse circuit. This circuit in particular is
 a 280-qubit instance of the
